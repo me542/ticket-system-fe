@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class ApiRegister {
-  // 🔥 Change this to your backend URL
+
   static const String baseUrl = 'http://localhost:8080/api/user';
 
   static Future<dynamic> register({
@@ -12,7 +12,7 @@ class ApiRegister {
     required String lastName,
     required String email,
     required String position,
-    //required String role,
+
   }) async {
     final url = Uri.parse('$baseUrl/register');
 
@@ -23,7 +23,7 @@ class ApiRegister {
       "last_name": lastName,
       "email": email,
       "position": position,
-      //"role": role,
+
     });
 
     try {

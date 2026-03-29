@@ -1,17 +1,12 @@
-// lib/core/services/api_login.dart
-
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class ApiLogin {
-  // 🔥 Replace this with your backend login endpoint
+
   static const String loginUrl = 'http://localhost:8080/api/user/login';
 
-  // Optional: Store token after login
   static String? _token;
 
-  /// Login function
-  /// Returns a Map with "success" and "data" or "error"
   static Future<Map<String, dynamic>> login({
     required String username,
     required String password,
@@ -29,7 +24,6 @@ class ApiLogin {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
 
-        // Optional: store token if backend returns it
         if (data['token'] != null) {
           _token = data['token'];
         }
@@ -44,10 +38,8 @@ class ApiLogin {
     }
   }
 
-  /// Optional: Get stored token
   static String? get token => _token;
 
-  /// Optional: Clear stored token (logout)
   static void logout() {
     _token = null;
   }
