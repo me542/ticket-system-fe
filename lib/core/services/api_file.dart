@@ -1,61 +1,50 @@
-import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:file_picker/file_picker.dart';
 
-class ApiService {
-
-  static const String baseUrl = "http://localhost:8080/admin/list/all/tickets";
-
-
-  /// ✅ Create Ticket API
-  static Future<Map<String, dynamic>> createTicket({
+class ApiFileTicket {
+  static Future<bool> createTicket({
     required String subject,
+    required String ticketType,
     required String category,
-    required String institution,
-    required String tickettype,
+    required String organization,
+    required int priority,
     required String description,
-    required String purpose,
-    required String assignee,
-    required String priority,
-    required String endorser,
-    required String approver,
+    PlatformFile? file,
   }) async {
     try {
-      final url = Uri.parse("$baseUrl/create-ticket");
+      var uri = Uri.parse("http://localhost:8080/api/admin/list/all/tickets");
 
-      var request = http.MultipartRequest("POST", url);
+      var request = http.MultipartRequest("POST", uri);
 
-
+      // ✅ MATCH BACKEND EXACTLY
       request.fields['subject'] = subject;
+      request.fields['tickettype'] = ticketType;     // ✅ FIX
       request.fields['category'] = category;
-      request.fields['institution'] = institution;
-      request.fields['tikcettype'] = tickettype;
+      request.fields['institution'] = organization;  // ✅ FIX
+      request.fields['priority'] = priority.toString(); // ✅ FIX
       request.fields['description'] = description;
-      request.fields['purpose'] = purpose;
-      request.fields['assignee'] = assignee;
-      request.fields['priority'] = priority;
-      request.fields['endorser'] = endorser;
-      request.fields['approver'] = approver;
 
-      final response = await request.send();
-
-      final responseBody = await response.stream.bytesToString();
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        return {
-          "success": true,
-          "data": jsonDecode(responseBody),
-        };
-      } else {
-        return {
-          "success": false,
-          "message": responseBody,
-        };
+      // FILE
+      if (file != null && file.bytes != null) {
+        request.files.add(
+          http.MultipartFile.fromBytes(
+            'file', // make sure backend uses this
+            file.bytes!,
+            filename: file.name,
+          ),
+        );
       }
+
+      var response = await request.send();
+      var resBody = await response.stream.bytesToString();
+
+      print("STATUS: ${response.statusCode}");
+      print("BODY: $resBody");
+
+      return response.statusCode == 200;
     } catch (e) {
-      return {
-        "success": false,
-        "message": e.toString(),
-      };
+      print("ERROR: $e");
+      return false;
     }
   }
 }

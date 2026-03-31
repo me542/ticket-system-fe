@@ -27,7 +27,7 @@ class MyApp extends StatelessWidget {
       title: 'Ticket System',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
-      home: const MainShell(),
+      home: const LoginScreen(),
     );
   }
 }
