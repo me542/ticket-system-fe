@@ -1,21 +1,17 @@
 import 'package:flutter/material.dart';
+import '../core/services/api_login.dart';
 import '../data/app_theme.dart';
 import '../screens/loginscreen.dart';
 
+
 class AppSidebar extends StatelessWidget {
   final String currentRoute;
-  final String userName;
-  final String userRole;
-  final String userInitials;
   final int allTicketsCount;
   final Function(String) onNavigate;
 
   const AppSidebar({
     super.key,
     required this.currentRoute,
-    required this.userName,
-    required this.userRole,
-    required this.userInitials,
     required this.allTicketsCount,
     required this.onNavigate,
   });
@@ -112,67 +108,81 @@ class AppSidebar extends StatelessWidget {
 
           const Spacer(),
 
-          // User profile at bottom
-          Container(
-            margin: const EdgeInsets.all(12),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: AppTheme.surfaceElevated,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 16,
-                  backgroundColor: AppTheme.accent,
-                  child: Text(
-                    userInitials,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                    ),
+          // User profile at bottom using FutureBuilder
+          FutureBuilder(
+            future: Future.wait([
+              ApiLogin.getUsername(),
+              ApiLogin.getRole(),
+              ApiLogin.getInitials(),
+            ]),
+            builder: (context, AsyncSnapshot<List<String>> snapshot) {
+              if (!snapshot.hasData) {
+                return const Padding(
+                  padding: EdgeInsets.all(12),
+                  child: Center(
+                    child: CircularProgressIndicator(strokeWidth: 2),
                   ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        userName,
-                        style: const TextStyle(
-                          color: AppTheme.textPrimary,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      Text(
-                        userRole,
-                        style: const TextStyle(
-                          color: AppTheme.textSecondary,
-                          fontSize: 10,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.logout, size: 16, color: AppTheme.textSecondary),
-                  onPressed: () {
-                    Navigator.pushAndRemoveUntil(
-                      context,
-                      MaterialPageRoute(builder: (context) => const LoginScreen()),
-                          (route) => false, // removes all previous routes
-                    );
-                  },
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                ),
+                );
+              }
 
-              ],
-            ),
+              final username = snapshot.data![0];
+              final initials = snapshot.data![2];
+
+              return Container(
+                margin: const EdgeInsets.all(12),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceElevated,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 16,
+                      backgroundColor: AppTheme.accent,
+                      child: Text(
+                        initials,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            username,
+                            style: const TextStyle(
+                              color: AppTheme.textPrimary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.logout, size: 16, color: AppTheme.textSecondary),
+                      onPressed: () async {
+                        await ApiLogin.logout();
+                        Navigator.pushAndRemoveUntil(
+                          context,
+                          MaterialPageRoute(builder: (context) => const LoginScreen()),
+                              (route) => false,
+                        );
+                      },
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                  ],
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -228,18 +238,6 @@ class AppSidebar extends StatelessWidget {
                 ),
               ),
             ),
-            if (badge != null)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                decoration: BoxDecoration(
-                  color: AppTheme.accent,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  badge.toString(),
-                  style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                ),
-              ),
           ],
         ),
       ),

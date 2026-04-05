@@ -7,7 +7,7 @@ import 'screens/dashboard_screen.dart';
 import 'screens/all_tickets_screen.dart';
 import 'screens/user_screen.dart';
 import 'screens/settings_screen.dart';
-import 'package:ticket_system/screens/loginscreen.dart';
+import 'screens/loginscreen.dart';
 
 void main() {
   runApp(
@@ -58,20 +58,16 @@ class _MainShellState extends State<MainShell> {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<TicketProvider>();
+
     return Scaffold(
       body: Row(
         children: [
           AppSidebar(
             currentRoute: _currentRoute,
-            userName: provider.currentUserName,
-            userRole: provider.currentUserRole,
-            userInitials: provider.currentUserInitials,
             allTicketsCount: provider.totalTickets,
             onNavigate: (route) => setState(() => _currentRoute = route),
           ),
-          Expanded(
-            child: _buildContent(),
-          ),
+          Expanded(child: _buildContent()),
         ],
       ),
     );

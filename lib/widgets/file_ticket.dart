@@ -1,8 +1,7 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
-
-import '../core/services/api_file.dart';
+import '../core/services/api_file.dart'; // updated API import
 
 final TextEditingController subjectController = TextEditingController();
 final TextEditingController descriptionController = TextEditingController();
@@ -16,13 +15,25 @@ class CreateTicketDialog extends StatefulWidget {
 
 class _CreateTicketDialogState extends State<CreateTicketDialog> {
   int selectedPriority = 1;
-
   String selectedTicketType = "Incident";
   String selectedOrganization = "Bakawan Data Analytics";
   String selectedCategory = "IT Related - Customer Premise E.";
 
   PlatformFile? _selectedFile;
   Uint8List? _fileBytes;
+
+  void _resetFields() {
+    subjectController.clear();
+    descriptionController.clear();
+    setState(() {
+      selectedPriority = 1;
+      selectedTicketType = "Incident";
+      selectedCategory = "IT Related - Customer Premise E.";
+      selectedOrganization = "Bakawan Data Analytics";
+      _selectedFile = null;
+      _fileBytes = null;
+    });
+  }
 
   Color _getPriorityColor(int value) {
     switch (value) {
@@ -47,10 +58,56 @@ class _CreateTicketDialogState extends State<CreateTicketDialog> {
     );
 
     if (result != null && result.files.isNotEmpty) {
+      final file = result.files.first;
+      if (file.size > 25 * 1024 * 1024) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("File too large. Max 25MB allowed")),
+        );
+        return;
+      }
+
       setState(() {
-        _selectedFile = result.files.first;
-        _fileBytes = _selectedFile!.bytes;
+        _selectedFile = file;
+        _fileBytes = file.bytes;
       });
+    }
+  }
+
+  void _removeFile() {
+    setState(() {
+      _selectedFile = null;
+      _fileBytes = null;
+    });
+  }
+
+  Future<void> _submitTicket() async {
+    if (subjectController.text.isEmpty || descriptionController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Subject and description are required")),
+      );
+      return;
+    }
+
+    final ticketCode = await ApiTicket.createTicket(
+      subject: subjectController.text,
+      ticketType: selectedTicketType,
+      category: selectedCategory,
+      organization: selectedOrganization,
+      priority: selectedPriority,
+      description: descriptionController.text,
+      file: _selectedFile,
+    );
+
+    if (ticketCode != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Ticket created successfully: $ticketCode")),
+      );
+      _resetFields(); // Clear all fields after submission
+      Navigator.pop(context);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Failed to create ticket")),
+      );
     }
   }
 
@@ -116,8 +173,7 @@ class _CreateTicketDialogState extends State<CreateTicketDialog> {
               Row(
                 children: [
                   Expanded(
-                    child: _inputWithLabel(
-                        "REQUESTER", "Search user or email..."),
+                    child: _inputWithLabel("REQUESTER", "Search user or email..."),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -125,8 +181,7 @@ class _CreateTicketDialogState extends State<CreateTicketDialog> {
                       "ORGANIZATION",
                       selectedOrganization,
                       ["Bakawan Data Analytics", "FDSAP", "CMIT"],
-                          (val) =>
-                          setState(() => selectedOrganization = val!),
+                          (val) => setState(() => selectedOrganization = val!),
                     ),
                   ),
                 ],
@@ -141,12 +196,10 @@ class _CreateTicketDialogState extends State<CreateTicketDialog> {
                   final color = _getPriorityColor(value);
                   return Expanded(
                     child: GestureDetector(
-                      onTap: () =>
-                          setState(() => selectedPriority = value),
+                      onTap: () => setState(() => selectedPriority = value),
                       child: Container(
                         margin: const EdgeInsets.only(right: 6),
-                        padding:
-                        const EdgeInsets.symmetric(vertical: 10),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
                         decoration: BoxDecoration(
                           color: selectedPriority == value
                               ? color.withOpacity(0.15)
@@ -159,14 +212,12 @@ class _CreateTicketDialogState extends State<CreateTicketDialog> {
                           ),
                         ),
                         child: Row(
-                          mainAxisAlignment:
-                          MainAxisAlignment.center,
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Container(
                               width: 6,
                               height: 6,
-                              margin:
-                              const EdgeInsets.only(right: 6),
+                              margin: const EdgeInsets.only(right: 6),
                               decoration: BoxDecoration(
                                 color: color,
                                 shape: BoxShape.circle,
@@ -197,7 +248,7 @@ class _CreateTicketDialogState extends State<CreateTicketDialog> {
                 padding: const EdgeInsets.all(10),
                 decoration: _boxDecoration(),
                 child: TextField(
-                  controller: descriptionController, // ✅ FIXED
+                  controller: descriptionController,
                   minLines: 3,
                   maxLines: null,
                   style: const TextStyle(color: Colors.white),
@@ -219,8 +270,7 @@ class _CreateTicketDialogState extends State<CreateTicketDialog> {
                   height: 80,
                   width: double.infinity,
                   decoration: BoxDecoration(
-                    border: Border.all(
-                        color: const Color(0xFF2A3142)),
+                    border: Border.all(color: const Color(0xFF2A3142)),
                     borderRadius: BorderRadius.circular(10),
                     color: const Color(0xFF1A1F2E),
                   ),
@@ -229,15 +279,11 @@ class _CreateTicketDialogState extends State<CreateTicketDialog> {
                     children: [
                       const SizedBox(width: 8),
                       if (_fileBytes != null &&
-                          (_selectedFile!.extension ==
-                              'jpg' ||
-                              _selectedFile!.extension ==
-                                  'png' ||
-                              _selectedFile!.extension ==
-                                  'jpeg'))
+                          (_selectedFile!.extension == 'jpg' ||
+                              _selectedFile!.extension == 'png' ||
+                              _selectedFile!.extension == 'jpeg'))
                         Padding(
-                          padding:
-                          const EdgeInsets.all(8.0),
+                          padding: const EdgeInsets.all(8.0),
                           child: Image.memory(
                             _fileBytes!,
                             width: 60,
@@ -247,8 +293,7 @@ class _CreateTicketDialogState extends State<CreateTicketDialog> {
                         )
                       else
                         const Padding(
-                          padding:
-                          EdgeInsets.all(8.0),
+                          padding: EdgeInsets.all(8.0),
                           child: Icon(
                             Icons.insert_drive_file,
                             color: Colors.white,
@@ -258,20 +303,20 @@ class _CreateTicketDialogState extends State<CreateTicketDialog> {
                       Expanded(
                         child: Text(
                           _selectedFile!.name,
-                          style: const TextStyle(
-                              color: Colors.white),
-                          overflow:
-                          TextOverflow.ellipsis,
+                          style: const TextStyle(color: Colors.white),
+                          overflow: TextOverflow.ellipsis,
                         ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.red),
+                        onPressed: _removeFile,
                       ),
                     ],
                   )
                       : const Center(
                     child: Text(
                       "Click anywhere to upload file (jpg, png, pdf, doc) max 25MB",
-                      style: TextStyle(
-                          color: Colors.grey,
-                          fontSize: 12),
+                      style: TextStyle(color: Colors.grey, fontSize: 12),
                       textAlign: TextAlign.center,
                     ),
                   ),
@@ -281,46 +326,15 @@ class _CreateTicketDialogState extends State<CreateTicketDialog> {
               const SizedBox(height: 16),
 
               Row(
-                mainAxisAlignment:
-                MainAxisAlignment.spaceBetween,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _outlineButton(
-                      "Cancel",
-                          () => Navigator.pop(context)),
-                  _primaryButton("Submit", () async {
-                    print("SUBJECT: ${subjectController.text}");
-                    print("DESCRIPTION: ${descriptionController.text}");
-
-                    bool success =
-                    await ApiFileTicket.createTicket(
-                      subject: subjectController.text,
-                      ticketType: selectedTicketType,
-                      category: selectedCategory,
-                      organization: selectedOrganization,
-                      priority: selectedPriority,
-                      description: descriptionController.text,
-                      file: _selectedFile,
-                    );
-
-                    if (success) {
-                      ScaffoldMessenger.of(context)
-                          .showSnackBar(
-                        const SnackBar(
-                            content: Text(
-                                "Ticket created successfully")),
-                      );
-                      Navigator.pop(context);
-                    } else {
-                      ScaffoldMessenger.of(context)
-                          .showSnackBar(
-                        const SnackBar(
-                            content: Text(
-                                "Failed to create ticket")),
-                      );
-                    }
+                  _outlineButton("Cancel", () {
+                    _resetFields();
+                    Navigator.pop(context);
                   }),
+                  _primaryButton("Submit", _submitTicket),
                 ],
-              )
+              ),
             ],
           ),
         ),
@@ -330,48 +344,35 @@ class _CreateTicketDialogState extends State<CreateTicketDialog> {
 
   Widget _label(String text) => Padding(
     padding: const EdgeInsets.only(bottom: 6),
-    child: Text(text,
-        style: const TextStyle(
-            color: Colors.grey, fontSize: 12)),
+    child: Text(text, style: const TextStyle(color: Colors.grey, fontSize: 12)),
   );
 
-  // ✅ FIXED HERE
-  Widget _input(String hint,
-      {TextEditingController? controller}) =>
-      Container(
-        padding:
-        const EdgeInsets.symmetric(horizontal: 12),
-        decoration: _boxDecoration(),
-        child: TextField(
-          controller: controller, // ✅ FIXED
-          style: const TextStyle(color: Colors.white),
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle:
-            const TextStyle(color: Colors.grey),
-            border: InputBorder.none,
-          ),
-        ),
-      );
+  Widget _input(String hint, {TextEditingController? controller}) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 12),
+    decoration: _boxDecoration(),
+    child: TextField(
+      controller: controller,
+      style: const TextStyle(color: Colors.white),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: const TextStyle(color: Colors.grey),
+        border: InputBorder.none,
+      ),
+    ),
+  );
 
-  Widget _inputWithLabel(String label, String hint) =>
-      Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [_label(label), _input(hint)],
-      );
+  Widget _inputWithLabel(String label, String hint) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [_label(label), _input(hint)],
+  );
 
-  Widget _dropdownCustom(
-      String label,
-      String value,
-      List<String> items,
-      ValueChanged<String?> onChanged) {
+  Widget _dropdownCustom(String label, String value, List<String> items, ValueChanged<String?> onChanged) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _label(label),
         Container(
-          padding:
-          const EdgeInsets.symmetric(horizontal: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: _boxDecoration(),
           child: DropdownButton<String>(
             value: value,
@@ -379,14 +380,9 @@ class _CreateTicketDialogState extends State<CreateTicketDialog> {
             isExpanded: true,
             underline: const SizedBox(),
             iconEnabledColor: Colors.white,
-            items: items.map((e) {
-              return DropdownMenuItem(
-                value: e,
-                child: Text(e,
-                    style: const TextStyle(
-                        color: Colors.white)),
-              );
-            }).toList(),
+            items: items
+                .map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(color: Colors.white))))
+                .toList(),
             onChanged: onChanged,
           ),
         ),
@@ -397,33 +393,22 @@ class _CreateTicketDialogState extends State<CreateTicketDialog> {
   BoxDecoration _boxDecoration() => BoxDecoration(
     color: const Color(0xFF1A1F2E),
     borderRadius: BorderRadius.circular(10),
-    border:
-    Border.all(color: const Color(0xFF2A3142)),
+    border: Border.all(color: const Color(0xFF2A3142)),
   );
 
-  Widget _primaryButton(
-      String text, VoidCallback onPressed) =>
-      ElevatedButton(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF268A15),
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(
-              horizontal: 20, vertical: 14),
-        ),
-        onPressed: onPressed,
-        child: Text(text),
-      );
+  Widget _primaryButton(String text, VoidCallback onPressed) => ElevatedButton(
+    style: ElevatedButton.styleFrom(
+      backgroundColor: const Color(0xFF268A15),
+      foregroundColor: Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+    ),
+    onPressed: onPressed,
+    child: Text(text),
+  );
 
-  Widget _outlineButton(
-      String text, VoidCallback onPressed) =>
-      OutlinedButton(
-        style: OutlinedButton.styleFrom(
-          side: const BorderSide(
-              color: Color(0xFF2A3142)),
-        ),
-        onPressed: onPressed,
-        child: Text(text,
-            style:
-            const TextStyle(color: Colors.white)),
-      );
+  Widget _outlineButton(String text, VoidCallback onPressed) => OutlinedButton(
+    style: OutlinedButton.styleFrom(side: const BorderSide(color: Color(0xFF2A3142))),
+    onPressed: onPressed,
+    child: Text(text, style: const TextStyle(color: Colors.white)),
+  );
 }
