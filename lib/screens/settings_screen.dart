@@ -1,34 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../core/services/api_login.dart';
 import '../core/services/api_user_data.dart';
 import '../data/app_theme.dart';
-import '../core/services/api_login.dart';
-
-/// Helper to get the current user's role from API
-class UserRoleHelper {
-  /// Get the role of the currently logged-in user from the full users list
-  static Future<String> getCurrentUserRole() async {
-    final username = await ApiLogin.getUsername();
-    final users = await ApiGetUser.fetchUsers();
-
-    final currentUser = users.firstWhere(
-          (user) => user['username'] == username,
-      orElse: () => {},
-    );
-
-    if (currentUser.isNotEmpty) {
-      return currentUser['role'] ?? 'User';
-    } else {
-      return 'User';
-    }
-  }
-
-  /// Check if logged-in user is admin
-  static Future<bool> isAdmin() async {
-    final role = await getCurrentUserRole();
-    return role.toLowerCase() == 'admin';
-  }
-}
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -52,23 +25,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _loadUserInfo();
   }
 
-  /// Load user info from login + shared preferences
+  /// Load user info from API
   Future<void> _loadUserInfo() async {
-    final username = await ApiLogin.getUsername();
-    final email = await _getEmail();
-    final role = await UserRoleHelper.getCurrentUserRole();
+    try {
+      final username = await ApiLogin.getUsername();
+      final users = await ApiGetUser.fetchUsers();
 
-    setState(() {
-      _displayName = username;
-      _email = email;
-      _role = role;
-    });
-  }
+      final currentUser = users.firstWhere(
+            (user) => user['username'] == username,
+        orElse: () => {},
+      );
 
-  /// Get email from SharedPreferences (or fallback)
-  Future<String> _getEmail() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('email') ?? _displayName + '@example.com';
+      setState(() {
+        _displayName = currentUser['name'] ?? username;
+        _email = currentUser['email'] ?? username + '@example.com';
+        _role = currentUser['role'] ?? 'User';
+      });
+    } catch (e) {
+      print('💥 Error loading user info: $e');
+      setState(() {
+        _displayName = '';
+        _email = '';
+        _role = 'User';
+      });
+    }
   }
 
   @override
@@ -138,7 +118,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const SizedBox(height: 20),
 
                 ElevatedButton(
-                  onPressed: () {},
+                  onPressed: () {
+                    // TODO: Implement save changes logic
+                    print('💾 Save button pressed');
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.accent,
                     foregroundColor: Colors.white,
@@ -158,6 +141,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  // Section container
   Widget _section(String title, List<Widget> children) {
     return Container(
       decoration: BoxDecoration(
@@ -184,6 +168,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  // Individual setting row
   Widget _settingRow(String label, {required Widget trailing}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -202,6 +187,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  // Display text for read-only fields
   Widget _displayText(String text) {
     return Text(
       text,

@@ -82,7 +82,11 @@ class ApiTicket {
                   e['user']?['username'] ??
                   e['ticket']?['username'] ??
                   'Unknown',
-              'category': e['category'] ?? '',
+              'category': e['category'] ??
+                  e['ticket']?['category'] ??
+                  e['user']?['category'] ??
+                  '',
+
               'created_at': e['created_at'] ?? '',
             };
           }).toList();

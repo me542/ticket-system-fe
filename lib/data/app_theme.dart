@@ -24,6 +24,8 @@ class AppTheme {
   static const Color catStorage = Color(0xFF6366F1);
   static const Color catNetwork = Color(0xFF3B82F6);
   static const Color catApplications = Color(0xFF10B981);
+  static const Color catDatabase = Color(0xFF14B8A6);       // Teal
+  static const Color catEndpoint = Color(0xFFF472B6);
 
   static const Color sidebarBg = Color(0xFF13151F);
   static const Color sidebarActive = Color(0xFF1E2130);

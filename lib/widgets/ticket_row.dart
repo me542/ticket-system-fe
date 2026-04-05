@@ -32,9 +32,9 @@ class TicketRow extends StatelessWidget {
   }
 
   Color get _assigneeColor {
-    if (ticket.assigneeInitials == 'S') return AppTheme.accent;
-    if (ticket.assigneeInitials == 'JV') return const Color(0xFF059669);
-    if (ticket.assigneeInitials == 'JB') return const Color(0xFFF59E0B);
+    if (ticket.submitterInitials == 'S') return AppTheme.accent;
+    if (ticket.submitterInitials == 'JV') return const Color(0xFF059669);
+    if (ticket.submitterInitials == 'JB') return const Color(0xFFF59E0B);
     return const Color(0xFFEF4444);
   }
 
@@ -76,7 +76,7 @@ class TicketRow extends StatelessWidget {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  '${ticket.categoryLabel} · ${ticket.timeAgo}',
+                  '${ticket.categoryLabel}',
                   style: const TextStyle(
                     color: AppTheme.textSecondary,
                     fontSize: 11,
@@ -169,7 +169,7 @@ class TicketRow extends StatelessWidget {
                   radius: 14,
                   backgroundColor: _assigneeColor,
                   child: Text(
-                    ticket.assigneeInitials,
+                    ticket.submitterInitials,
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 10,
@@ -180,7 +180,7 @@ class TicketRow extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    ticket.assignee,
+                    ticket.submitter,
                     style: const TextStyle(
                       color: AppTheme.textPrimary,
                       fontSize: 12,

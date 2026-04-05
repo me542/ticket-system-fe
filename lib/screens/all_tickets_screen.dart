@@ -25,25 +25,22 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
   Future<void> _fetchAllTickets() async {
     setState(() => _loading = true);
     try {
-      // Call API for all tickets
       final data = await ApiTicket.getAllTickets();
-      print('All tickets data: $data');
+      print('Raw API tickets: $data');
 
       _tickets = data.map<Ticket>((item) {
+        final username = item['username'] ?? 'Unknown';
+        final createdAt = DateTime.tryParse(item['created_at'] ?? '') ?? DateTime.now();
+
         return Ticket(
           id: item['ticket_id'] ?? '',
           title: item['subject'] ?? '',
-          category: TicketCategory.values.firstWhere(
-                (c) => c.name.toLowerCase() ==
-                (item['category'] ?? '').toLowerCase(),
-            orElse: () => TicketCategory.customerPremise,
-          ),
+          category: _mapCategory(item['category'] ?? ''),
           status: _mapStatus(item['status'] ?? ''),
           priority: _mapPriority(item['priority']),
-          assignee: item['username'] ?? '',
-          assigneeInitials: ((item['username'] ?? '??')[0]),
-          createdAt: DateTime.tryParse(item['created_at'] ?? '') ??
-              DateTime.now(),
+          submitter: username,
+          submitterInitials: username.isNotEmpty ? username[0] : '?',
+          createdAt: createdAt,
         );
       }).toList();
 
@@ -55,6 +52,7 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
     }
   }
 
+  // ✅ Map API status to enum
   TicketStatus _mapStatus(String status) {
     switch (status.toLowerCase()) {
       case 'forassessment':
@@ -70,6 +68,7 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
     }
   }
 
+  // ✅ Map API priority to enum
   TicketPriority _mapPriority(dynamic p) {
     final prio = int.tryParse(p.toString()) ?? 1;
     switch (prio) {
@@ -84,6 +83,24 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
     }
   }
 
+  // ✅ Map API category to enum
+  TicketCategory _mapCategory(String cat) {
+    final c = cat.toLowerCase().trim();
+    if (c.contains('customer premise')) return TicketCategory.customerPremise;
+    if (c.contains('software')) return TicketCategory.softwareInstallation;
+    if (c.contains('storage')) return TicketCategory.storageServer;
+    if (c.contains('network')) return TicketCategory.networkConnection;
+    if (c.contains('database')) return TicketCategory.databaseUserAccounts;
+    if (c.contains('applications')) return TicketCategory.applicationsAmazon;
+    if (c.contains('endpoint')) return TicketCategory.endpointDesktop;
+
+    print('Unknown category: $cat');
+    return TicketCategory.customerPremise; // fallback
+  }
+
+
+
+
   @override
   Widget build(BuildContext context) {
     final filteredTickets = _tickets.where((t) {
@@ -94,6 +111,7 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
 
     return Column(
       children: [
+        // Header with search
         Container(
           height: 56,
           padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -146,6 +164,8 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
             ],
           ),
         ),
+
+        // Tickets table
         Expanded(
           child: Padding(
             padding: const EdgeInsets.all(24),
@@ -166,7 +186,7 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
                         SizedBox(width: 12),
                         Expanded(flex: 2, child: _Header('PRIORITY')),
                         SizedBox(width: 12),
-                        Expanded(flex: 2, child: _Header('ASSIGNEE')),
+                        Expanded(flex: 2, child: _Header('SUBMITTER')),
                       ],
                     ),
                   ),

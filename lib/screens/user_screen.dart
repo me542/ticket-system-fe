@@ -395,7 +395,50 @@ class _UserScreenState extends State<UserScreen> {
             TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
             ElevatedButton(
               onPressed: () async {
-                // Call API to add user here
+                // Validate before sending
+                if (fullNameController.text.trim().isEmpty ||
+                    userNameController.text.trim().isEmpty ||
+                    emailController.text.trim().isEmpty ||
+                    passwordController.text.trim().isEmpty ||
+                    !fullNameValid || !userNameValid || !emailValid || !passwordValid) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please fix the errors before submitting')),
+                  );
+                  return;
+                }
+
+                final success = await ApiUser.createUser(
+                  username: userNameController.text.trim(),
+                  fullname: fullNameController.text.trim(),
+                  email: emailController.text.trim(),
+                  password: passwordController.text.trim(),
+                  role: selectedRole,
+                  position: selectedPosition,
+                );
+
+                if (success) {
+                  setState(() {
+                    users.add({
+                      'username': userNameController.text.trim(),
+                      'name': fullNameController.text.trim(),
+                      'email': emailController.text.trim(),
+                      'role': selectedRole,
+                      'position': selectedPosition,
+                      'initials': fullNameController.text.trim().isNotEmpty
+                          ? fullNameController.text.trim().split(' ').map((e) => e[0]).take(2).join()
+                          : '',
+                    });
+                  });
+
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('User created successfully')),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Failed to create user')),
+                  );
+                }
               },
               child: const Text('Add'),
             ),
@@ -427,7 +470,7 @@ class _UserScreenState extends State<UserScreen> {
         builder: (context, setStateDialog) => AlertDialog(
           title: const Text('Edit User'),
           content: SizedBox(
-            width: 400, // <-- Set the dialog width here
+            width: 400,
             child: SingleChildScrollView(
               child: Column(
                 children: [
@@ -479,7 +522,37 @@ class _UserScreenState extends State<UserScreen> {
             TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
             ElevatedButton(
               onPressed: () async {
-                // Save user logic
+                final success = await ApiUser.updateUser(
+                  username: userNameController.text.trim(),
+                  fullname: fullNameController.text.trim(),
+                  email: emailController.text.trim(),
+                  password: passwordController.text.trim().isNotEmpty
+                      ? passwordController.text.trim()
+                      : null,
+                  role: selectedRole,
+                  position: selectedPosition,
+                );
+
+                if (success) {
+                  setState(() {
+                    user['username'] = userNameController.text.trim();
+                    user['name'] = fullNameController.text.trim();
+                    user['email'] = emailController.text.trim();
+                    user['role'] = selectedRole;
+                    user['position'] = selectedPosition;
+                    user['initials'] = fullNameController.text.trim().isNotEmpty
+                        ? fullNameController.text.trim().split(' ').map((e) => e[0]).take(2).join()
+                        : '';
+                  });
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('User updated successfully')),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Failed to update user')),
+                  );
+                }
               },
               child: const Text('Save'),
             ),
@@ -488,7 +561,6 @@ class _UserScreenState extends State<UserScreen> {
       ),
     );
   }
-
 
   // ================= DISABLE USER =================
   void _confirmDisableUser(Map<String, String> user) {
@@ -516,9 +588,8 @@ class _UserScreenState extends State<UserScreen> {
                   SnackBar(content: Text('${user['name']} has been disabled')),
                 );
               } else {
-                Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Failed to disable ${user['name']}')),
+                  const SnackBar(content: Text('Failed to disable user')),
                 );
               }
             },

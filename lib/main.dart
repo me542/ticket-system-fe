@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'data/ticket_provider.dart';
 import 'data/app_theme.dart';
 import 'widgets/app_sidebar.dart';
 import 'screens/dashboard_screen.dart';
@@ -10,12 +8,7 @@ import 'screens/settings_screen.dart';
 import 'screens/loginscreen.dart';
 
 void main() {
-  runApp(
-    ChangeNotifierProvider(
-      create: (_) => TicketProvider(),
-      child: const MyApp(),
-    ),
-  );
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
@@ -57,14 +50,12 @@ class _MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) {
-    final provider = context.watch<TicketProvider>();
-
     return Scaffold(
       body: Row(
         children: [
           AppSidebar(
             currentRoute: _currentRoute,
-            allTicketsCount: provider.totalTickets,
+            allTicketsCount: 0, // Removed provider, static 0 for now
             onNavigate: (route) => setState(() => _currentRoute = route),
           ),
           Expanded(child: _buildContent()),

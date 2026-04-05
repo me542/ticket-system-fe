@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../data/ticket_provider.dart';
+import '../core/services/api_file.dart';
 import '../data/app_theme.dart';
 import '../models/ticket.dart';
 import '../widgets/file_ticket.dart';
 import '../widgets/stats_card.dart';
-import '../widgets/ticket_row.dart';
+import 'package:ticket_system/widgets/ticket_row.dart';
+
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -17,6 +17,27 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   String _selectedFilter = 'All';
   final List<String> _filters = ['All', 'For', 'In', 'Resolved'];
+
+  final List<Ticket> _tickets = [];
+  final List<ActivityItem> _activities = [];
+
+  /// Initialize category count for all updated TicketCategory values
+  final Map<TicketCategory, int> _categoryCount = {
+    for (var cat in TicketCategory.values) cat: 0,
+  };
+
+  Map<String, int> _statsCounts = {
+    'total': 0,
+    'forAssessment': 0,
+    'inProgress': 0,
+    'resolved': 0,
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTickets();
+  }
 
   Color _activityColor(ActivityType type) {
     switch (type) {
@@ -33,27 +54,105 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  Future<void> _loadTickets() async {
+    final ticketData = await ApiTicket.getAllTickets();
+
+    final tickets = ticketData.map((e) {
+      // --- Status mapping ---
+      TicketStatus status;
+      switch ((e['status'] ?? '').toLowerCase()) {
+        case 'forassessment':
+        case 'for assessment':
+          status = TicketStatus.forAssessment;
+          break;
+        case 'inprogress':
+        case 'in progress':
+          status = TicketStatus.inProgress;
+          break;
+        case 'resolved':
+          status = TicketStatus.resolved;
+          break;
+        case 'cancelled':
+          status = TicketStatus.cancelled;
+          break;
+        default:
+          status = TicketStatus.forAssessment;
+      }
+
+      // --- Category mapping using updated enum ---
+      TicketCategory category = mapCategory(e['category'] ?? '');
+
+      // --- Priority mapping ---
+      TicketPriority priority;
+      switch (e['priority'] ?? 0) {
+        case 1:
+          priority = TicketPriority.priority1;
+          break;
+        case 2:
+          priority = TicketPriority.priority2;
+          break;
+        case 3:
+          priority = TicketPriority.priority3;
+          break;
+        default:
+          priority = TicketPriority.priority3;
+      }
+
+      return Ticket(
+        id: e['ticket_id'] ?? '',
+        title: e['subject'] ?? '',
+        category: category,
+        status: status,
+        priority: priority,
+        submitter: e['username'] ?? 'Unknown',
+        submitterInitials: (e['username'] ?? 'U').substring(0, 1).toUpperCase(),
+        createdAt: DateTime.tryParse(e['created_at'] ?? '') ?? DateTime.now(),
+      );
+    }).toList();
+
+    // Compute stats
+    final total = tickets.length;
+    final forAssessment = tickets.where((t) => t.status == TicketStatus.forAssessment).length;
+    final inProgress = tickets.where((t) => t.status == TicketStatus.inProgress).length;
+    final resolved = tickets.where((t) => t.status == TicketStatus.resolved).length;
+
+    // Compute categories count dynamically
+    final Map<TicketCategory, int> categoryCount = {};
+    for (var cat in TicketCategory.values) {
+      categoryCount[cat] = tickets.where((t) => t.category == cat).length;
+    }
+
+    setState(() {
+      _tickets.clear();
+      _tickets.addAll(tickets);
+      _categoryCount.clear();
+      _categoryCount.addAll(categoryCount);
+      _statsCounts = {
+        'total': total,
+        'forAssessment': forAssessment,
+        'inProgress': inProgress,
+        'resolved': resolved,
+      };
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    final provider = context.watch<TicketProvider>();
-    final filteredTickets = provider.filterTickets(_selectedFilter);
-    final categoryCount = provider.categoryCount;
-    final maxCat = categoryCount.values.isEmpty
-        ? 0
-        : categoryCount.values.reduce((a, b) => a > b ? a : b);
+    final filteredTickets = _tickets;
+    final maxCat = _categoryCount.values.isEmpty ? 0 : _categoryCount.values.reduce((a, b) => a > b ? a : b);
 
     return Column(
       children: [
-        _buildTopBar(context, provider),
+        _buildTopBar(context),
         Expanded(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildStatsRow(provider),
+                _buildStatsRow(),
                 const SizedBox(height: 24),
-                _buildMainContent(provider, filteredTickets, categoryCount, maxCat),
+                _buildMainContent(filteredTickets, maxCat),
               ],
             ),
           ),
@@ -62,7 +161,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildTopBar(BuildContext context, TicketProvider provider) {
+  Widget _buildTopBar(BuildContext context) {
     return Container(
       height: 56,
       padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -145,33 +244,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildStatsRow(TicketProvider provider) {
+  Widget _buildStatsRow() {
     return Row(
       children: [
         StatsCard(
           title: 'Total Tickets',
-          count: provider.totalTickets,
+          count: _statsCounts['total'] ?? 0,
           subtitle: 'All time records',
           accentColor: AppTheme.accent,
         ),
         const SizedBox(width: 16),
         StatsCard(
           title: 'For Assessment',
-          count: provider.forAssessmentCount,
+          count: _statsCounts['forAssessment'] ?? 0,
           subtitle: 'awaiting review',
           accentColor: AppTheme.statusAssessment,
         ),
         const SizedBox(width: 16),
         StatsCard(
           title: 'In Progress',
-          count: provider.inProgressCount,
+          count: _statsCounts['inProgress'] ?? 0,
           subtitle: 'being worked',
           accentColor: AppTheme.statusProgress,
         ),
         const SizedBox(width: 16),
         StatsCard(
           title: 'Resolved',
-          count: provider.resolvedCount,
+          count: _statsCounts['resolved'] ?? 0,
           subtitle: 'completed',
           accentColor: AppTheme.statusResolved,
         ),
@@ -179,20 +278,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildMainContent(TicketProvider provider, List<Ticket> tickets,
-      Map<TicketCategory, int> categoryCount, int maxCat) {
+  Widget _buildMainContent(List<Ticket> tickets, int maxCat) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(child: _buildTicketsTable(provider, tickets)),
+        Expanded(child: _buildTicketsTable(tickets)),
         const SizedBox(width: 20),
         SizedBox(
           width: 260,
           child: Column(
             children: [
-              _buildCategoryPanel(categoryCount, maxCat),
+              _buildCategoryPanel(maxCat),
               const SizedBox(height: 16),
-              _buildRecentActivity(provider),
+              _buildRecentActivity(),
             ],
           ),
         ),
@@ -200,7 +298,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildTicketsTable(TicketProvider provider, List<Ticket> tickets) {
+  Widget _buildTicketsTable(List<Ticket> tickets) {
+    final recentTickets = tickets.take(8).toList();
+
     return Container(
       decoration: BoxDecoration(
         color: AppTheme.surface,
@@ -210,7 +310,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildTicketsHeader(provider),
+          _buildTicketsHeader(),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
             child: Row(
@@ -220,31 +320,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 SizedBox(width: 12),
                 Expanded(flex: 2, child: _TableHeader('PRIORITY')),
                 SizedBox(width: 12),
-                Expanded(flex: 2, child: _TableHeader('ASSIGNEE')),
+                Expanded(flex: 2, child: _TableHeader('SUBMITTER')),
               ],
             ),
           ),
-          ...tickets.take(8).map((t) => TicketRow(ticket: t)),
-          if (tickets.isEmpty)
+          if (recentTickets.isEmpty)
             const Padding(
               padding: EdgeInsets.all(32),
               child: Center(
                 child: Text('No tickets found', style: TextStyle(color: AppTheme.textSecondary)),
               ),
-            ),
+            )
+          else
+            Column(
+              children: recentTickets.take(6).map<Widget>((t) => TicketRow(ticket: t)).toList(),
+            )
         ],
       ),
     );
   }
 
-  Widget _buildTicketsHeader(TicketProvider provider) {
+
+
+  Widget _buildTicketsHeader() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       child: Row(
         children: [
           const Text('Recent Tickets', style: TextStyle(color: AppTheme.textPrimary, fontSize: 15, fontWeight: FontWeight.w700)),
           const SizedBox(width: 8),
-          Text('${provider.totalTickets} total', style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+          Text('${_tickets.length} total', style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
           const Spacer(),
           Row(
             children: _filters.map((f) {
@@ -276,7 +381,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildCategoryPanel(Map<TicketCategory, int> categoryCount, int maxCat) {
+  /// --- Updated Category Panel dynamically from TicketCategory enum ---
+  Widget _buildCategoryPanel(int maxCat) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -287,23 +393,77 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('By Category', style: TextStyle(color: AppTheme.textPrimary, fontSize: 14, fontWeight: FontWeight.w700)),
+          const Text(
+            'By Category',
+            style: TextStyle(
+              color: AppTheme.textPrimary,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
           const SizedBox(height: 16),
-          _CategoryBar('Customer Prem.', categoryCount[TicketCategory.customerPremise] ?? 0, maxCat, AppTheme.catCustomer),
-          const SizedBox(height: 10),
-          _CategoryBar('Software', categoryCount[TicketCategory.software] ?? 0, maxCat, AppTheme.catSoftware),
-          const SizedBox(height: 10),
-          _CategoryBar('Storage', categoryCount[TicketCategory.storage] ?? 0, maxCat, AppTheme.catStorage),
-          const SizedBox(height: 10),
-          _CategoryBar('Network', categoryCount[TicketCategory.network] ?? 0, maxCat, AppTheme.catNetwork),
-          const SizedBox(height: 10),
-          _CategoryBar('Applications', categoryCount[TicketCategory.applications] ?? 0, maxCat, AppTheme.catApplications),
+          ...TicketCategory.values.map((cat) {
+            final count = _categoryCount[cat] ?? 0;
+            final label = cat.toString().split('.').last; // temporary, can use categoryLabel helper if needed
+            Color color;
+            switch (cat) {
+              case TicketCategory.customerPremise:
+                color = AppTheme.catCustomer;
+                break;
+              case TicketCategory.softwareInstallation:
+                color = AppTheme.catSoftware;
+                break;
+              case TicketCategory.storageServer:
+                color = AppTheme.catStorage;
+                break;
+              case TicketCategory.networkConnection:
+                color = AppTheme.catNetwork;
+                break;
+              case TicketCategory.databaseUserAccounts:
+                color = AppTheme.catDatabase;
+                break;
+              case TicketCategory.applicationsAmazon:
+                color = AppTheme.catApplications;
+                break;
+              case TicketCategory.endpointDesktop:
+                color = AppTheme.catEndpoint;
+                break;
+            }
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _CategoryBar(
+                catLabel(cat),
+                count,
+                maxCat,
+                color,
+              ),
+            );
+          }).toList(),
         ],
       ),
     );
   }
 
-  Widget _buildRecentActivity(TicketProvider provider) {
+  String catLabel(TicketCategory cat) {
+    switch (cat) {
+      case TicketCategory.customerPremise:
+        return 'Customer Prem.';
+      case TicketCategory.softwareInstallation:
+        return 'Software';
+      case TicketCategory.storageServer:
+        return 'Storage';
+      case TicketCategory.networkConnection:
+        return 'Network';
+      case TicketCategory.databaseUserAccounts:
+        return 'Database';
+      case TicketCategory.applicationsAmazon:
+        return 'Applications';
+      case TicketCategory.endpointDesktop:
+        return 'Endpoint';
+    }
+  }
+
+  Widget _buildRecentActivity() {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -311,51 +471,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppTheme.border),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Recent Activity', style: TextStyle(color: AppTheme.textPrimary, fontSize: 14, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 14),
-          ...provider.activities.map((a) => Padding(
-            padding: const EdgeInsets.only(bottom: 14),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 8,
-                  height: 8,
-                  margin: const EdgeInsets.only(top: 4),
-                  decoration: BoxDecoration(color: _activityColor(a.type), shape: BoxShape.circle),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      RichText(
-                        text: TextSpan(
-                          children: [
-                            TextSpan(
-                              text: '${a.ticketId} ',
-                              style: const TextStyle(color: AppTheme.accent, fontSize: 12, fontWeight: FontWeight.w600),
-                            ),
-                            TextSpan(
-                              text: a.message,
-                              style: const TextStyle(color: AppTheme.textPrimary, fontSize: 12),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(a.timeAgo, style: const TextStyle(color: AppTheme.textSecondary, fontSize: 11)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          )),
-        ],
-      ),
+      child: const Center(child: Text('No recent activity', style: TextStyle(color: AppTheme.textSecondary))),
     );
   }
 }
