@@ -697,7 +697,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           fontSize: 12,
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 5),
                       // Email TextField
                       TextField(
                         controller: _emailController,
@@ -757,6 +757,14 @@ class _LoginScreenState extends State<LoginScreen> {
                       ],
                       SizedBox(height: 15),
 
+                      const Text(
+                        'Password',
+                        style: TextStyle(
+                          color: Color(0xFF8A92A3),
+                          fontSize: 12,
+                        ),
+                      ),
+                      const SizedBox(height: 5),
                       // Password TextField
                       TextField(
                         controller: _passwordController,
