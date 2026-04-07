@@ -584,3 +584,8 @@ class _CategoryBar extends StatelessWidget {
     );
   }
 }
+
+
+
+
+
