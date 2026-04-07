@@ -133,7 +133,7 @@ class _CreateTicketDialogState extends State<CreateTicketDialog> {
       priority: selectedPriority,
       description: descriptionController.text,
       file: _selectedFile,
-      // 👉 if needed later: requester: selectedRequester,
+      endorser: selectedRequester ?? '', // ✅ only one endorser parameter
     );
 
     if (ticketCode != null) {

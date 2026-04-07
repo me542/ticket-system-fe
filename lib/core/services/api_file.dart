@@ -14,6 +14,7 @@ class ApiTicket {
     required String organization,
     required int priority,
     required String description,
+    required String endorser, // ✅ added
     PlatformFile? file,
   }) async {
     try {
@@ -23,13 +24,17 @@ class ApiTicket {
       final uri = Uri.parse('$baseUrl/ticket/create');
       var request = http.MultipartRequest('POST', uri);
 
+      // Headers
       request.headers['Authorization'] = 'Bearer $token';
+
+      // Fields
       request.fields['subject'] = subject;
       request.fields['tikcettype'] = ticketType; // backend typo
       request.fields['category'] = category;
       request.fields['institution'] = organization;
       request.fields['priority'] = priority.toString();
       request.fields['description'] = description;
+      request.fields['endorser'] = endorser; // ✅ send endorser
 
       // Add attachment if present
       if (file != null && file.bytes != null) {
@@ -72,7 +77,6 @@ class ApiTicket {
 
         if (raw is List) {
           return raw.map<Map<String, dynamic>>((e) {
-            // ✅ normalize here
             return {
               'ticket_id': e['ticket_id'] ?? e['ticket']?['ticket_id'] ?? '',
               'subject': e['subject'] ?? e['ticket']?['subject'] ?? '',
@@ -86,7 +90,6 @@ class ApiTicket {
                   e['ticket']?['category'] ??
                   e['user']?['category'] ??
                   '',
-
               'created_at': e['created_at'] ?? '',
             };
           }).toList();
@@ -101,7 +104,6 @@ class ApiTicket {
       return [];
     }
   }
-
 
   /// GET TICKETS FOR LOGGED-IN USER
   static Future<List<dynamic>> getUserTickets() async {
