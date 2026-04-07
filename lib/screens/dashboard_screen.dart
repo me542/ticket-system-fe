@@ -6,6 +6,8 @@ import '../widgets/file_ticket.dart';
 import '../widgets/stats_card.dart';
 import 'package:ticket_system/widgets/ticket_row.dart';
 
+import '../widgets/status_sidebar.dart';
+
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -14,7 +16,26 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
+
+
 class _DashboardScreenState extends State<DashboardScreen> {
+
+  Ticket? _selectedTicket;
+  bool _isSidebarOpen = false;
+
+  void _openTicket(Ticket ticket) {
+    setState(() {
+      _selectedTicket = ticket;
+      _isSidebarOpen = true;
+    });
+  }
+
+  void _closeSidebar() {
+    setState(() {
+      _isSidebarOpen = false;
+    });
+  }
+
   String _selectedFilter = 'All';
   final List<String> _filters = ['All', 'For', 'In', 'Resolved'];
 
@@ -139,22 +160,48 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final filteredTickets = _tickets;
-    final maxCat = _categoryCount.values.isEmpty ? 0 : _categoryCount.values.reduce((a, b) => a > b ? a : b);
+    final maxCat = _categoryCount.values.isEmpty
+        ? 0
+        : _categoryCount.values.reduce((a, b) => a > b ? a : b);
 
-    return Column(
+    return Stack(
       children: [
-        _buildTopBar(context),
-        Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildStatsRow(),
-                const SizedBox(height: 24),
-                _buildMainContent(filteredTickets, maxCat),
-              ],
+        Column(
+          children: [
+            _buildTopBar(context),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildStatsRow(),
+                    const SizedBox(height: 24),
+                    _buildMainContent(filteredTickets, maxCat),
+                  ],
+                ),
+              ),
             ),
+          ],
+        ),
+
+        /// 🔥 DARK OVERLAY
+        if (_isSidebarOpen)
+          GestureDetector(
+            onTap: _closeSidebar,
+            child: Container(color: Colors.black54),
+          ),
+
+        /// 🔥 RIGHT SIDEBAR
+        AnimatedPositioned(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+          top: 0,
+          bottom: 0,
+          right: _isSidebarOpen ? 0 : -520,
+          child: TicketSidebar(
+            ticket: _selectedTicket,
+            onClose: _closeSidebar,
           ),
         ),
       ],
@@ -333,7 +380,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
             )
           else
             Column(
-              children: recentTickets.take(6).map<Widget>((t) => TicketRow(ticket: t)).toList(),
+              children: recentTickets.take(6).map<Widget>((t) {
+                return GestureDetector(
+                  onTap: () => _openTicket(t),
+                  child: TicketRow(ticket: t),
+                );
+              }).toList(),
             )
         ],
       ),
