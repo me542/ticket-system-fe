@@ -127,7 +127,7 @@ class _CreateTicketDialogState extends State<CreateTicketDialog> {
 
     final ticketCode = await ApiTicket.createTicket(
       subject: subjectController.text,
-      ticketType: selectedTicketType,
+      tickettype: selectedTicketType,
       category: selectedCategory,
       organization: selectedOrganization,
       priority: selectedPriority,

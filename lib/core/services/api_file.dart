@@ -9,7 +9,7 @@ class ApiTicket {
   /// CREATE TICKET
   static Future<bool> createTicket({
     required String subject,
-    required String ticketType,
+    required String tickettype,
     required String category,
     required String organization,
     required int priority,
@@ -29,7 +29,7 @@ class ApiTicket {
 
       // Fields
       request.fields['subject'] = subject;
-      request.fields['tikcettype'] = ticketType; // backend typo
+      request.fields['tickettype'] = tickettype; // backend typo
       request.fields['category'] = category;
       request.fields['institution'] = organization;
       request.fields['priority'] = priority.toString();
