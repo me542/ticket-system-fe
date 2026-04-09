@@ -36,8 +36,9 @@ class ApiGetUser {
               : (user['username'] ?? 'Unknown');
 
           return {
+            'id': user['user_id']?.toString() ?? '',
             'name': fullName,
-            'username': user['username']?.toString() ?? '', // ✅ ADD THIS
+            'username': user['username']?.toString() ?? '',
             'email': user['email']?.toString() ?? 'N/A',
             'position': (user['position'] as String?)?.trim().isNotEmpty == true
                 ? user['position']!.trim()

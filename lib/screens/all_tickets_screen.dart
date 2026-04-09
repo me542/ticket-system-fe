@@ -40,7 +40,7 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
           priority: _mapPriority(item['priority']),
           submitter: username,
           submitterInitials: username.isNotEmpty ? username[0] : '?',
-          createdAt: createdAt,
+          createdAt: createdAt, description: '',
         );
       }).toList();
 

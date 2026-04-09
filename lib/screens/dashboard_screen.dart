@@ -5,9 +5,7 @@ import '../models/ticket.dart';
 import '../widgets/file_ticket.dart';
 import '../widgets/stats_card.dart';
 import 'package:ticket_system/widgets/ticket_row.dart';
-
 import '../widgets/status_sidebar.dart';
-
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -15,8 +13,6 @@ class DashboardScreen extends StatefulWidget {
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
-
-
 
 class _DashboardScreenState extends State<DashboardScreen> {
 
@@ -128,6 +124,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         submitter: e['username'] ?? 'Unknown',
         submitterInitials: (e['username'] ?? 'U').substring(0, 1).toUpperCase(),
         createdAt: DateTime.tryParse(e['created_at'] ?? '') ?? DateTime.now(),
+        description: e['description'] ?? '',
       );
     }).toList();
 
@@ -198,7 +195,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           curve: Curves.easeInOut,
           top: 0,
           bottom: 0,
-          right: _isSidebarOpen ? 0 : -520,
+          right: _isSidebarOpen ? 0 : -1040,
           child: TicketSidebar(
             ticket: _selectedTicket,
             onClose: _closeSidebar,

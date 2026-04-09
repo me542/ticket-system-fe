@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:file_picker/file_picker.dart';
-import 'api_login.dart'; // your login API
+import 'api_login.dart';
 
 class ApiTicket {
   static const String baseUrl = 'http://localhost:8080/api/user';
@@ -14,7 +14,7 @@ class ApiTicket {
     required String organization,
     required int priority,
     required String description,
-    required String endorser, // ✅ added
+    required String endorser,
     PlatformFile? file,
   }) async {
     try {
@@ -24,19 +24,15 @@ class ApiTicket {
       final uri = Uri.parse('$baseUrl/ticket/create');
       var request = http.MultipartRequest('POST', uri);
 
-      // Headers
       request.headers['Authorization'] = 'Bearer $token';
-
-      // Fields
       request.fields['subject'] = subject;
-      request.fields['tickettype'] = tickettype; // backend typo
+      request.fields['tickettype'] = tickettype;
       request.fields['category'] = category;
       request.fields['institution'] = organization;
       request.fields['priority'] = priority.toString();
       request.fields['description'] = description;
-      request.fields['endorser'] = endorser; // ✅ send endorser
+      request.fields['endorser'] = endorser;
 
-      // Add attachment if present
       if (file != null && file.bytes != null) {
         request.files.add(
           http.MultipartFile.fromBytes(
@@ -49,13 +45,11 @@ class ApiTicket {
 
       final response = await request.send();
       final resBody = await response.stream.bytesToString();
-
-      print('STATUS: ${response.statusCode}');
-      print('BODY: $resBody');
-
+      print('CREATE STATUS: ${response.statusCode}');
+      print('CREATE BODY: $resBody');
       return response.statusCode == 201;
     } catch (e) {
-      print('ERROR: $e');
+      print('CREATE ERROR: $e');
       return false;
     }
   }
@@ -67,9 +61,7 @@ class ApiTicket {
       if (token == null) return [];
 
       final uri = Uri.parse('$baseUrl/list/all/tickets');
-      final res = await http.get(uri, headers: {
-        'Authorization': 'Bearer $token'
-      });
+      final res = await http.get(uri, headers: {'Authorization': 'Bearer $token'});
 
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
@@ -79,28 +71,20 @@ class ApiTicket {
           return raw.map<Map<String, dynamic>>((e) {
             return {
               'ticket_id': e['ticket_id'] ?? e['ticket']?['ticket_id'] ?? '',
-              'subject': e['subject'] ?? e['ticket']?['subject'] ?? '',
-              'priority': e['priority'] ?? e['ticket']?['priority'] ?? 0,
-              'status': e['status'] ?? e['ticket']?['status'] ?? '',
-              'username': e['username'] ??
-                  e['user']?['username'] ??
-                  e['ticket']?['username'] ??
-                  'Unknown',
-              'category': e['category'] ??
-                  e['ticket']?['category'] ??
-                  e['user']?['category'] ??
-                  '',
+              'subject':   e['subject']   ?? e['ticket']?['subject']   ?? '',
+              'priority':  e['priority']  ?? e['ticket']?['priority']  ?? 0,
+              'status':    e['status']    ?? e['ticket']?['status']    ?? '',
+              'username':  e['username']  ?? e['user']?['username']    ?? e['ticket']?['username'] ?? 'Unknown',
+              'category':  e['category']  ?? e['ticket']?['category']  ?? e['user']?['category']  ?? '',
               'created_at': e['created_at'] ?? '',
             };
           }).toList();
         }
-
         return [];
       }
-
       return [];
     } catch (e) {
-      print('ERROR: $e');
+      print('GET ALL ERROR: $e');
       return [];
     }
   }
@@ -119,36 +103,70 @@ class ApiTicket {
         return data['data'] ?? [];
       }
 
-      print('Failed to fetch user tickets: ${res.body}');
+      print('USER TICKETS FAILED: ${res.body}');
       return [];
     } catch (e) {
-      print('ERROR: $e');
+      print('USER TICKETS ERROR: $e');
       return [];
     }
   }
 
-  /// GET SINGLE TICKET BY ID
+  /// GET SINGLE TICKET BY SR NUMBER
+  /// Returns a flat map with all available fields regardless of nesting.
   static Future<Map<String, dynamic>?> getTicketByID(String ticketID) async {
     try {
       final token = await ApiLogin.getToken();
       if (token == null) return null;
 
-      final uri = Uri.parse('$baseUrl/ticket/$ticketID');
+      final uri = Uri.parse('$baseUrl/tickets/$ticketID');
       final res = await http.get(uri, headers: {'Authorization': 'Bearer $token'});
 
+      // ── DEBUG: print raw so you can see the exact shape ──────────────────
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      print('getTicketByID  SR: $ticketID');
+      print('STATUS: ${res.statusCode}');
+      print('RAW BODY: ${res.body}');
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
       if (res.statusCode == 200) {
-        final data = jsonDecode(res.body);
-        return data['data'];
+        final decoded = jsonDecode(res.body);
+
+        // The API might wrap the ticket in different ways.
+        // We try each common shape and flatten into one map.
+        final Map<String, dynamic> flat = {};
+
+        // Shape A: { "data": { ...ticket fields... } }
+        // Shape B: { "data": { "ticket": {...}, "user": {...}, ... } }
+        // Shape C: { "data": [ { ...ticket... } ] }  (rare but guard it)
+
+        dynamic raw = decoded['data'];
+
+        if (raw is List && raw.isNotEmpty) raw = raw.first;
+
+        if (raw is Map<String, dynamic>) {
+          // Merge top-level fields first
+          flat.addAll(raw);
+
+          // If there are sub-objects, hoist their fields too (without overwriting)
+          for (final key in ['ticket', 'user', 'endorser_info', 'approver_info', 'resolver_info']) {
+            final sub = raw[key];
+            if (sub is Map<String, dynamic>) {
+              sub.forEach((k, v) {
+                flat.putIfAbsent(k, () => v);
+              });
+            }
+          }
+        }
+
+        print('FLATTENED: $flat');
+        return flat.isEmpty ? null : flat;
       }
 
-      print('Failed to fetch ticket: ${res.body}');
+      print('getTicketByID FAILED: ${res.body}');
       return null;
     } catch (e) {
-      print('ERROR: $e');
+      print('getTicketByID ERROR: $e');
       return null;
     }
   }
 }
-
-
-

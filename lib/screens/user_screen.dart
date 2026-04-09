@@ -108,7 +108,6 @@ class _UserScreenState extends State<UserScreen> {
                           ),
                         ),
                         const Spacer(),
-
                         ElevatedButton.icon(
                           onPressed: _showAddUserDialog,
                           icon: const Icon(Icons.add, size: 16),
@@ -147,7 +146,7 @@ class _UserScreenState extends State<UserScreen> {
 
   // ================= USER ROW =================
   Widget _buildUserRow(Map<String, String> u) {
-    final bool isDisabled = u['role'] == 'disabled';
+    final bool isDisabled = u['status'] == 'inactive';
     return InkWell(
       onTap: () => _showUserActions(u),
       child: Container(
@@ -232,6 +231,7 @@ class _UserScreenState extends State<UserScreen> {
 
   // ================= ACTION MENU =================
   void _showUserActions(Map<String, String> user) {
+    final bool isDisabled = user['status'] == 'inactive';
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -248,9 +248,16 @@ class _UserScreenState extends State<UserScreen> {
           TextButton(
             onPressed: () {
               Navigator.pop(context);
-              _confirmDisableUser(user);
+              if (isDisabled) {
+                _confirmEnableUser(user);
+              } else {
+                _confirmDisableUser(user);
+              }
             },
-            child: const Text('Disable', style: TextStyle(color: Colors.orange)),
+            child: Text(
+              isDisabled ? 'Enable' : 'Disable',
+              style: TextStyle(color: isDisabled ? Colors.green : Colors.orange),
+            ),
           ),
         ],
       ),
@@ -265,7 +272,7 @@ class _UserScreenState extends State<UserScreen> {
     final passwordController = TextEditingController();
 
     String selectedPosition = 'Cloud Ops';
-    String selectedRole = 'user';
+    String selectedRole = 'enduser';
 
     bool fullNameValid = true;
     bool userNameValid = true;
@@ -293,7 +300,6 @@ class _UserScreenState extends State<UserScreen> {
                     },
                   ),
                   const SizedBox(height: 10),
-
                   TextField(
                     controller: userNameController,
                     decoration: InputDecoration(
@@ -301,15 +307,12 @@ class _UserScreenState extends State<UserScreen> {
                       errorText: userNameValid ? null : 'Invalid or duplicate username',
                     ),
                     onChanged: (value) {
-                      bool valid = value.trim().isNotEmpty &&
-                          !RegExp(r'^[0-9]+$').hasMatch(value);
-                      bool duplicate = users.any((u) =>
-                      u['username']?.toLowerCase() == value.toLowerCase());
+                      bool valid = value.trim().isNotEmpty && !RegExp(r'^[0-9]+$').hasMatch(value);
+                      bool duplicate = users.any((u) => u['username']?.toLowerCase() == value.toLowerCase());
                       setStateDialog(() => userNameValid = valid && !duplicate);
                     },
                   ),
                   const SizedBox(height: 10),
-
                   TextField(
                     controller: emailController,
                     decoration: InputDecoration(
@@ -317,14 +320,11 @@ class _UserScreenState extends State<UserScreen> {
                       errorText: emailValid ? null : 'Invalid or duplicate email',
                     ),
                     onChanged: (value) {
-                      bool duplicate = users.any((u) =>
-                      u['email']?.toLowerCase() == value.toLowerCase());
-                      setStateDialog(() =>
-                      emailValid = value.trim().isNotEmpty && !duplicate);
+                      bool duplicate = users.any((u) => u['email']?.toLowerCase() == value.toLowerCase());
+                      setStateDialog(() => emailValid = value.trim().isNotEmpty && !duplicate);
                     },
                   ),
                   const SizedBox(height: 10),
-
                   TextField(
                     controller: passwordController,
                     obscureText: true,
@@ -355,7 +355,6 @@ class _UserScreenState extends State<UserScreen> {
                     ),
                   ),
                   const SizedBox(height: 10),
-
                   DropdownButtonFormField<String>(
                     value: selectedPosition,
                     items: const [
@@ -370,17 +369,13 @@ class _UserScreenState extends State<UserScreen> {
                     decoration: const InputDecoration(labelText: 'Position'),
                   ),
                   const SizedBox(height: 10),
-
                   DropdownButtonFormField<String>(
                     value: selectedRole,
                     items: const [
-                      DropdownMenuItem(value: 'user', child: Text('User')),
+                      DropdownMenuItem(value: 'enduser', child: Text('End User')),
                       DropdownMenuItem(value: 'endorser', child: Text('Endorser')),
                       DropdownMenuItem(value: 'approver', child: Text('Approver')),
                       DropdownMenuItem(value: 'resolver', child: Text('Resolver')),
-                      DropdownMenuItem(value: 'admin', child: Text('Admin')),
-                      DropdownMenuItem(value: 'superadmin', child: Text('SuperAdmin')),
-                      DropdownMenuItem(value: 'N/A', child: Text('N/A')),
                     ],
                     onChanged: (value) {
                       if (value != null) setStateDialog(() => selectedRole = value);
@@ -395,7 +390,6 @@ class _UserScreenState extends State<UserScreen> {
             TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
             ElevatedButton(
               onPressed: () async {
-                // Validate before sending
                 if (fullNameController.text.trim().isEmpty ||
                     userNameController.text.trim().isEmpty ||
                     emailController.text.trim().isEmpty ||
@@ -417,20 +411,8 @@ class _UserScreenState extends State<UserScreen> {
                 );
 
                 if (success) {
-                  setState(() {
-                    users.add({
-                      'username': userNameController.text.trim(),
-                      'name': fullNameController.text.trim(),
-                      'email': emailController.text.trim(),
-                      'role': selectedRole,
-                      'position': selectedPosition,
-                      'initials': fullNameController.text.trim().isNotEmpty
-                          ? fullNameController.text.trim().split(' ').map((e) => e[0]).take(2).join()
-                          : '',
-                    });
-                  });
-
                   Navigator.pop(context);
+                  await _loadUsers(); // reload from API instead of adding locally
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('User created successfully')),
                   );
@@ -451,18 +433,18 @@ class _UserScreenState extends State<UserScreen> {
   // ================= EDIT USER =================
   void _showEditUserDialog(Map<String, String> user) {
     final fullNameController = TextEditingController(text: user['name']);
-    final userNameController = TextEditingController(text: user['username']);
     final emailController = TextEditingController(text: user['email']);
     final passwordController = TextEditingController();
 
-    String selectedPosition = const ['Cloud Ops', 'PS', 'QA'].contains(user['position'])
+    String selectedPosition = ['Cloud Ops', 'PS', 'QA', 'N/A'].contains(user['position'])
         ? user['position']!
         : 'N/A';
 
-    String selectedRole = const ['user', 'endorser', 'approver', 'resolver', 'admin', 'superadmin']
-        .contains(user['role'])
+    String selectedRole = ['enduser', 'endorser', 'approver', 'resolver'].contains(user['role'])
         ? user['role']!
-        : 'N/A';
+        : 'enduser';
+
+    String selectedStatus = user['status'] == 'inactive' ? 'inactive' : 'active';
 
     showDialog(
       context: context,
@@ -474,15 +456,25 @@ class _UserScreenState extends State<UserScreen> {
             child: SingleChildScrollView(
               child: Column(
                 children: [
-                  TextField(controller: fullNameController, decoration: const InputDecoration(labelText: 'Full Name')),
+                  TextField(
+                    controller: fullNameController,
+                    decoration: const InputDecoration(labelText: 'Full Name'),
+                  ),
                   const SizedBox(height: 10),
-                  TextField(controller: userNameController, decoration: const InputDecoration(labelText: 'User Name')),
+                  TextField(
+                    controller: emailController,
+                    decoration: const InputDecoration(labelText: 'Email'),
+                  ),
                   const SizedBox(height: 10),
-                  TextField(controller: emailController, decoration: const InputDecoration(labelText: 'Email')),
+                  TextField(
+                    controller: passwordController,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Password',
+                      hintText: 'Leave blank to keep current',
+                    ),
+                  ),
                   const SizedBox(height: 10),
-                  TextField(controller: passwordController, obscureText: true, decoration: const InputDecoration(labelText: 'Password')),
-                  const SizedBox(height: 10),
-
                   DropdownButtonFormField<String>(
                     value: selectedPosition,
                     items: const [
@@ -497,22 +489,30 @@ class _UserScreenState extends State<UserScreen> {
                     decoration: const InputDecoration(labelText: 'Position'),
                   ),
                   const SizedBox(height: 10),
-
                   DropdownButtonFormField<String>(
                     value: selectedRole,
                     items: const [
-                      DropdownMenuItem(value: 'user', child: Text('User')),
+                      DropdownMenuItem(value: 'enduser', child: Text('End User')),
                       DropdownMenuItem(value: 'endorser', child: Text('Endorser')),
                       DropdownMenuItem(value: 'approver', child: Text('Approver')),
                       DropdownMenuItem(value: 'resolver', child: Text('Resolver')),
-                      DropdownMenuItem(value: 'admin', child: Text('Admin')),
-                      DropdownMenuItem(value: 'superadmin', child: Text('SuperAdmin')),
-                      DropdownMenuItem(value: 'N/A', child: Text('N/A')),
                     ],
                     onChanged: (value) {
                       if (value != null) setStateDialog(() => selectedRole = value);
                     },
                     decoration: const InputDecoration(labelText: 'Role'),
+                  ),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    value: selectedStatus,
+                    items: const [
+                      DropdownMenuItem(value: 'active', child: Text('Active')),
+                      DropdownMenuItem(value: 'inactive', child: Text('Inactive')),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) setStateDialog(() => selectedStatus = value);
+                    },
+                    decoration: const InputDecoration(labelText: 'Status'),
                   ),
                 ],
               ),
@@ -522,8 +522,16 @@ class _UserScreenState extends State<UserScreen> {
             TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
             ElevatedButton(
               onPressed: () async {
+                final id = int.tryParse(user['id'] ?? '');
+                if (id == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Invalid user ID')),
+                  );
+                  return;
+                }
+
                 final success = await ApiUser.updateUser(
-                  username: userNameController.text.trim(),
+                  id: id,
                   fullname: fullNameController.text.trim(),
                   email: emailController.text.trim(),
                   password: passwordController.text.trim().isNotEmpty
@@ -531,15 +539,16 @@ class _UserScreenState extends State<UserScreen> {
                       : null,
                   role: selectedRole,
                   position: selectedPosition,
+                  status: selectedStatus,
                 );
 
                 if (success) {
                   setState(() {
-                    user['username'] = userNameController.text.trim();
                     user['name'] = fullNameController.text.trim();
                     user['email'] = emailController.text.trim();
                     user['role'] = selectedRole;
                     user['position'] = selectedPosition;
+                    user['status'] = selectedStatus;
                     user['initials'] = fullNameController.text.trim().isNotEmpty
                         ? fullNameController.text.trim().split(' ').map((e) => e[0]).take(2).join()
                         : '';
@@ -577,17 +586,27 @@ class _UserScreenState extends State<UserScreen> {
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
             onPressed: () async {
-              final success = await ApiUser.disableUser(email: user['email']!);
+              final id = int.tryParse(user['id'] ?? '');
+              if (id == null) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Invalid user ID')),
+                );
+                return;
+              }
+
+              final success = await ApiUser.disableUser(id: id);
 
               if (success) {
                 setState(() {
-                  user['role'] = 'disabled';
+                  user['status'] = 'inactive';
                 });
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('${user['name']} has been disabled')),
+                  SnackBar(content: Text('${user['name']} disabled successfully')),
                 );
               } else {
+                Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Failed to disable user')),
                 );
@@ -599,9 +618,52 @@ class _UserScreenState extends State<UserScreen> {
       ),
     );
   }
+
+  // ================= ENABLE USER =================
+  void _confirmEnableUser(Map<String, String> user) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Enable User'),
+        content: Text('Are you sure you want to enable ${user['name']}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+            onPressed: () async {
+              final id = int.tryParse(user['id'] ?? '');
+              if (id == null) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Invalid user ID')),
+                );
+                return;
+              }
+
+              final success = await ApiUser.enableUser(id: id);
+
+              if (success) {
+                setState(() {
+                  user['status'] = 'active';
+                });
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('${user['name']} enabled successfully')),
+                );
+              } else {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Failed to enable user')),
+                );
+              }
+            },
+            child: const Text('Enable'),
+          ),
+        ],
+      ),
+    );
+  }
 }
-
-
-
-
-

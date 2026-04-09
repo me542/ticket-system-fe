@@ -15,9 +15,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _darkMode = true;
 
   // User info
-  String _displayName = '';
+  String _username = '';
+  String _fullName = '';
   String _email = '';
   String _role = '';
+  String _position = '';
 
   @override
   void initState() {
@@ -37,16 +39,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
       );
 
       setState(() {
-        _displayName = currentUser['name'] ?? username;
+        _username = username;
+        _fullName = currentUser['name'] ?? '';       // ← use 'name' key from API
         _email = currentUser['email'] ?? username + '@example.com';
         _role = currentUser['role'] ?? 'User';
+        _position = currentUser['position'] ?? '';
       });
     } catch (e) {
       print('💥 Error loading user info: $e');
       setState(() {
-        _displayName = '';
+        _username = '';
+        _fullName = '';
         _email = '';
         _role = 'User';
+        _position = '';
       });
     }
   }
@@ -85,9 +91,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
               children: [
                 // Profile section (read-only)
                 _section('Profile', [
-                  _settingRow('Display Name', trailing: _displayText(_displayName)),
+                  _settingRow('Full Name', trailing: _displayText(_fullName)),
+                  _settingRow('Username', trailing: _displayText(_username)),
                   _settingRow('Email', trailing: _displayText(_email)),
                   _settingRow('Role', trailing: _displayText(_role)),
+                  _settingRow('Position', trailing: _displayText(_position)),
                 ]),
                 const SizedBox(height: 20),
 
@@ -97,7 +105,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     'Email Notifications',
                     trailing: Switch(
                       value: _emailNotifications,
-                      onChanged: (v) => setState(() => _emailNotifications = v),
+                      onChanged: (v) =>
+                          setState(() => _emailNotifications = v),
                       activeColor: AppTheme.accent,
                     ),
                   ),
@@ -125,8 +134,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.accent,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
                   ),
                   child: const Text(
                     'Save Changes',
@@ -199,7 +210,3 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 }
-
-
-
-

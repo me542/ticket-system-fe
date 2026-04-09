@@ -41,6 +41,8 @@ class ApiUser {
 
     try {
       final response = await http.post(url, headers: await _headers(), body: body);
+      print('📡 Create user status: ${response.statusCode}');
+      print('📋 Response body: ${response.body}');
       return response.statusCode == 200 || response.statusCode == 201;
     } catch (e) {
       print('❌ Error creating user: $e');
@@ -50,26 +52,29 @@ class ApiUser {
 
   // ================= UPDATE =================
   static Future<bool> updateUser({
-    required String username,
+    required int id,
     required String fullname,
     required String email,
-    String? password, // optional
+    String? password,
     required String role,
     required String position,
+    required String status,
   }) async {
-    final url = Uri.parse('$baseUrl/update');
+    final url = Uri.parse('$baseUrl/update/profile/$id');
 
     final body = jsonEncode({
-      'username': username,
       'full_name': fullname,
       'email': email,
       if (password != null && password.isNotEmpty) 'password': password,
       'role': role,
       'position': position,
+      'status': status,
     });
 
     try {
       final response = await http.put(url, headers: await _headers(), body: body);
+      print('📡 Update user status: ${response.statusCode}');
+      print('📋 Response body: ${response.body}');
       return response.statusCode == 200;
     } catch (e) {
       print('❌ Error updating user: $e');
@@ -78,13 +83,14 @@ class ApiUser {
   }
 
   // ================= DISABLE =================
-  static Future<bool> disableUser({required String email}) async {
-    final url = Uri.parse('$baseUrl/disable');
+  static Future<bool> disableUser({required int id}) async {
+    final url = Uri.parse('$baseUrl/update/profile/$id');
 
-    final body = jsonEncode({'email': email});
+    final body = jsonEncode({'status': 'inactive'});
 
     try {
       final response = await http.put(url, headers: await _headers(), body: body);
+      print('📡 Disable user status: ${response.statusCode}');
       return response.statusCode == 200;
     } catch (e) {
       print('❌ Error disabling user: $e');
@@ -93,13 +99,14 @@ class ApiUser {
   }
 
   // ================= ENABLE =================
-  static Future<bool> enableUser({required String email}) async {
-    final url = Uri.parse('$baseUrl/enable');
+  static Future<bool> enableUser({required int id}) async {
+    final url = Uri.parse('$baseUrl/update/profile/$id');
 
-    final body = jsonEncode({'email': email});
+    final body = jsonEncode({'status': 'active'});
 
     try {
       final response = await http.put(url, headers: await _headers(), body: body);
+      print('📡 Enable user status: ${response.statusCode}');
       return response.statusCode == 200;
     } catch (e) {
       print('❌ Error enabling user: $e');
@@ -107,6 +114,3 @@ class ApiUser {
     }
   }
 }
-
-
-

@@ -22,6 +22,7 @@ class Ticket {
   final String submitter;
   final String submitterInitials;
   final DateTime createdAt;
+  final String description;
 
   const Ticket({
     required this.id,
@@ -32,6 +33,7 @@ class Ticket {
     required this.submitter,
     required this.submitterInitials,
     required this.createdAt,
+    required this.description,
   });
 
   /// Human-readable labels for category
