@@ -55,13 +55,16 @@ class ApiTicket {
   }
 
   /// GET ALL TICKETS
+  /// Handles both flat and nested { "ticket": {...} } shapes.
+  /// Also handles GORM's CamelCase JSON keys (CreatedAt, UpdatedAt, etc.)
   static Future<List<Map<String, dynamic>>> getAllTickets() async {
     try {
       final token = await ApiLogin.getToken();
       if (token == null) return [];
 
       final uri = Uri.parse('$baseUrl/list/all/tickets');
-      final res = await http.get(uri, headers: {'Authorization': 'Bearer $token'});
+      final res = await http.get(
+          uri, headers: {'Authorization': 'Bearer $token'});
 
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
@@ -69,14 +72,48 @@ class ApiTicket {
 
         if (raw is List) {
           return raw.map<Map<String, dynamic>>((e) {
+            // Backend wraps as { "ticket": {...}, "attachments": [...] }
+            // Fall back to flat if no nested ticket key
+            final Map t =
+            (e['ticket'] is Map) ? e['ticket'] as Map : e as Map;
+
+            // Pick the first non-empty value from a list of key candidates.
+            // This handles both snake_case (json tags) and CamelCase (GORM default).
+            String pick(List<String> keys) {
+              for (final k in keys) {
+                final v = t[k] ?? e[k];
+                if (v != null && v.toString().trim().isNotEmpty) {
+                  return v.toString().trim();
+                }
+              }
+              return '';
+            }
+
+            dynamic pickNum(List<String> keys) {
+              for (final k in keys) {
+                final v = t[k] ?? e[k];
+                if (v != null) return v;
+              }
+              return 0;
+            }
+
             return {
-              'ticket_id': e['ticket_id'] ?? e['ticket']?['ticket_id'] ?? '',
-              'subject':   e['subject']   ?? e['ticket']?['subject']   ?? '',
-              'priority':  e['priority']  ?? e['ticket']?['priority']  ?? 0,
-              'status':    e['status']    ?? e['ticket']?['status']    ?? '',
-              'username':  e['username']  ?? e['user']?['username']    ?? e['ticket']?['username'] ?? 'Unknown',
-              'category':  e['category']  ?? e['ticket']?['category']  ?? e['user']?['category']  ?? '',
-              'created_at': e['created_at'] ?? '',
+              'ticket_id':    pick(['ticket_id', 'TicketID',    'ticketId']),
+              'subject':      pick(['subject',    'Subject']),
+              'category':     pick(['category',   'Category']),
+              'description':  pick(['description','Description']),
+              'institution':  pick(['institution','Institution']),
+              'tickettype':   pick(['tickettype', 'Tickettype', 'ticket_type', 'TicketType']),
+              'priority':     pickNum(['priority','Priority']),
+              'status':       pick(['status',     'Status']),
+              'username':     pick(['username',   'Username']),
+              'assignee':     pick(['assignee',   'Assignee']),
+              'endorser':     pick(['endorser',   'Endorser']),
+              'approver':     pick(['approver',   'Approver']),
+              'created_at':   pick(['created_at', 'CreatedAt', 'createdAt']),
+              'updated_at':   pick(['updated_at', 'UpdatedAt', 'updatedAt']),
+              'cancelled_by': pick(['cancelled_by','CancelledBy','cancelledBy']),
+              'cancelled_at': pick(['cancelled_at','CancelledAt','cancelledAt']),
             };
           }).toList();
         }
@@ -96,7 +133,8 @@ class ApiTicket {
       if (token == null) return [];
 
       final uri = Uri.parse('$baseUrl/ticket/user');
-      final res = await http.get(uri, headers: {'Authorization': 'Bearer $token'});
+      final res = await http.get(
+          uri, headers: {'Authorization': 'Bearer $token'});
 
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
@@ -119,9 +157,9 @@ class ApiTicket {
       if (token == null) return null;
 
       final uri = Uri.parse('$baseUrl/tickets/$ticketID');
-      final res = await http.get(uri, headers: {'Authorization': 'Bearer $token'});
+      final res = await http.get(
+          uri, headers: {'Authorization': 'Bearer $token'});
 
-      // ── DEBUG: print raw so you can see the exact shape ──────────────────
       print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       print('getTicketByID  SR: $ticketID');
       print('STATUS: ${res.statusCode}');
@@ -130,30 +168,20 @@ class ApiTicket {
 
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
-
-        // The API might wrap the ticket in different ways.
-        // We try each common shape and flatten into one map.
         final Map<String, dynamic> flat = {};
 
-        // Shape A: { "data": { ...ticket fields... } }
-        // Shape B: { "data": { "ticket": {...}, "user": {...}, ... } }
-        // Shape C: { "data": [ { ...ticket... } ] }  (rare but guard it)
-
         dynamic raw = decoded['data'];
-
         if (raw is List && raw.isNotEmpty) raw = raw.first;
 
         if (raw is Map<String, dynamic>) {
-          // Merge top-level fields first
           flat.addAll(raw);
-
-          // If there are sub-objects, hoist their fields too (without overwriting)
-          for (final key in ['ticket', 'user', 'endorser_info', 'approver_info', 'resolver_info']) {
+          for (final key in [
+            'ticket', 'user', 'endorser_info',
+            'approver_info', 'resolver_info'
+          ]) {
             final sub = raw[key];
             if (sub is Map<String, dynamic>) {
-              sub.forEach((k, v) {
-                flat.putIfAbsent(k, () => v);
-              });
+              sub.forEach((k, v) => flat.putIfAbsent(k, () => v));
             }
           }
         }

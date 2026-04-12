@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'data/app_theme.dart';
 import 'widgets/app_sidebar.dart';
 import 'screens/dashboard_screen.dart';
@@ -7,12 +8,21 @@ import 'screens/user_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/loginscreen.dart';
 
-void main() {
-  runApp(const MyApp());
+void main() async {
+  // Required before any async work in main()
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Check if a valid token already exists in SharedPreferences
+  final prefs = await SharedPreferences.getInstance();
+  final token = prefs.getString('user_token') ?? '';
+  final isLoggedIn = token.isNotEmpty;
+
+  runApp(MyApp(isLoggedIn: isLoggedIn));
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final bool isLoggedIn;
+  const MyApp({super.key, required this.isLoggedIn});
 
   @override
   Widget build(BuildContext context) {
@@ -20,7 +30,8 @@ class MyApp extends StatelessWidget {
       title: 'Ticket System',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
-      home: const LoginScreen(),
+      // If token exists → go straight to MainShell, else LoginScreen
+      home: isLoggedIn ? const MainShell() : const LoginScreen(),
     );
   }
 }
@@ -55,7 +66,7 @@ class _MainShellState extends State<MainShell> {
         children: [
           AppSidebar(
             currentRoute: _currentRoute,
-            allTicketsCount: 0, // Removed provider, static 0 for now
+            allTicketsCount: 0,
             onNavigate: (route) => setState(() => _currentRoute = route),
           ),
           Expanded(child: _buildContent()),

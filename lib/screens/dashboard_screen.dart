@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/services/api_file.dart';
+import '../core/services/api_export.dart';
 import '../data/app_theme.dart';
 import '../models/ticket.dart';
 import '../widgets/file_ticket.dart';
@@ -15,7 +16,7 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-
+  // ── Sidebar ──────────────────────────────────────────────
   Ticket? _selectedTicket;
   bool _isSidebarOpen = false;
 
@@ -32,13 +33,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
   }
 
+  // ── Filter & Search ──────────────────────────────────────
   String _selectedFilter = 'All';
-  final List<String> _filters = ['All', 'For', 'In', 'Resolved'];
+  final List<String> _filters = ['All', 'For', 'In', 'Resolved', 'Cancelled'];
 
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  bool _isExporting = false;
+
+  // ── Data ─────────────────────────────────────────────────
   final List<Ticket> _tickets = [];
   final List<ActivityItem> _activities = [];
 
-  /// Initialize category count for all updated TicketCategory values
   final Map<TicketCategory, int> _categoryCount = {
     for (var cat in TicketCategory.values) cat: 0,
   };
@@ -50,12 +57,61 @@ class _DashboardScreenState extends State<DashboardScreen> {
     'resolved': 0,
   };
 
+  // ── Computed filtered list ────────────────────────────────
+  List<Ticket> get _filteredTickets {
+    // 1. Apply status filter
+    List<Ticket> list;
+    switch (_selectedFilter) {
+      case 'For':
+        list = _tickets
+            .where((t) => t.status == TicketStatus.forAssessment)
+            .toList();
+        break;
+      case 'In':
+        list = _tickets
+            .where((t) => t.status == TicketStatus.inProgress)
+            .toList();
+        break;
+      case 'Resolved':
+        list =
+            _tickets.where((t) => t.status == TicketStatus.resolved).toList();
+        break;
+      case 'Cancelled':
+        list =
+            _tickets.where((t) => t.status == TicketStatus.cancelled).toList();
+        break;
+      default:
+        list = List.from(_tickets);
+    }
+
+    // 2. Apply search query
+    if (_searchQuery.isEmpty) return list;
+    final q = _searchQuery.toLowerCase();
+    return list
+        .where((t) =>
+    t.title.toLowerCase().contains(q) ||
+        t.id.toLowerCase().contains(q) ||
+        t.submitter.toLowerCase().contains(q))
+        .toList();
+  }
+
+  // ── Lifecycle ─────────────────────────────────────────────
   @override
   void initState() {
     super.initState();
     _loadTickets();
+    _searchController.addListener(() {
+      setState(() => _searchQuery = _searchController.text);
+    });
   }
 
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  // ── Helpers ───────────────────────────────────────────────
   Color _activityColor(ActivityType type) {
     switch (type) {
       case ActivityType.submitted:
@@ -71,11 +127,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  // ── Load tickets ──────────────────────────────────────────
   Future<void> _loadTickets() async {
     final ticketData = await ApiTicket.getAllTickets();
 
     final tickets = ticketData.map((e) {
-      // --- Status mapping ---
+      // Status mapping
       TicketStatus status;
       switch ((e['status'] ?? '').toLowerCase()) {
         case 'forassessment':
@@ -96,10 +153,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
           status = TicketStatus.forAssessment;
       }
 
-      // --- Category mapping using updated enum ---
+      // Category mapping
       TicketCategory category = mapCategory(e['category'] ?? '');
 
-      // --- Priority mapping ---
+      // Priority mapping
       TicketPriority priority;
       switch (e['priority'] ?? 0) {
         case 1:
@@ -122,7 +179,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         status: status,
         priority: priority,
         submitter: e['username'] ?? 'Unknown',
-        submitterInitials: (e['username'] ?? 'U').substring(0, 1).toUpperCase(),
+        submitterInitials:
+        (e['username'] ?? 'U').substring(0, 1).toUpperCase(),
         createdAt: DateTime.tryParse(e['created_at'] ?? '') ?? DateTime.now(),
         description: e['description'] ?? '',
       );
@@ -130,21 +188,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     // Compute stats
     final total = tickets.length;
-    final forAssessment = tickets.where((t) => t.status == TicketStatus.forAssessment).length;
-    final inProgress = tickets.where((t) => t.status == TicketStatus.inProgress).length;
-    final resolved = tickets.where((t) => t.status == TicketStatus.resolved).length;
+    final forAssessment =
+        tickets.where((t) => t.status == TicketStatus.forAssessment).length;
+    final inProgress =
+        tickets.where((t) => t.status == TicketStatus.inProgress).length;
+    final resolved =
+        tickets.where((t) => t.status == TicketStatus.resolved).length;
 
-    // Compute categories count dynamically
+    // Compute category counts
     final Map<TicketCategory, int> categoryCount = {};
     for (var cat in TicketCategory.values) {
       categoryCount[cat] = tickets.where((t) => t.category == cat).length;
     }
 
     setState(() {
-      _tickets.clear();
-      _tickets.addAll(tickets);
-      _categoryCount.clear();
-      _categoryCount.addAll(categoryCount);
+      _tickets
+        ..clear()
+        ..addAll(tickets);
+      _categoryCount
+        ..clear()
+        ..addAll(categoryCount);
       _statsCounts = {
         'total': total,
         'forAssessment': forAssessment,
@@ -154,9 +217,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
   }
 
+  // ── Build ─────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    final filteredTickets = _tickets;
+    final filtered = _filteredTickets;
     final maxCat = _categoryCount.values.isEmpty
         ? 0
         : _categoryCount.values.reduce((a, b) => a > b ? a : b);
@@ -174,7 +238,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   children: [
                     _buildStatsRow(),
                     const SizedBox(height: 24),
-                    _buildMainContent(filteredTickets, maxCat),
+                    _buildMainContent(filtered, maxCat),
                   ],
                 ),
               ),
@@ -182,14 +246,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ],
         ),
 
-        /// 🔥 DARK OVERLAY
+        // Dark overlay
         if (_isSidebarOpen)
           GestureDetector(
             onTap: _closeSidebar,
             child: Container(color: Colors.black54),
           ),
 
-        /// 🔥 RIGHT SIDEBAR
+        // Right sidebar
         AnimatedPositioned(
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeInOut,
@@ -205,6 +269,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  // ── Top bar ───────────────────────────────────────────────
   Widget _buildTopBar(BuildContext context) {
     return Container(
       height: 56,
@@ -224,6 +289,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
           const SizedBox(width: 20),
+
+          // ── Real search bar ──────────────────────────────
           Expanded(
             child: Container(
               height: 36,
@@ -232,24 +299,48 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: AppTheme.border),
               ),
-              child: const Row(
+              child: Row(
                 children: [
-                  SizedBox(width: 12),
-                  Icon(Icons.search, size: 16, color: AppTheme.textSecondary),
-                  SizedBox(width: 8),
-                  Text(
-                    'Search tickets, users...',
-                    style: TextStyle(color: AppTheme.textMuted, fontSize: 13),
+                  const SizedBox(width: 12),
+                  const Icon(Icons.search,
+                      size: 16, color: AppTheme.textSecondary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextField(
+                      controller: _searchController,
+                      style: const TextStyle(
+                          color: AppTheme.textPrimary, fontSize: 13),
+                      decoration: const InputDecoration(
+                        hintText: 'Search tickets, users...',
+                        hintStyle: TextStyle(
+                            color: AppTheme.textMuted, fontSize: 13),
+                        border: InputBorder.none,
+                        isDense: true,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
                   ),
+                  // Clear button
+                  if (_searchQuery.isNotEmpty)
+                    GestureDetector(
+                      onTap: () => _searchController.clear(),
+                      child: const Padding(
+                        padding: EdgeInsets.only(right: 8),
+                        child: Icon(Icons.close,
+                            size: 14, color: AppTheme.textSecondary),
+                      ),
+                    ),
                 ],
               ),
             ),
           ),
+
           const SizedBox(width: 16),
           Stack(
             children: [
               IconButton(
-                icon: const Icon(Icons.notifications_outlined, color: AppTheme.textSecondary),
+                icon: const Icon(Icons.notifications_outlined,
+                    color: AppTheme.textSecondary),
                 onPressed: () {},
               ),
               const Positioned(
@@ -263,24 +354,60 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ],
           ),
           IconButton(
-            icon: const Icon(Icons.download_outlined, color: AppTheme.textSecondary),
-            onPressed: () {},
+            icon: _isExporting
+                ? const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                  strokeWidth: 2, color: AppTheme.textSecondary),
+            )
+                : const Icon(Icons.download_outlined,
+                color: AppTheme.textSecondary),
+            tooltip: 'Export tickets to Excel',
+            onPressed: _isExporting
+                ? null
+                : () async {
+              setState(() => _isExporting = true);
+              try {
+                await ApiExport.downloadTicketsExcel();
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Export failed: $e'),
+                      backgroundColor: Colors.redAccent,
+                    ),
+                  );
+                }
+              } finally {
+                if (mounted) setState(() => _isExporting = false);
+              }
+            },
           ),
           const SizedBox(width: 8),
+
+          // ── New Ticket button — awaits dialog then refreshes ──
           ElevatedButton.icon(
-            onPressed: () => showDialog(
-              context: context,
-              barrierDismissible: false,
-              builder: (_) => const CreateTicketDialog(),
-            ),
+            onPressed: () async {
+              await showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (_) => const CreateTicketDialog(),
+              );
+              // Re-fetch tickets so new one appears immediately
+              _loadTickets();
+            },
             icon: const Icon(Icons.add, size: 16),
             label: const Text('New Ticket'),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.accent,
               foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+              padding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+              textStyle:
+              const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
             ),
           ),
         ],
@@ -288,6 +415,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  // ── Stats row ─────────────────────────────────────────────
   Widget _buildStatsRow() {
     return Row(
       children: [
@@ -322,6 +450,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  // ── Main content ──────────────────────────────────────────
   Widget _buildMainContent(List<Ticket> tickets, int maxCat) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -342,6 +471,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  // ── Tickets table ─────────────────────────────────────────
   Widget _buildTicketsTable(List<Ticket> tickets) {
     final recentTickets = tickets.take(8).toList();
 
@@ -372,7 +502,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             const Padding(
               padding: EdgeInsets.all(32),
               child: Center(
-                child: Text('No tickets found', style: TextStyle(color: AppTheme.textSecondary)),
+                child: Text('No tickets found',
+                    style: TextStyle(color: AppTheme.textSecondary)),
               ),
             )
           else
@@ -383,23 +514,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   child: TicketRow(ticket: t),
                 );
               }).toList(),
-            )
+            ),
         ],
       ),
     );
   }
 
-
-
+  // ── Tickets header with filter buttons ────────────────────
   Widget _buildTicketsHeader() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       child: Row(
         children: [
-          const Text('Recent Tickets', style: TextStyle(color: AppTheme.textPrimary, fontSize: 15, fontWeight: FontWeight.w700)),
+          const Text('Recent Tickets',
+              style: TextStyle(
+                  color: AppTheme.textPrimary,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700)),
           const SizedBox(width: 8),
-          Text('${_tickets.length} total', style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+          // Show filtered count vs total
+          Text(
+            _searchQuery.isNotEmpty || _selectedFilter != 'All'
+                ? '${_filteredTickets.length} of ${_tickets.length}'
+                : '${_tickets.length} total',
+            style: const TextStyle(
+                color: AppTheme.textSecondary, fontSize: 12),
+          ),
           const Spacer(),
+          // ── Filter buttons ───────────────────────────────
           Row(
             children: _filters.map((f) {
               final isSelected = _selectedFilter == f;
@@ -407,18 +549,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 onTap: () => setState(() => _selectedFilter = f),
                 child: Container(
                   margin: const EdgeInsets.only(left: 6),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: isSelected ? AppTheme.accent.withOpacity(0.15) : Colors.transparent,
+                    color: isSelected
+                        ? AppTheme.accent.withOpacity(0.15)
+                        : Colors.transparent,
                     borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: isSelected ? AppTheme.accent : AppTheme.border),
+                    border: Border.all(
+                        color:
+                        isSelected ? AppTheme.accent : AppTheme.border),
                   ),
                   child: Text(
                     f,
                     style: TextStyle(
-                      color: isSelected ? AppTheme.accent : AppTheme.textSecondary,
+                      color: isSelected
+                          ? AppTheme.accent
+                          : AppTheme.textSecondary,
                       fontSize: 12,
-                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                      fontWeight: isSelected
+                          ? FontWeight.w600
+                          : FontWeight.normal,
                     ),
                   ),
                 ),
@@ -430,7 +581,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  /// --- Updated Category Panel dynamically from TicketCategory enum ---
+  // ── Category panel ────────────────────────────────────────
   Widget _buildCategoryPanel(int maxCat) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -453,7 +604,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const SizedBox(height: 16),
           ...TicketCategory.values.map((cat) {
             final count = _categoryCount[cat] ?? 0;
-            final label = cat.toString().split('.').last; // temporary, can use categoryLabel helper if needed
             Color color;
             switch (cat) {
               case TicketCategory.customerPremise:
@@ -480,12 +630,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             }
             return Padding(
               padding: const EdgeInsets.only(bottom: 10),
-              child: _CategoryBar(
-                catLabel(cat),
-                count,
-                maxCat,
-                color,
-              ),
+              child: _CategoryBar(catLabel(cat), count, maxCat, color),
             );
           }).toList(),
         ],
@@ -512,6 +657,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  // ── Recent activity ───────────────────────────────────────
   Widget _buildRecentActivity() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -520,11 +666,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppTheme.border),
       ),
-      child: const Center(child: Text('No recent activity', style: TextStyle(color: AppTheme.textSecondary))),
+      child: const Center(
+        child: Text('No recent activity',
+            style: TextStyle(color: AppTheme.textSecondary)),
+      ),
     );
   }
 }
 
+// ── Table header cell ─────────────────────────────────────────
 class _TableHeader extends StatelessWidget {
   final String label;
   const _TableHeader(this.label);
@@ -543,6 +693,7 @@ class _TableHeader extends StatelessWidget {
   }
 }
 
+// ── Category progress bar ─────────────────────────────────────
 class _CategoryBar extends StatelessWidget {
   final String label;
   final int count;
@@ -558,16 +709,27 @@ class _CategoryBar extends StatelessWidget {
       children: [
         SizedBox(
           width: 90,
-          child: Text(label, style: const TextStyle(color: AppTheme.textSecondary, fontSize: 11), overflow: TextOverflow.ellipsis),
+          child: Text(label,
+              style: const TextStyle(
+                  color: AppTheme.textSecondary, fontSize: 11),
+              overflow: TextOverflow.ellipsis),
         ),
         const SizedBox(width: 8),
         Expanded(
           child: Stack(
             children: [
-              Container(height: 4, decoration: BoxDecoration(color: AppTheme.border, borderRadius: BorderRadius.circular(2))),
+              Container(
+                  height: 4,
+                  decoration: BoxDecoration(
+                      color: AppTheme.border,
+                      borderRadius: BorderRadius.circular(2))),
               FractionallySizedBox(
                 widthFactor: ratio,
-                child: Container(height: 4, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2))),
+                child: Container(
+                    height: 4,
+                    decoration: BoxDecoration(
+                        color: color,
+                        borderRadius: BorderRadius.circular(2))),
               ),
             ],
           ),
@@ -575,14 +737,12 @@ class _CategoryBar extends StatelessWidget {
         const SizedBox(width: 8),
         SizedBox(
           width: 20,
-          child: Text(count.toString(), style: const TextStyle(color: AppTheme.textSecondary, fontSize: 11), textAlign: TextAlign.right),
+          child: Text(count.toString(),
+              style: const TextStyle(
+                  color: AppTheme.textSecondary, fontSize: 11),
+              textAlign: TextAlign.right),
         ),
       ],
     );
   }
 }
-
-
-
-
-

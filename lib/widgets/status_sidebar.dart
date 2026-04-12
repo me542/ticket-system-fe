@@ -1,12 +1,12 @@
-// ignore: avoid_web_libraries_in_flutter
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../core/services/api_attachment.dart';
 import '../core/services/api_file.dart';
 import '../core/services/api_login.dart';
-import '../core/services/api_user_data.dart'; // ApiGetUser lives here
+import '../core/services/api_user_data.dart';
 import '../data/app_theme.dart';
 import '../models/ticket.dart';
+import 'package:ticket_system/core/services/api_update_ticket.dart';
 
 class TicketSidebar extends StatefulWidget {
   final Ticket? ticket;
@@ -27,9 +27,9 @@ class _TicketSidebarState extends State<TicketSidebar> {
   bool _isLoading = false;
   String? _error;
 
-  // ── current-user role (fetched once on init) ──────────────────────────────
-  String _currentUserRole = '';   // e.g. 'endorser', 'approver', 'resolver'
-  bool _actionLoading = false;    // spinner while an action API call is in-flight
+  String _currentUserRole     = '';
+  String _currentUsername     = '';
+  bool   _actionLoading       = false;
 
   // ─── lifecycle ─────────────────────────────────────────────────────────────
 
@@ -37,7 +37,7 @@ class _TicketSidebarState extends State<TicketSidebar> {
   void initState() {
     super.initState();
     _fetchBySR(widget.ticket?.id);
-    _loadCurrentUserRole();
+    _loadCurrentUser();
   }
 
   @override
@@ -48,72 +48,52 @@ class _TicketSidebarState extends State<TicketSidebar> {
     }
   }
 
-  // ── load the logged-in user's role from ApiGetUser ────────────────────────
+  // ─── load current user ─────────────────────────────────────────────────────
 
-  Future<void> _loadCurrentUserRole() async {
+  Future<void> _loadCurrentUser() async {
     try {
-      // Step 1: get the username that was saved at login time
-      final savedUsername = await ApiLogin.getUsername(); // add getUsername() to ApiLogin if missing
-
-      // Step 2: fetch the full user list
-      final users = await ApiGetUser.fetchUsers();
+      final savedUsername = await ApiLogin.getUsername();
+      final users         = await ApiGetUser.fetchUsers();
 
       String role = '';
+      String username = savedUsername ?? '';
 
       if (savedUsername != null && savedUsername.isNotEmpty) {
-        // Match by username first (most reliable)
         final match = users.firstWhere(
-              (u) => (u['username'] ?? '').toLowerCase() ==
-              savedUsername.toLowerCase(),
+              (u) => (u['username'] ?? '').toLowerCase() == savedUsername.toLowerCase(),
           orElse: () => {},
         );
         role = match['role'] ?? '';
       }
 
-      // Fallback: if username match failed, take the first result
-      // (only safe when the endpoint is scoped to the authed user)
       if (role.isEmpty && users.isNotEmpty) {
         role = users.first['role'] ?? '';
       }
 
-      debugPrint('👤 Current user role detected: "$role"');
+      debugPrint('👤 user: "$username"  role: "$role"');
 
-      if (mounted) setState(() => _currentUserRole = role.toLowerCase().trim());
+      if (mounted) {
+        setState(() {
+          _currentUserRole = role.toLowerCase().trim();
+          _currentUsername = username.toLowerCase().trim();
+        });
+      }
     } catch (e) {
-      debugPrint('Could not load current-user role: $e');
+      debugPrint('Could not load current user: $e');
     }
   }
 
+  // ─── fetch ticket ──────────────────────────────────────────────────────────
+
   Future<void> _fetchBySR(String? srNumber) async {
     if (srNumber == null || srNumber.trim().isEmpty) return;
-
-    setState(() {
-      _isLoading = true;
-      _error = null;
-      _detail = null;
-    });
-
+    setState(() { _isLoading = true; _error = null; _detail = null; });
     try {
       final data = await ApiTicket.getTicketByID(srNumber.trim());
-
-      if (data != null) {
-        final returnedId = _pick(data, ['ticket_id', 'id', 'sr_number', 'sr_id'])
-            ?.toString()
-            .trim();
-        if (returnedId != null &&
-            returnedId.isNotEmpty &&
-            returnedId != srNumber.trim()) {
-          debugPrint('⚠️  SR mismatch: requested $srNumber, received $returnedId');
-        }
-      }
-
-      setState(() {
-        _detail = data;
-        _isLoading = false;
-      });
+      setState(() { _detail = data; _isLoading = false; });
     } catch (e) {
       setState(() {
-        _error = 'Could not load ticket details. Please try again.';
+        _error     = 'Could not load ticket details. Please try again.';
         _isLoading = false;
       });
     }
@@ -135,31 +115,71 @@ class _TicketSidebarState extends State<TicketSidebar> {
     return v?.toString() ?? fallback;
   }
 
-  // ─── ticket status helpers ─────────────────────────────────────────────────
+  // ─── status helpers ────────────────────────────────────────────────────────
 
-  /// Normalised lowercase status string, no spaces.
   String get _rawStatus =>
       _field(['status'], fallback: widget.ticket?.status.name ?? '')
           .toLowerCase()
-          .replaceAll(' ', '');
+          .trim();
 
-  bool get _isSubmitted  => _rawStatus.contains('submit') || _rawStatus == 'new';
-  bool get _isEndorsed   => _rawStatus.contains('endorse') || _rawStatus.contains('forassess');
-  bool get _isApproved   => _rawStatus.contains('approv');
-  bool get _isAssigned   => _rawStatus.contains('assign') ||
-      _rawStatus.contains('inprogress') ||
-      _rawStatus.contains('progress');
-  bool get _isResolved   => _rawStatus.contains('resolv') || _rawStatus.contains('cancel');
+  String get _normalizedStatus {
+    switch (_rawStatus.replaceAll(' ', '').replaceAll('_', '')) {
+      case 'forendorsement':
+      case 'pendingendorsement':
+      case 'submitted':
+      case 'new':
+        return 'submitted';
+      case 'endorsed':
+      case 'forapproval':
+      case 'pendingapproval':
+      case 'forassessment':
+      case 'assessment':
+        return 'endorsed';
+      case 'approved':
+      case 'forassignment':
+      case 'pendingassignment':
+        return 'approved';
+      case 'assigned':
+      case 'inprogress':
+        return 'assigned';
+      case 'resolved':
+        return 'resolved';
+      case 'cancelled':
+      case 'canceled':
+        return 'cancelled';
+      default:
+        debugPrint('⚠️  Unknown ticket status: "$_rawStatus"');
+        return _rawStatus.replaceAll(' ', '');
+    }
+  }
+
+  bool get _isSubmitted => _normalizedStatus == 'submitted';
+  bool get _isEndorsed  => _normalizedStatus == 'endorsed';
+  bool get _isApproved  => _normalizedStatus == 'approved';
+  bool get _isAssigned  => _normalizedStatus == 'assigned';
+  bool get _isResolved  => _normalizedStatus == 'resolved';
+  bool get _isCancelled => _normalizedStatus == 'cancelled';
+
+  // ─── who created this ticket ───────────────────────────────────────────────
+
+  /// Returns true if the logged-in user is the one who submitted this ticket.
+  bool get _isCreator {
+    final submitter = _field(
+      ['username', 'submitter', 'created_by'],
+      fallback: widget.ticket?.submitter ?? '',
+    ).toLowerCase().trim();
+    return _currentUsername.isNotEmpty && _currentUsername == submitter;
+  }
 
   // ─── color helpers ─────────────────────────────────────────────────────────
 
   Color get _statusColor {
     switch (widget.ticket?.status) {
       case TicketStatus.forAssessment: return AppTheme.statusAssessment;
-      case TicketStatus.inProgress:   return AppTheme.statusProgress;
-      case TicketStatus.resolved:     return AppTheme.statusResolved;
-      case TicketStatus.cancelled:    return AppTheme.statusCancelled;
-      default:                        return AppTheme.statusAssessment;
+      case TicketStatus.inProgress:    return AppTheme.statusProgress;
+      case TicketStatus.resolved:      return AppTheme.statusResolved;
+      case TicketStatus.cancelled:     return AppTheme.statusCancelled;
+      default:                         return AppTheme.statusAssessment;
     }
   }
 
@@ -203,6 +223,9 @@ class _TicketSidebarState extends State<TicketSidebar> {
   // ─── header ────────────────────────────────────────────────────────────────
 
   Widget _buildHeader(Ticket ticket) {
+    // Cancel is only shown to the ticket creator while still active
+    final canCancel = _isCreator && !_isResolved && !_isCancelled;
+
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
       decoration: const BoxDecoration(
@@ -211,39 +234,52 @@ class _TicketSidebarState extends State<TicketSidebar> {
       child: Row(
         children: [
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Ticket Detail',
-                  style: TextStyle(
-                    color: AppTheme.textPrimary,
-                    fontSize: 17,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Row(
-                  children: [
-                    const Icon(Icons.tag, size: 13, color: Colors.orange),
-                    const SizedBox(width: 4),
-                    Text(
-                      'SR: ${ticket.id}',
-                      style: const TextStyle(
-                        color: Colors.orange,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+            child: const Text(
+              'Ticket Detail',
+              style: TextStyle(
+                color: AppTheme.textPrimary,
+                fontSize: 17,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
+
+          // ── Cancel button (creator only) ────────────────────────────────
+          if (canCancel)
+            Tooltip(
+              message: 'Cancel Ticket',
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: GestureDetector(
+                  onTap: _actionLoading ? null : () => _confirmAndCancel(ticket.id),
+                  child: Container(
+                    margin: const EdgeInsets.only(right: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: Colors.orange.withOpacity(0.5)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Icon(Icons.block_outlined, size: 14, color: Colors.orange),
+                        SizedBox(width: 5),
+                        Text('Cancel',
+                            style: TextStyle(
+                                color: Colors.orange,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
           IconButton(
             onPressed: () => _fetchBySR(ticket.id),
-            icon: const Icon(Icons.refresh,
-                color: AppTheme.textSecondary, size: 20),
+            icon: const Icon(Icons.refresh, color: AppTheme.textSecondary, size: 20),
             tooltip: 'Refresh',
           ),
           IconButton(
@@ -255,45 +291,70 @@ class _TicketSidebarState extends State<TicketSidebar> {
     );
   }
 
-  // ─── loading / error ───────────────────────────────────────────────────────
+  // ─── confirm cancel dialog ─────────────────────────────────────────────────
 
-  Widget _buildLoading() {
-    return const Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          CircularProgressIndicator(),
-          SizedBox(height: 16),
-          Text('Loading ticket details…',
-              style: TextStyle(color: AppTheme.textSecondary)),
+  Future<void> _confirmAndCancel(String ticketId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        title: const Text('Cancel Ticket',
+            style: TextStyle(color: AppTheme.textPrimary)),
+        content: const Text(
+          'Are you sure you want to cancel this ticket? This cannot be undone.',
+          style: TextStyle(color: AppTheme.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('No'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Yes, Cancel'),
+          ),
         ],
       ),
     );
+    if (confirmed == true) await _handleAction('cancel', ticketId);
   }
 
-  Widget _buildError() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.error_outline, color: Colors.redAccent, size: 40),
-            const SizedBox(height: 12),
-            Text(_error!,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.redAccent)),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: () => _fetchBySR(widget.ticket?.id),
-              icon: const Icon(Icons.refresh),
-              label: const Text('Retry'),
-            ),
-          ],
-        ),
+  // ─── loading / error ───────────────────────────────────────────────────────
+
+  Widget _buildLoading() => const Center(
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        CircularProgressIndicator(),
+        SizedBox(height: 16),
+        Text('Loading ticket details…',
+            style: TextStyle(color: AppTheme.textSecondary)),
+      ],
+    ),
+  );
+
+  Widget _buildError() => Center(
+    child: Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.error_outline, color: Colors.redAccent, size: 40),
+          const SizedBox(height: 12),
+          Text(_error!,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.redAccent)),
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
+            onPressed: () => _fetchBySR(widget.ticket?.id),
+            icon: const Icon(Icons.refresh),
+            label: const Text('Retry'),
+          ),
+        ],
       ),
-    );
-  }
+    ),
+  );
 
   // ─── main content ──────────────────────────────────────────────────────────
 
@@ -305,19 +366,17 @@ class _TicketSidebarState extends State<TicketSidebar> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── LEFT COLUMN ─────────────────────────────────────────────────
+            // ── LEFT COLUMN ──────────────────────────────────────────────
             Expanded(
               flex: 1,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      _chip(ticket.statusLabel, _statusColor),
-                      const SizedBox(width: 8),
-                      _chip(ticket.priorityLabel, _priorityColor),
-                    ],
-                  ),
+                  Row(children: [
+                    _chip(ticket.statusLabel, _statusColor),
+                    const SizedBox(width: 8),
+                    _chip(ticket.priorityLabel, _priorityColor),
+                  ]),
                   const SizedBox(height: 16),
                   _buildSubjectCard(ticket),
                   const SizedBox(height: 12),
@@ -332,7 +391,7 @@ class _TicketSidebarState extends State<TicketSidebar> {
 
             const SizedBox(width: 20),
 
-            // ── RIGHT COLUMN ─────────────────────────────────────────────────
+            // ── RIGHT COLUMN ─────────────────────────────────────────────
             Expanded(
               flex: 1,
               child: Column(
@@ -342,11 +401,8 @@ class _TicketSidebarState extends State<TicketSidebar> {
                   const SizedBox(height: 16),
                   _buildApprovalChain(),
                   const SizedBox(height: 12),
-
-                  // ── ACTION BUTTONS (role-aware) ──────────────────────────
                   _buildActionButtons(ticket),
                   const SizedBox(height: 16),
-
                   _buildReplySection(),
                 ],
               ),
@@ -365,30 +421,21 @@ class _TicketSidebarState extends State<TicketSidebar> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const Icon(Icons.confirmation_number,
-                  color: Colors.orange, size: 18),
-              const SizedBox(width: 8),
-              Text(
-                'SR #${ticket.id}',
+          Row(children: [
+            const Icon(Icons.confirmation_number, color: Colors.orange, size: 18),
+            const SizedBox(width: 8),
+            Text('SR #${ticket.id}',
                 style: const TextStyle(
-                  color: Colors.orange,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13,
-                ),
-              ),
-            ],
-          ),
+                    color: Colors.orange,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13)),
+          ]),
           const SizedBox(height: 6),
-          Text(
-            subject,
-            style: const TextStyle(
-              color: AppTheme.textPrimary,
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
+          Text(subject,
+              style: const TextStyle(
+                  color: AppTheme.textPrimary,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600)),
         ],
       ),
     );
@@ -398,12 +445,10 @@ class _TicketSidebarState extends State<TicketSidebar> {
 
   Widget _buildDetailsCard(Ticket ticket) {
     final category    = _field(['category'], fallback: ticket.categoryLabel);
-    final submitter   = _field(
-        ['username', 'submitter', 'created_by'], fallback: ticket.submitter);
+    final submitter   = _field(['username', 'submitter', 'created_by'], fallback: ticket.submitter);
     final institution = _field(['institution', 'organization', 'company']);
     final ticketType  = _field(['tickettype', 'ticket_type', 'type']);
-    final createdRaw  = _field(
-        ['CreatedAt', 'created_at', 'createdAt', 'date_created']);
+    final createdRaw  = _field(['CreatedAt', 'created_at', 'createdAt', 'date_created']);
     final createdAt   = _parseDate(createdRaw) ?? ticket.createdAt;
     final createdStr  =
         '${createdAt.year}-${_p(createdAt.month)}-${_p(createdAt.day)}'
@@ -412,13 +457,13 @@ class _TicketSidebarState extends State<TicketSidebar> {
     return _card(
       child: Column(
         children: [
-          _detailRow(Icons.category_outlined,  'Category',     category),
-          _detailRow(Icons.person_outline,      'Submitter',    submitter),
+          _detailRow(Icons.category_outlined, 'Category',     category),
+          _detailRow(Icons.person_outline,    'Submitter',    submitter),
           if (institution != '—')
             _detailRow(Icons.business_outlined, 'Organization', institution),
           if (ticketType != '—')
-            _detailRow(Icons.label_outline,     'Type',         ticketType),
-          _detailRow(Icons.access_time,         'Created',      createdStr),
+            _detailRow(Icons.label_outline,   'Type',         ticketType),
+          _detailRow(Icons.access_time,       'Created',      createdStr),
         ],
       ),
     );
@@ -442,8 +487,7 @@ class _TicketSidebarState extends State<TicketSidebar> {
           ),
           Expanded(
             child: Text(value,
-                style: const TextStyle(
-                    color: AppTheme.textPrimary, fontSize: 12)),
+                style: const TextStyle(color: AppTheme.textPrimary, fontSize: 12)),
           ),
         ],
       ),
@@ -488,9 +532,8 @@ class _TicketSidebarState extends State<TicketSidebar> {
             final filePath = (att['file_path'] ?? '').toString();
             final fileName =
             (att['file_name'] ?? filePath.split('/').last).toString();
-            final url = filePath;
-            final isImage = RegExp(
-                r'\.(jpg|jpeg|png|gif|webp|bmp)$',
+            final url     = filePath;
+            final isImage = RegExp(r'\.(jpg|jpeg|png|gif|webp|bmp)$',
                 caseSensitive: false)
                 .hasMatch(fileName);
 
@@ -575,8 +618,7 @@ class _TicketSidebarState extends State<TicketSidebar> {
       child: GestureDetector(
         onTap: onTap,
         child: Container(
-          padding:
-          const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
             color: color.withOpacity(0.12),
             borderRadius: BorderRadius.circular(6),
@@ -601,13 +643,11 @@ class _TicketSidebarState extends State<TicketSidebar> {
 
   Future<void> _fetchAndOpen(String url, String fileName,
       {bool download = false}) async {
-    _showSnackbar('Opening file…', color: Colors.blue);
     try {
       if (download) {
         await ApiAttachment.downloadFile(url, fileName);
       } else {
         await ApiAttachment.viewFile(url, fileName);
-        _showSnackbar('Opened in new tab', color: Colors.green);
       }
     } catch (e) {
       _showSnackbar('Failed: $e', color: Colors.redAccent);
@@ -633,11 +673,13 @@ class _TicketSidebarState extends State<TicketSidebar> {
     ];
 
     int active = 0;
-    if (_isEndorsed)  active = 1;
-    if (_isApproved)  active = 2;
-    if (_isAssigned)  active = 3;
-    if (_rawStatus.contains('inprogress')) active = 4;
+    if (_isEndorsed) active = 1;
+    if (_isApproved) active = 2;
+    if (_isAssigned) active = 3;
+    if (_isAssigned &&
+        _rawStatus.replaceAll(' ', '') == 'inprogress') active = 4;
     if (_isResolved)  active = 5;
+    if (_isCancelled) active = 5;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -651,38 +693,36 @@ class _TicketSidebarState extends State<TicketSidebar> {
             return Expanded(
               child: Column(
                 children: [
-                  Row(
-                    children: [
-                      if (i != 0)
-                        Expanded(
-                            child: Container(
-                                height: 2,
-                                color: i <= active
-                                    ? Colors.green
-                                    : Colors.grey.shade800)),
-                      CircleAvatar(
-                        radius: 13,
-                        backgroundColor: done
-                            ? (current
-                            ? Colors.green.shade600
-                            : Colors.green)
-                            : Colors.grey.shade800,
-                        child: done
-                            ? const Icon(Icons.check,
-                            color: Colors.white, size: 13)
-                            : Text('${i + 1}',
-                            style: const TextStyle(
-                                color: Colors.white, fontSize: 10)),
-                      ),
-                      if (i != steps.length - 1)
-                        Expanded(
-                            child: Container(
-                                height: 2,
-                                color: i < active
-                                    ? Colors.green
-                                    : Colors.grey.shade800)),
-                    ],
-                  ),
+                  Row(children: [
+                    if (i != 0)
+                      Expanded(
+                          child: Container(
+                              height: 2,
+                              color: i <= active
+                                  ? Colors.green
+                                  : Colors.grey.shade800)),
+                    CircleAvatar(
+                      radius: 13,
+                      backgroundColor: done
+                          ? (current
+                          ? Colors.green.shade600
+                          : Colors.green)
+                          : Colors.grey.shade800,
+                      child: done
+                          ? const Icon(Icons.check,
+                          color: Colors.white, size: 13)
+                          : Text('${i + 1}',
+                          style: const TextStyle(
+                              color: Colors.white, fontSize: 10)),
+                    ),
+                    if (i != steps.length - 1)
+                      Expanded(
+                          child: Container(
+                              height: 2,
+                              color: i < active
+                                  ? Colors.green
+                                  : Colors.grey.shade800)),
+                  ]),
                   const SizedBox(height: 5),
                   Text(
                     steps[i],
@@ -704,18 +744,22 @@ class _TicketSidebarState extends State<TicketSidebar> {
   }
 
   // ─── approval chain ────────────────────────────────────────────────────────
+  //
+  // Shows the actual name of whoever endorsed / approved / assigned / resolved.
+  // Falls back to "No X assigned" if the field is empty.
 
   Widget _buildApprovalChain() {
-    final endorserName =
-    _field(['endorser', 'endorser_name', 'endorsed_by']);
-    final approverName =
-    _field(['approver', 'approver_name', 'approved_by']);
-    final resolverName =
-    _field(['resolver', 'resolver_name', 'assigned_to', 'resolved_by']);
+    // ── Pull names from API response ────────────────────────────────────────
+    // Adjust these key lists to match whatever your backend returns.
+    final endorserName = _field(['endorser', 'endorser_name', 'endorsed_by']);
+    final approverName = _field(['approver', 'approver_name', 'approved_by']);
+    final assigneeName = _field(['assigned_to', 'assignee', 'resolver_name', 'resolver']);
+    final resolverName = assigneeName; // same person resolves after grab
 
-    final atEndorse = _isSubmitted || _isEndorsed;
-    final atApprove = _isApproved;
-    final atResolve = _isAssigned;
+    final endorseDone = _isEndorsed || _isApproved || _isAssigned || _isResolved || _isCancelled;
+    final approveDone = _isApproved || _isAssigned || _isResolved || _isCancelled;
+    final assignDone  = _isAssigned || _isResolved || _isCancelled;
+    final resolveDone = _isResolved || _isCancelled;
 
     return _card(
       child: Column(
@@ -724,51 +768,70 @@ class _TicketSidebarState extends State<TicketSidebar> {
           _sectionLabel('Approval Chain'),
           const SizedBox(height: 14),
 
+          // ── Step 1: Endorser ────────────────────────────────────────────
           _chainRow(
-            initials:
-            endorserName != '—' ? endorserName[0].toUpperCase() : 'E',
-            name: endorserName != '—' ? endorserName : 'Pending Endorser',
-            role: 'Endorser',
-            avatarColor: Colors.blue,
-            statusText: atEndorse
-                ? 'Reviewing'
-                : (endorserName != '—' ? 'Endorsed ✓' : 'Waiting'),
-            statusColor: atEndorse
+            name:        endorserName != '—' ? endorserName : 'No endorser assigned',
+            role:        'Endorser',
+            isDone:      endorseDone,
+            isActive:    !endorseDone,
+            isLocked:    false,
+            statusText:  endorseDone ? 'Endorsed ✓' : 'Awaiting',
+            statusColor: endorseDone ? Colors.green : Colors.orange,
+          ),
+
+          Divider(color: Colors.grey.shade800),
+
+          // ── Step 2: Approver ────────────────────────────────────────────
+          _chainRow(
+            name:        approverName != '—' ? approverName : 'No approver assigned',
+            role:        'Approver',
+            isDone:      approveDone,
+            isActive:    endorseDone && !approveDone,
+            isLocked:    !endorseDone,
+            statusText:  approveDone
+                ? 'Approved ✓'
+                : (endorseDone ? 'Awaiting' : 'Locked'),
+            statusColor: approveDone
                 ? Colors.green
-                : (endorserName != '—' ? Colors.green : Colors.grey),
+                : (endorseDone ? Colors.orange : Colors.grey.shade600),
           ),
 
           Divider(color: Colors.grey.shade800),
 
+          // ── Step 3: Assignee ────────────────────────────────────────────
           _chainRow(
-            initials:
-            approverName != '—' ? approverName[0].toUpperCase() : 'A',
-            name: approverName != '—' ? approverName : 'Pending Approver',
-            role: 'Approver',
-            avatarColor:
-            atApprove ? Colors.orange : Colors.grey.shade800,
-            statusText: atApprove
-                ? 'Pending Approval'
-                : (approverName != '—' ? 'Approved ✓' : 'Waiting'),
-            statusColor: atApprove
-                ? Colors.orange
-                : (approverName != '—' ? Colors.green : Colors.grey),
+            name:        assigneeName != '—' ? assigneeName : 'No assignee yet',
+            role:        'Assigned To',
+            isDone:      assignDone,
+            isActive:    approveDone && !assignDone,
+            isLocked:    !approveDone,
+            statusText:  assignDone
+                ? 'Assigned ✓'
+                : (approveDone ? 'Awaiting' : 'Locked'),
+            statusColor: assignDone
+                ? Colors.green
+                : (approveDone ? Colors.purple : Colors.grey.shade600),
           ),
 
           Divider(color: Colors.grey.shade800),
 
+          // ── Step 4: Resolver ────────────────────────────────────────────
           _chainRow(
-            initials:
-            resolverName != '—' ? resolverName[0].toUpperCase() : 'R',
-            name: resolverName != '—'
-                ? resolverName
-                : 'Unassigned Resolver',
-            role: 'Resolver',
-            avatarColor:
-            atResolve ? Colors.purple : Colors.grey.shade800,
-            statusText: resolverName != '—' ? 'Assigned' : 'Open',
-            statusColor:
-            resolverName != '—' ? Colors.green : Colors.grey,
+            name:        resolverName != '—' ? resolverName : 'Awaiting assignee',
+            role:        'Resolver',
+            isDone:      resolveDone,
+            isActive:    assignDone && !resolveDone,
+            isLocked:    !assignDone,
+            statusText:  _isCancelled
+                ? 'Cancelled'
+                : (resolveDone
+                ? 'Resolved ✓'
+                : (assignDone ? 'In Progress' : 'Locked')),
+            statusColor: _isCancelled
+                ? Colors.redAccent
+                : (resolveDone
+                ? Colors.teal
+                : (assignDone ? Colors.blue : Colors.grey.shade600)),
           ),
         ],
       ),
@@ -776,13 +839,23 @@ class _TicketSidebarState extends State<TicketSidebar> {
   }
 
   Widget _chainRow({
-    required String initials,
     required String name,
     required String role,
-    required Color avatarColor,
+    required bool   isDone,
+    required bool   isActive,
+    required bool   isLocked,
     required String statusText,
-    required Color statusColor,
+    required Color  statusColor,
   }) {
+    // Derive initials from the actual name
+    final initials = _initialsFrom(name);
+
+    final Color avatarColor = isDone
+        ? Colors.green.shade700
+        : isActive
+        ? Colors.orange.shade700
+        : Colors.grey.shade800;
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
@@ -790,146 +863,221 @@ class _TicketSidebarState extends State<TicketSidebar> {
           CircleAvatar(
             radius: 18,
             backgroundColor: avatarColor,
-            child: Text(initials,
+            child: isLocked
+                ? const Icon(Icons.lock_outline, color: Colors.white54, size: 16)
+                : isDone
+                ? const Icon(Icons.check, color: Colors.white, size: 16)
+                : Text(initials,
                 style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold)),
+                    color: Colors.white, fontWeight: FontWeight.bold)),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(name,
-                    style: const TextStyle(
-                        color: AppTheme.textPrimary, fontSize: 13)),
+                Text(
+                  name,
+                  style: TextStyle(
+                    color: isLocked ? AppTheme.textMuted : AppTheme.textPrimary,
+                    fontSize: 13,
+                    fontStyle: isLocked ? FontStyle.italic : FontStyle.normal,
+                  ),
+                ),
                 Text(role,
                     style:
                     const TextStyle(color: Colors.grey, fontSize: 11)),
               ],
             ),
           ),
-          Text(statusText,
-              style: TextStyle(color: statusColor, fontSize: 12)),
+          Container(
+            padding:
+            const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: statusColor.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: statusColor.withOpacity(0.4)),
+            ),
+            child: Text(statusText,
+                style: TextStyle(
+                    color: statusColor,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600)),
+          ),
         ],
       ),
     );
   }
 
-  // ─── ACTION BUTTONS (below Approval Chain) ─────────────────────────────────
-  //
-  // Visibility rules:
-  //   • endorser role  → visible when ticket is Submitted (waiting to be endorsed)
-  //   • approver role  → visible when ticket is Endorsed (waiting to be approved)
-  //   • resolver role  → visible when ticket is Approved (waiting to be grabbed)
-  //
-  // Button label changes to reflect what action is possible at the current step.
+  /// Returns up to 2 initials from a name string.
+  String _initialsFrom(String name) {
+    final parts = name.trim().split(RegExp(r'[\s._]+'));
+    if (parts.isEmpty) return '?';
+    if (parts.length == 1) return parts[0][0].toUpperCase();
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+
+  // ─── action buttons ────────────────────────────────────────────────────────
 
   Widget _buildActionButtons(Ticket ticket) {
-    final role   = _currentUserRole.toLowerCase().trim();
-    final status = _rawStatus;
+    final role = _currentUserRole.toLowerCase().trim();
 
-    // ── Still fetching role → show spinner ───────────────────────────────────
     if (role.isEmpty) {
-      return _actionCard(
-        debugLabel: 'loading role…',
-        children: const [
-          SizedBox(
-            height: 20, width: 20,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-        ],
-      );
+      return _actionCard(children: const [
+        SizedBox(height: 20, width: 20,
+            child: CircularProgressIndicator(strokeWidth: 2)),
+      ]);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // ENDORSER  — show when ticket has NOT yet been endorsed/approved/assigned
-    // Covers any status that precedes endorsement (submitted, new, open, etc.)
-    // ─────────────────────────────────────────────────────────────────────────
-    final alreadyEndorsed = _isEndorsed || _isApproved || _isAssigned || _isResolved;
+    final endorseDone = _isEndorsed || _isApproved || _isAssigned || _isResolved || _isCancelled;
+    final approveDone = _isApproved || _isAssigned || _isResolved || _isCancelled;
+    final assignDone  = _isAssigned || _isResolved || _isCancelled;
+    final resolveDone = _isResolved || _isCancelled;
 
-    if (role.contains('endors') && !alreadyEndorsed) {
-      return _actionCard(
-        debugLabel: 'role: $role | status: $status',
-        children: [
-          _actionBtn(
-            label: 'Endorse',
-            icon: Icons.thumb_up_alt_outlined,
-            color: Colors.green,
-            onTap: () => _handleAction('endorse', ticket.id),
-          ),
-          const SizedBox(width: 12),
-          _actionBtn(
-            label: 'Reject',
-            icon: Icons.thumb_down_alt_outlined,
-            color: Colors.redAccent,
-            onTap: () => _handleAction('reject', ticket.id),
-          ),
-        ],
-      );
+    final isEndorser = role == 'endorser' || role.startsWith('endorser');
+    final isApprover = role == 'approver' || role.startsWith('approver');
+    final isResolver = role == 'resolver' || role.startsWith('resolver') || role.contains('resolv');
+
+    // ── Cancelled ────────────────────────────────────────────────────────────
+    if (_isCancelled) {
+      return _actionCard(children: [
+        const Icon(Icons.cancel, color: Colors.redAccent, size: 18),
+        const SizedBox(width: 8),
+        const Text('This ticket has been cancelled.',
+            style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+      ]);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // APPROVER — show when ticket is endorsed but not yet approved
-    // ─────────────────────────────────────────────────────────────────────────
-    if (role.contains('approv') && _isEndorsed && !_isApproved) {
-      return _actionCard(
-        debugLabel: 'role: $role | status: $status',
-        children: [
-          _actionBtn(
-            label: 'Approve',
-            icon: Icons.verified_outlined,
-            color: Colors.blue,
-            onTap: () => _handleAction('approve', ticket.id),
-          ),
-          const SizedBox(width: 12),
-          _actionBtn(
-            label: 'Reject',
-            icon: Icons.cancel_outlined,
-            color: Colors.redAccent,
-            onTap: () => _handleAction('reject', ticket.id),
-          ),
-        ],
-      );
+    // ── ENDORSER ─────────────────────────────────────────────────────────────
+    if (isEndorser) {
+      if (!endorseDone) {
+        return _actionCard(
+          debugLabel: 'endorser · $_normalizedStatus',
+          children: [
+            _actionBtn(
+              label: 'Endorse',
+              icon: Icons.thumb_up_alt_outlined,
+              color: Colors.green,
+              onTap: () => _handleAction('endorse', ticket.id),
+            ),
+            const SizedBox(width: 12),
+            _actionBtn(
+              label: 'Reject',
+              icon: Icons.thumb_down_alt_outlined,
+              color: Colors.redAccent,
+              onTap: () => _handleAction('reject', ticket.id),
+            ),
+          ],
+        );
+      }
+      return _actionCard(children: [
+        const Icon(Icons.check_circle_outline, color: Colors.green, size: 18),
+        const SizedBox(width: 8),
+        const Text('Ticket has been endorsed.',
+            style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+      ]);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // RESOLVER — show when ticket is approved but not yet assigned/grabbed
-    // ─────────────────────────────────────────────────────────────────────────
-    if (role.contains('resolv') && _isApproved && !_isAssigned) {
-      return _actionCard(
-        debugLabel: 'role: $role | status: $status',
-        children: [
-          _actionBtn(
-            label: 'Grab Ticket',
-            icon: Icons.handshake_outlined,
-            color: Colors.purple,
-            onTap: () => _handleAction('grab', ticket.id),
-            fullWidth: true,
-          ),
-        ],
-      );
+    // ── APPROVER ─────────────────────────────────────────────────────────────
+    if (isApprover) {
+      if (!endorseDone) {
+        return _actionCard(children: [
+          const Icon(Icons.lock_outline, color: Colors.grey, size: 18),
+          const SizedBox(width: 8),
+          const Text('Waiting for endorsement first.',
+              style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+        ]);
+      }
+      if (!approveDone) {
+        return _actionCard(
+          debugLabel: 'approver · $_normalizedStatus',
+          children: [
+            _actionBtn(
+              label: 'Approve',
+              icon: Icons.verified_outlined,
+              color: Colors.blue,
+              onTap: () => _handleAction('approve', ticket.id),
+            ),
+            const SizedBox(width: 12),
+            _actionBtn(
+              label: 'Reject',
+              icon: Icons.cancel_outlined,
+              color: Colors.redAccent,
+              onTap: () => _handleAction('reject', ticket.id),
+            ),
+          ],
+        );
+      }
+      return _actionCard(children: [
+        const Icon(Icons.check_circle_outline, color: Colors.green, size: 18),
+        const SizedBox(width: 8),
+        const Text('Ticket has been approved.',
+            style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+      ]);
     }
 
-    // ── Fallback: always show the card so you can see why buttons are hidden ──
+    // ── RESOLVER ─────────────────────────────────────────────────────────────
+    if (isResolver) {
+      if (!approveDone) {
+        return _actionCard(children: [
+          const Icon(Icons.lock_outline, color: Colors.grey, size: 18),
+          const SizedBox(width: 8),
+          const Text('Waiting for approval first.',
+              style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+        ]);
+      }
+      if (!assignDone) {
+        return _actionCard(
+          debugLabel: 'resolver · $_normalizedStatus',
+          children: [
+            _actionBtn(
+              label: 'Grab Ticket',
+              icon: Icons.handshake_outlined,
+              color: Colors.purple,
+              onTap: () => _handleAction('grab', ticket.id),
+            ),
+            const SizedBox(width: 12),
+            _actionBtn(
+              label: 'Reject',
+              icon: Icons.cancel_outlined,
+              color: Colors.redAccent,
+              onTap: () => _handleAction('reject', ticket.id),
+            ),
+          ],
+        );
+      }
+      if (!resolveDone) {
+        return _actionCard(
+          debugLabel: 'resolver (assigned) · $_normalizedStatus',
+          children: [
+            _actionBtn(
+              label: 'Resolve',
+              icon: Icons.task_alt_outlined,
+              color: Colors.teal,
+              onTap: () => _handleAction('resolve', ticket.id),
+            ),
+          ],
+        );
+      }
+      return _actionCard(children: [
+        const Icon(Icons.check_circle, color: Colors.teal, size: 18),
+        const SizedBox(width: 8),
+        const Text('Ticket has been resolved.',
+            style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+      ]);
+    }
+
+    // ── Fallback ──────────────────────────────────────────────────────────────
     return _actionCard(
-      debugLabel: 'role: "$role" | status: "$status" — no action at this stage',
+      debugLabel: 'role: "$role" · status: "$_normalizedStatus"',
       children: const [
-        Text(
-          'No actions available for your role at this stage.',
-          style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
-        ),
+        Text('No actions available for your role at this stage.',
+            style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
       ],
     );
   }
 
-  /// Wraps action buttons in a styled card container.
-  /// [debugLabel] is shown in small grey text to help identify role/status issues.
-  /// Remove debugLabel param + the debug row once everything is working.
-  Widget _actionCard({
-    required List<Widget> children,
-    String? debugLabel,
-  }) {
+  Widget _actionCard({required List<Widget> children, String? debugLabel}) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
@@ -947,13 +1095,11 @@ class _TicketSidebarState extends State<TicketSidebar> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
               decoration: BoxDecoration(
-                color: Colors.black26,
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(
-                debugLabel,
-                style: const TextStyle(color: Colors.grey, fontSize: 9),
-              ),
+                  color: Colors.black26,
+                  borderRadius: BorderRadius.circular(4)),
+              child: Text(debugLabel,
+                  style:
+                  const TextStyle(color: Colors.grey, fontSize: 9)),
             ),
           ],
           const SizedBox(height: 10),
@@ -966,7 +1112,6 @@ class _TicketSidebarState extends State<TicketSidebar> {
     );
   }
 
-  /// Individual action button.
   Widget _actionBtn({
     required String label,
     required IconData icon,
@@ -987,51 +1132,74 @@ class _TicketSidebarState extends State<TicketSidebar> {
             border: Border.all(color: color.withOpacity(0.55)),
           ),
           child: Row(
-            mainAxisSize: fullWidth ? MainAxisSize.max : MainAxisSize.min,
+            mainAxisSize:
+            fullWidth ? MainAxisSize.max : MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(icon, size: 16, color: color),
               const SizedBox(width: 7),
-              Text(
-                label,
-                style: TextStyle(
-                    color: color,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600),
-              ),
+              Text(label,
+                  style: TextStyle(
+                      color: color,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600)),
             ],
           ),
         ),
       ),
     );
-
     return fullWidth ? Expanded(child: btn) : btn;
   }
 
-  /// Dispatches an action to the backend.
-  /// Replace the TODO bodies with your actual API service calls.
+  // ─── handle action ─────────────────────────────────────────────────────────
+
   Future<void> _handleAction(String action, String ticketId) async {
     setState(() => _actionLoading = true);
     try {
+      final token = await ApiLogin.getToken();
+      if (token == null || token.isEmpty) {
+        _showSnackbar('Not authenticated. Please log in again.',
+            color: Colors.redAccent);
+        return;
+      }
+
+      Map<String, dynamic> result;
       switch (action) {
         case 'endorse':
-        // TODO: await ApiTicket.endorseTicket(ticketId);
-          _showSnackbar('Ticket endorsed ✓', color: Colors.green);
+          result = await ApiUpdateTicket.endorseTicket(token, ticketId);
+          _showSnackbar(result['message'] ?? 'Ticket endorsed ✓',
+              color: Colors.green);
           break;
         case 'approve':
-        // TODO: await ApiTicket.approveTicket(ticketId);
-          _showSnackbar('Ticket approved ✓', color: Colors.blue);
+          result = await ApiUpdateTicket.approveTicket(token, ticketId);
+          _showSnackbar(result['message'] ?? 'Ticket approved ✓',
+              color: Colors.blue);
           break;
         case 'grab':
-        // TODO: await ApiTicket.grabTicket(ticketId);
-          _showSnackbar('Ticket assigned to you ✓', color: Colors.purple);
+          result = await ApiUpdateTicket.assignTicket(token, ticketId);
+          _showSnackbar(result['message'] ?? 'Ticket assigned to you ✓',
+              color: Colors.purple);
           break;
         case 'reject':
-        // TODO: await ApiTicket.rejectTicket(ticketId);
-          _showSnackbar('Ticket rejected', color: Colors.redAccent);
+          result = await ApiUpdateTicket.rejectTicket(token, ticketId);
+          _showSnackbar(result['message'] ?? 'Ticket rejected',
+              color: Colors.redAccent);
           break;
+        case 'resolve':
+          result = await ApiUpdateTicket.resolveTicket(token, ticketId);
+          _showSnackbar(result['message'] ?? 'Ticket resolved ✓',
+              color: Colors.teal);
+          break;
+        case 'cancel':
+          result = await ApiUpdateTicket.cancelTicket(token, ticketId);
+          _showSnackbar(result['message'] ?? 'Ticket cancelled',
+              color: Colors.orange);
+          break;
+        default:
+          _showSnackbar('Unknown action: $action', color: Colors.orange);
+          return;
       }
-      // Refresh ticket data so the UI reflects the new status
+
       await _fetchBySR(ticketId);
     } catch (e) {
       _showSnackbar('Action failed: $e', color: Colors.redAccent);
@@ -1058,8 +1226,7 @@ class _TicketSidebarState extends State<TicketSidebar> {
               borderSide: const BorderSide(color: AppTheme.border),
             ),
             hintText: 'Write a reply…',
-            hintStyle:
-            const TextStyle(color: AppTheme.textMuted),
+            hintStyle: const TextStyle(color: AppTheme.textMuted),
           ),
           style: const TextStyle(color: AppTheme.textPrimary),
         ),
@@ -1077,54 +1244,46 @@ class _TicketSidebarState extends State<TicketSidebar> {
 
   // ─── shared widgets ────────────────────────────────────────────────────────
 
-  Widget _card({required Widget child}) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppTheme.border),
-      ),
-      child: child,
-    );
-  }
+  Widget _card({required Widget child}) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: AppTheme.surface,
+      borderRadius: BorderRadius.circular(8),
+      border: Border.all(color: AppTheme.border),
+    ),
+    child: child,
+  );
 
-  Widget _sectionLabel(String text) {
-    return Text(
-      text.toUpperCase(),
-      style: const TextStyle(
-        color: AppTheme.textMuted,
-        fontSize: 10,
-        fontWeight: FontWeight.w700,
-        letterSpacing: 0.8,
-      ),
-    );
-  }
+  Widget _sectionLabel(String text) => Text(
+    text.toUpperCase(),
+    style: const TextStyle(
+      color: AppTheme.textMuted,
+      fontSize: 10,
+      fontWeight: FontWeight.w700,
+      letterSpacing: 0.8,
+    ),
+  );
 
-  Widget _chip(String text, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withOpacity(0.4)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
+  Widget _chip(String text, Color color) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+    decoration: BoxDecoration(
+      color: color.withOpacity(0.15),
+      borderRadius: BorderRadius.circular(6),
+      border: Border.all(color: color.withOpacity(0.4)),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
             width: 6,
             height: 6,
-            decoration:
-            BoxDecoration(color: color, shape: BoxShape.circle),
-          ),
-          const SizedBox(width: 6),
-          Text(text, style: TextStyle(color: color, fontSize: 12)),
-        ],
-      ),
-    );
-  }
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+        const SizedBox(width: 6),
+        Text(text, style: TextStyle(color: color, fontSize: 12)),
+      ],
+    ),
+  );
 
   String _p(int n) => n.toString().padLeft(2, '0');
 
@@ -1161,28 +1320,23 @@ class _AuthImageState extends State<_AuthImage> {
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
           return Container(
-            height: widget.height,
-            color: AppTheme.surface,
-            child: const Center(
-                child: CircularProgressIndicator(strokeWidth: 2)),
-          );
+              height: widget.height,
+              color: AppTheme.surface,
+              child: const Center(
+                  child: CircularProgressIndicator(strokeWidth: 2)));
         }
         if (snap.data == null) {
           return Container(
-            height: widget.height,
-            color: AppTheme.surface,
-            child: const Center(
-              child: Icon(Icons.broken_image,
-                  color: Colors.grey, size: 32),
-            ),
-          );
+              height: widget.height,
+              color: AppTheme.surface,
+              child: const Center(
+                  child: Icon(Icons.broken_image,
+                      color: Colors.grey, size: 32)));
         }
-        return Image.memory(
-          snap.data!,
-          fit: BoxFit.cover,
-          width: double.infinity,
-          height: widget.height,
-        );
+        return Image.memory(snap.data!,
+            fit: BoxFit.cover,
+            width: double.infinity,
+            height: widget.height);
       },
     );
   }

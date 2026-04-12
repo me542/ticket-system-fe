@@ -46,6 +46,10 @@ class ApiGetUser {
             'role': (user['role'] as String?)?.trim().isNotEmpty == true
                 ? user['role']!.trim()
                 : 'N/A',
+            // ← ADDED: status field
+            'status': (user['status'] as String?)?.trim().isNotEmpty == true
+                ? user['status']!.trim()
+                : 'active',
             'initials': fullName.isNotEmpty
                 ? fullName
                 .split(' ')
@@ -66,7 +70,3 @@ class ApiGetUser {
     }
   }
 }
-
-
-
-
