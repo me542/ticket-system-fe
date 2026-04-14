@@ -35,7 +35,11 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
     'status': '',
     'tickettype': '',
     'institution': '',
+    'username': '',
   };
+
+  DateTime? _createdAtFrom;
+  DateTime? _createdAtTo;
 
   // ── Pagination ────────────────────────────────────────────
   int _currentPage = 1;
@@ -61,6 +65,20 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
   // ── Computed ──────────────────────────────────────────────
   List<Map<String, dynamic>> get _filteredRaw {
     var list = List<Map<String, dynamic>>.from(_rawData);
+
+    // Date range filter for "created_at"
+    if (_createdAtFrom != null || _createdAtTo != null) {
+      list = list.where((r) {
+        final createdStr = r['created_at'] ?? '';
+        final created = DateTime.tryParse(createdStr);
+        if (created == null) return false;
+        final afterStart = _createdAtFrom == null || !created.isBefore(_createdAtFrom!);
+        final beforeEnd = _createdAtTo == null || !created.isAfter(_createdAtTo!);
+        return afterStart && beforeEnd;
+      }).toList();
+    }
+
+
 
     // Status tab filter
     if (_selectedFilter != 'All') {
@@ -567,7 +585,7 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
   Widget _buildScrollableTable() {
     final cols = [
       _ColDef('Ticket ID',    'ticket_id',    120, false),
-      _ColDef('Creator',      'username',     120, false),
+      _ColDef('Creator',      'username',     120, true),
       _ColDef('Category',     'category',     160, true),
       _ColDef('Subject',      'subject',      200, false),
       _ColDef('Institution',  'institution',  140, true),
@@ -578,7 +596,7 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
       _ColDef('Endorser',     'endorser',     120, true),
       _ColDef('Approver',     'approver',     120, true),
       _ColDef('Status',       'status',       140, true),
-      _ColDef('Created At',   'created_at',   160, false),
+      _ColDef('Created At',   'created_at',   160, true),
       _ColDef('Updated At',   'updated_at',   160, false),
       _ColDef('Cancelled By', 'cancelled_by', 120, true),
       _ColDef('Cancelled At', 'cancelled_at', 160, false),

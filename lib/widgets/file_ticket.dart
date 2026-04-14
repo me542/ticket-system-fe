@@ -16,7 +16,7 @@ class CreateTicketDialog extends StatefulWidget {
 
 class _CreateTicketDialogState extends State<CreateTicketDialog> {
   int selectedPriority = 1;
-  String selectedTicketType = "Incident";
+  String selectedTicketType = "Service Request";
   String selectedOrganization = "Bakawan Data Analytics";
   String selectedCategory = "IT Related - Customer Premise E.";
 
@@ -59,7 +59,7 @@ class _CreateTicketDialogState extends State<CreateTicketDialog> {
     descriptionController.clear();
     setState(() {
       selectedPriority = 1;
-      selectedTicketType = "Incident";
+      selectedTicketType = "Service Request";
       selectedCategory = "IT Related - Customer Premise E.";
       selectedOrganization = "Bakawan Data Analytics";
       _selectedFile = null;
@@ -186,7 +186,7 @@ class _CreateTicketDialogState extends State<CreateTicketDialog> {
                     child: _dropdownCustom(
                       "TICKET TYPE *",
                       selectedTicketType,
-                      ["Incident", "Service Request", "Change Request"],
+                      ["Service Request", "Change Request", "Incident"],
                           (val) =>
                           setState(() => selectedTicketType = val!),
                     ),

@@ -11,6 +11,7 @@ import '../core/services/api_user_data.dart';
 import '../data/app_theme.dart';
 import '../models/ticket.dart';
 import 'package:ticket_system/core/services/api_update_ticket.dart';
+import '../core/services/api_remarks.dart';
 
 class TicketSidebar extends StatefulWidget {
   final Ticket? ticket;
@@ -49,6 +50,15 @@ class _TicketSidebarState extends State<TicketSidebar> {
 
   // ─── lifecycle ─────────────────────────────────────────────────────────────
 
+  bool _isNearBottom() {
+    if (!_scrollController.hasClients) return true;
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    final currentScroll = _scrollController.position.pixels;
+    return (maxScroll - currentScroll) < 100; // threshold
+  }
+  final ScrollController _scrollController = ScrollController();
+
+
   @override
   void initState() {
     super.initState();
@@ -63,6 +73,8 @@ class _TicketSidebarState extends State<TicketSidebar> {
       _fetchBySR(widget.ticket?.id);
     }
   }
+
+
 
   // ─── load current user ─────────────────────────────────────────────────────
 
@@ -136,6 +148,7 @@ class _TicketSidebarState extends State<TicketSidebar> {
     _resolutionTimer?.cancel();
     _remarkCtrl.dispose();
     _remarkScroll.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -270,51 +283,48 @@ class _TicketSidebarState extends State<TicketSidebar> {
 
   Future<void> _fetchRemarks(String ticketId) async {
     if (!mounted) return;
-    setState(() => _remarksLoading = true);
+
+    final shouldScroll = _isNearBottom(); // 👈 check BEFORE updating
+
+    setState(() {
+      _remarksLoading = true;
+    });
+
     try {
-      final token = await ApiLogin.getToken();
-      if (token == null) return;
-      final res = await http.get(
-        Uri.parse('http://localhost:8080/api/user/ticket/$ticketId/remarks'),
-        headers: {'Authorization': 'Bearer $token'},
-      );
-      if (res.statusCode == 200) {
-        final body = jsonDecode(res.body);
-        debugPrint('📝 remarks raw: ${res.body}'); // ← debug
-        final raw  = body['data'];
-        if (raw is List) {
-          setState(() {
-            _remarks = raw.map((e) {
-              // API wraps each item as {"remark": {...}}
-              final r = e is Map && e.containsKey('remark') ? e['remark'] : e;
-              return Map<String, dynamic>.from(r as Map);
-            }).toList();
-          });
-          _scrollRemarksToBottom();
-        } else {
-          setState(() => _remarks = []);
+      final remarks = await ApiRemarks.fetchRemarks(ticketId);
+
+      if (mounted) {
+        setState(() {
+          _remarks = remarks;
+          _remarksLoading = false;
+        });
+
+        if (shouldScroll) {
+          _scrollRemarksToBottom(); // 👈 only if user was already at bottom
         }
       }
     } catch (e) {
       debugPrint('Failed to fetch remarks: $e');
-    } finally {
-      if (mounted) setState(() => _remarksLoading = false);
+      if (mounted) {
+        setState(() {
+          _remarksLoading = false;
+        });
+      }
     }
   }
+
 
   Future<void> _postRemark(String ticketId) async {
     final msg = _remarkCtrl.text.trim();
     if (msg.isEmpty) return;
 
-    // Try multiple sources for user_id
     String userId = (_detail?['user_id'] ?? _detail?['id'] ?? '').toString();
 
-    // Fallback: decode user id from JWT token
     if (userId.isEmpty || userId == 'null') {
       try {
         final token = await ApiLogin.getToken();
         if (token != null) {
-          final parts   = token.split('.');
+          final parts = token.split('.');
           if (parts.length == 3) {
             final payload = utf8.decode(
                 base64Url.decode(base64Url.normalize(parts[1])));
@@ -330,32 +340,26 @@ class _TicketSidebarState extends State<TicketSidebar> {
           color: Colors.redAccent);
       return;
     }
+
     setState(() => _postingRemark = true);
+
     try {
-      final token = await ApiLogin.getToken();
-      if (token == null) return;
-      final res = await http.post(
-        Uri.parse('http://localhost:8080/api/user/ticket/remark'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'ticket_id': ticketId,
-          'user_id':   userId,
-          'message':   msg,
-        }),
+      await ApiRemarks.postRemark(
+        ticketId: ticketId,
+        userId: userId,
+        username: _currentUsername,
+        message: msg,
       );
-      if (res.statusCode == 200) {
-        _remarkCtrl.clear();
-        await _fetchRemarks(ticketId);
-      } else {
-        final body = jsonDecode(res.body);
-        _showSnackbar(body['message'] ?? 'Failed to post remark',
-            color: Colors.redAccent);
-      }
+
+      _remarkCtrl.clear();
+
+      // ❌ REMOVE THIS (causes jump)
+      // _scrollRemarksToBottom();
+
+      await _fetchRemarks(ticketId); // this will handle scroll properly
     } catch (e) {
-      _showSnackbar('Error: $e', color: Colors.redAccent);
+      _showSnackbar(e.toString().replaceFirst('Exception: ', ''),
+          color: Colors.redAccent);
     } finally {
       if (mounted) setState(() => _postingRemark = false);
     }
@@ -1619,21 +1623,40 @@ class _TicketSidebarState extends State<TicketSidebar> {
                 mainAxisSize: MainAxisSize.min,
                 children: const [
                   Icon(Icons.chat_bubble_outline,
-                      color: AppTheme.textMuted, size: 28),
-                  SizedBox(height: 8),
-                  Text('No remarks yet.',
-                      style: TextStyle(
-                          color: AppTheme.textMuted, fontSize: 12)),
+                      color: AppTheme.textMuted, size: 32),
+                  SizedBox(height: 10),
+                  Text(
+                    'No remarks yet',
+                    style: TextStyle(
+                      color: AppTheme.textPrimary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'Be the first to leave a remark.',
+                    style: TextStyle(
+                      color: AppTheme.textMuted,
+                      fontSize: 11,
+                    ),
+                  ),
                 ],
               ),
             )
                 : ListView.builder(
-              controller: _remarkScroll,
+              controller: _scrollController,
+              reverse: true, // 👈 makes it start from bottom
               padding: const EdgeInsets.symmetric(
-                  horizontal: 12, vertical: 8),
+                horizontal: 12,
+                vertical: 8,
+              ),
               itemCount: _remarks.length,
-              itemBuilder: (_, i) => _buildRemarkBubble(_remarks[i]),
-            ),
+              itemBuilder: (_, i) {
+                final remark = _remarks[_remarks.length - 1 - i]; // 👈 reverse data
+                return _buildRemarkBubble(remark);
+              },
+            )
           ),
 
           const Divider(height: 1, color: AppTheme.border),
@@ -1706,32 +1729,63 @@ class _TicketSidebarState extends State<TicketSidebar> {
   }
 
   Widget _buildRemarkBubble(Map<String, dynamic> remark) {
-    final message   = remark['message']?.toString() ?? '';
-    final userId    = remark['user_id']?.toString() ?? '';
-    final createdAt = remark['created_at']?.toString() ?? '';
-    final isMe      = userId == (_detail?['user_id'] ?? _detail?['id'] ?? '').toString();
+    final message      = remark['message']?.toString() ?? '';
+    final remarkUserId = remark['user_id']?.toString() ?? '';
+    final username     = remark['username']?.toString() ?? '';
+    final createdAt    = remark['created_at']?.toString() ?? '';
 
-    // Format time
+
+
+    // Match on username first, fall back to user_id vs detail id
+    bool isMe = false;
+    if (_currentUsername.isNotEmpty && username.isNotEmpty) {
+      isMe = _currentUsername.toLowerCase() == username.toLowerCase();
+    }
+    if (!isMe && remarkUserId.isNotEmpty) {
+      final myId = (_detail?['logged_in_user_id'] ??
+          _detail?['current_user_id'] ?? '').toString();
+      if (myId.isNotEmpty) isMe = remarkUserId == myId;
+    }
+
+    final String displayName = username.isNotEmpty
+        ? username
+        : (remarkUserId.length > 8 ? remarkUserId.substring(0, 8) : remarkUserId);
+    final String avatarLetter =
+    displayName.isNotEmpty ? displayName[0].toUpperCase() : '?';
+
+    final avatarColors = [
+      Colors.blueGrey.shade600,
+      Colors.teal.shade600,
+      Colors.indigo.shade400,
+      Colors.purple.shade400,
+      Colors.cyan.shade700,
+    ];
+    final avatarColor =
+    avatarColors[displayName.hashCode.abs() % avatarColors.length];
+
+    // Format timestamp  e.g.  2:30 PM · 2025-06-12
     String timeStr = '';
     final dt = DateTime.tryParse(createdAt)?.toLocal();
     if (dt != null) {
-      timeStr = '${_p(dt.hour)}:${_p(dt.minute)}  '
-          '${dt.year}-${_p(dt.month)}-${_p(dt.day)}';
+      final h12   = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+      final ampm  = dt.hour < 12 ? 'AM' : 'PM';
+      timeStr = '$h12:${_p(dt.minute)} $ampm · ${dt.year}-${_p(dt.month)}-${_p(dt.day)}';
     }
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.only(bottom: 14),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.end,
         mainAxisAlignment:
         isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
         children: [
+          // ── Avatar for others ───────────────────────────────────────────
           if (!isMe) ...[
             CircleAvatar(
-              radius: 14,
-              backgroundColor: Colors.blueGrey.shade700,
+              radius: 15,
+              backgroundColor: avatarColor,
               child: Text(
-                userId.isNotEmpty ? userId[0].toUpperCase() : '?',
+                avatarLetter,
                 style: const TextStyle(
                     color: Colors.white,
                     fontSize: 11,
@@ -1740,48 +1794,66 @@ class _TicketSidebarState extends State<TicketSidebar> {
             ),
             const SizedBox(width: 8),
           ],
+
+          // ── Bubble + meta ───────────────────────────────────────────────
           Flexible(
             child: Column(
               crossAxisAlignment:
               isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
               children: [
+                // Sender name above bubble (others only)
+                if (!isMe)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4, bottom: 3),
+                    child: Text(
+                      displayName,
+                      style: TextStyle(
+                        color: avatarColor,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+
+                // Bubble
                 Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 8),
+                      horizontal: 13, vertical: 9),
                   decoration: BoxDecoration(
                     color: isMe
-                        ? Colors.blue.withOpacity(0.18)
-                        : AppTheme.sidebarBg,
+                        ? const Color(0xFF1A6FD4)   // solid blue — "me"
+                        : const Color(0xFF1E2A38),   // dark card — others
                     borderRadius: BorderRadius.only(
-                      topLeft: const Radius.circular(12),
-                      topRight: const Radius.circular(12),
-                      bottomLeft: Radius.circular(isMe ? 12 : 2),
-                      bottomRight: Radius.circular(isMe ? 2 : 12),
-                    ),
-                    border: Border.all(
-                      color: isMe
-                          ? Colors.blue.withOpacity(0.35)
-                          : AppTheme.border,
+                      topLeft:     const Radius.circular(16),
+                      topRight:    const Radius.circular(16),
+                      bottomLeft:  Radius.circular(isMe ? 16 : 3),
+                      bottomRight: Radius.circular(isMe ? 3 : 16),
                     ),
                   ),
                   child: Text(
                     message,
-                    style: const TextStyle(
-                        color: AppTheme.textPrimary,
-                        fontSize: 13,
-                        height: 1.45),
+                    style: TextStyle(
+                      color: isMe ? Colors.white : AppTheme.textPrimary,
+                      fontSize: 13,
+                      height: 1.45,
+                    ),
                   ),
                 ),
-                const SizedBox(height: 3),
-                Text(
-                  timeStr,
-                  style: const TextStyle(
-                      color: AppTheme.textMuted, fontSize: 10),
+
+                // Timestamp below bubble
+                Padding(
+                  padding: const EdgeInsets.only(top: 4, left: 2, right: 2),
+                  child: Text(
+                    timeStr,
+                    style: const TextStyle(
+                        color: AppTheme.textMuted, fontSize: 10),
+                  ),
                 ),
               ],
             ),
           ),
-          if (isMe) const SizedBox(width: 8),
+
+          if (isMe) const SizedBox(width: 4),
         ],
       ),
     );

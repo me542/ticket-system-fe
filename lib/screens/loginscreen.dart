@@ -27,6 +27,44 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  Future<void> _handleLogin() async {
+    setState(() {
+      emailError = null;
+      passwordError = null;
+    });
+
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+
+    if (email.isEmpty) {
+      setState(() => emailError = 'Please enter your email');
+    }
+    if (password.isEmpty) {
+      setState(() => passwordError = 'Please enter your password');
+    }
+    if (email.isEmpty || password.isEmpty) return;
+
+    final response = await ApiLogin.login(
+      username: email,
+      password: password,
+    );
+
+    if (response['success'] == true) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const MainShell(),
+        ),
+      );
+    } else {
+      setState(() {
+        emailError = ' ';
+        passwordError =
+            response['error'] ?? 'Invalid email or password';
+      });
+    }
+  }
+
   // =========================
   // FORGOT PASSWORD DIALOG (ENTER EMAIL)
   // =========================
@@ -698,10 +736,15 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                       const SizedBox(height: 5),
-                      // Email TextField
+
+                      // ✅ Email Field
                       TextField(
                         controller: _emailController,
                         style: const TextStyle(color: Colors.white),
+                        textInputAction: TextInputAction.next, // 👈 Next button
+                        onSubmitted: (_) {
+                          FocusScope.of(context).nextFocus(); // 👈 go to password
+                        },
                         decoration: InputDecoration(
                           hintText: 'admin@example.com',
                           hintStyle: const TextStyle(color: Color(0xFF4A5268)),
@@ -739,9 +782,10 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
                         ),
-                        onChanged: (value) {
-                          if (emailError != null)
+                        onChanged: (_) {
+                          if (emailError != null) {
                             setState(() => emailError = null);
+                          }
                         },
                       ),
 
@@ -749,13 +793,11 @@ class _LoginScreenState extends State<LoginScreen> {
                         const SizedBox(height: 4),
                         Text(
                           emailError!,
-                          style: const TextStyle(
-                            color: Colors.red,
-                            fontSize: 13,
-                          ),
+                          style: const TextStyle(color: Colors.red, fontSize: 13),
                         ),
                       ],
-                      SizedBox(height: 15),
+
+                      const SizedBox(height: 15),
 
                       const Text(
                         'Password',
@@ -765,11 +807,14 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                       const SizedBox(height: 5),
-                      // Password TextField
+
+                      // ✅ Password Field
                       TextField(
                         controller: _passwordController,
                         obscureText: _obscurePassword,
                         style: const TextStyle(color: Colors.white),
+                        textInputAction: TextInputAction.done, // 👈 Done button
+                        onSubmitted: (_) => _handleLogin(), // 👈 ENTER triggers login
                         decoration: InputDecoration(
                           hintText: 'Password',
                           hintStyle: const TextStyle(color: Color(0xFF4A5268)),
@@ -779,7 +824,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           suffixIcon: GestureDetector(
                             onTap: () => setState(
-                              () => _obscurePassword = !_obscurePassword,
+                                  () => _obscurePassword = !_obscurePassword,
                             ),
                             child: Icon(
                               _obscurePassword
@@ -818,9 +863,10 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
                         ),
-                        onChanged: (value) {
-                          if (passwordError != null)
+                        onChanged: (_) {
+                          if (passwordError != null) {
                             setState(() => passwordError = null);
+                          }
                         },
                       ),
 
@@ -828,12 +874,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         const SizedBox(height: 4),
                         Text(
                           passwordError!,
-                          style: const TextStyle(
-                            color: Colors.red,
-                            fontSize: 13,
-                          ),
+                          style: const TextStyle(color: Colors.red, fontSize: 13),
                         ),
                       ],
+
                       Align(
                         alignment: Alignment.centerRight,
                         child: TextButton(
@@ -844,53 +888,15 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                       ),
+
                       const SizedBox(height: 16),
+
+                      // ✅ Login Button
                       SizedBox(
                         width: double.infinity,
                         height: 48,
                         child: ElevatedButton(
-                          onPressed: () async {
-                            setState(() {
-                              emailError = null;
-                              passwordError = null;
-                            });
-
-                            final email = _emailController.text.trim();
-                            final password = _passwordController.text.trim();
-
-                            if (email.isEmpty) {
-                              setState(() {
-                                emailError = 'Please enter your email';
-                              });
-                            }
-                            if (password.isEmpty) {
-                              setState(() {
-                                passwordError = 'Please enter your password';
-                              });
-                            }
-                            if (email.isEmpty || password.isEmpty) return;
-
-                            final response = await ApiLogin.login(
-                              username: email,
-                              password: password,
-                            );
-
-                            if (response['success'] == true) {
-                              Navigator.pushReplacement(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => const MainShell(),
-                                ),
-                              );
-                            } else {
-                              setState(() {
-                                emailError = ' ';
-                                passwordError =
-                                    response['error'] ??
-                                    'Invalid email or password';
-                              });
-                            }
-                          },
+                          onPressed: _handleLogin, // 👈 reuse same logic
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF268A15),
                             shape: RoundedRectangleBorder(
@@ -904,7 +910,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                     ],
-                  ),
+                  )
                 ),
               ),
             ],
