@@ -1,5 +1,9 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:ui';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import '../core/services/api_attachment.dart';
 import '../core/services/api_file.dart';
 import '../core/services/api_login.dart';
@@ -30,6 +34,18 @@ class _TicketSidebarState extends State<TicketSidebar> {
   String _currentUserRole     = '';
   String _currentUsername     = '';
   bool   _actionLoading       = false;
+
+  // ─── resolution timer ──────────────────────────────────────────────────────
+  Timer?    _resolutionTimer;
+  int       _elapsedSeconds  = 0;   // seconds since grab
+  DateTime? _grabStartTime;         // parsed from started_at
+
+  // ─── remarks ───────────────────────────────────────────────────────────────
+  List<Map<String, dynamic>> _remarks        = [];
+  bool                       _remarksLoading = false;
+  bool                       _postingRemark  = false;
+  final TextEditingController _remarkCtrl    = TextEditingController();
+  final ScrollController      _remarkScroll  = ScrollController();
 
   // ─── lifecycle ─────────────────────────────────────────────────────────────
 
@@ -83,7 +99,155 @@ class _TicketSidebarState extends State<TicketSidebar> {
     }
   }
 
-  // ─── fetch ticket ──────────────────────────────────────────────────────────
+  // ─── timer management ──────────────────────────────────────────────────────
+
+  void _syncTimer() {
+    _resolutionTimer?.cancel();
+
+    final startedRaw = _detail?['started_at']?.toString() ?? '';
+    final startedAt  = startedRaw.isNotEmpty ? DateTime.tryParse(startedRaw)?.toLocal() : null;
+
+    // Only run timer when ticket is in-progress (grabbed but not yet resolved)
+    if (startedAt != null && _isAssigned && !_isResolved && !_isCancelled) {
+      _grabStartTime  = startedAt;
+      _elapsedSeconds = DateTime.now().difference(startedAt).inSeconds.clamp(0, 999999);
+
+      _resolutionTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted) setState(() => _elapsedSeconds++);
+      });
+    } else {
+      // If resolved, freeze the elapsed time at finish
+      if (startedAt != null && (_isResolved || _isCancelled)) {
+        final endedRaw = _detail?['resolved_at']?.toString() ?? _detail?['updated_at']?.toString() ?? '';
+        final endedAt  = endedRaw.isNotEmpty ? DateTime.tryParse(endedRaw)?.toLocal() : null;
+        _grabStartTime  = startedAt;
+        _elapsedSeconds = endedAt != null
+            ? endedAt.difference(startedAt).inSeconds.clamp(0, 999999)
+            : DateTime.now().difference(startedAt).inSeconds.clamp(0, 999999);
+      } else {
+        _grabStartTime  = null;
+        _elapsedSeconds = 0;
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _resolutionTimer?.cancel();
+    _remarkCtrl.dispose();
+    _remarkScroll.dispose();
+    super.dispose();
+  }
+
+  String _formatElapsed(int seconds) {
+    final h = seconds ~/ 3600;
+    final m = (seconds % 3600) ~/ 60;
+    final s = seconds % 60;
+    if (h > 0) return '${h}h ${_p(m)}m ${_p(s)}s';
+    if (m > 0) return '${m}m ${_p(s)}s';
+    return '${s}s';
+  }
+
+  // ─── confirmation dialogs ──────────────────────────────────────────────────
+
+  Future<bool> _confirm({
+    required String title,
+    required String message,
+    required String confirmLabel,
+    required Color  confirmColor,
+    IconData icon = Icons.help_outline,
+  }) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Row(children: [
+          Icon(icon, color: confirmColor, size: 20),
+          const SizedBox(width: 8),
+          Text(title, style: const TextStyle(color: AppTheme.textPrimary, fontSize: 16)),
+        ]),
+        content: Text(message,
+            style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel', style: TextStyle(color: AppTheme.textMuted)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: confirmColor,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(confirmLabel),
+          ),
+        ],
+      ),
+    );
+    return result == true;
+  }
+
+  Future<void> _confirmAndAct(String action, String ticketId) async {
+    late String title, message, label;
+    late Color  color;
+    late IconData icon;
+
+    switch (action) {
+      case 'endorse':
+        title   = 'Endorse Ticket';
+        message = 'Are you sure you want to endorse this ticket? It will be forwarded for approval.';
+        label   = 'Yes, Endorse';
+        color   = Colors.green;
+        icon    = Icons.thumb_up_alt_outlined;
+        break;
+      case 'approve':
+        title   = 'Approve Ticket';
+        message = 'Are you sure you want to approve this ticket? It will be made available for assignment.';
+        label   = 'Yes, Approve';
+        color   = Colors.blue;
+        icon    = Icons.verified_outlined;
+        break;
+      case 'grab':
+        title   = 'Grab / Assign Ticket';
+        message = 'Are you sure you want to grab this ticket? The resolution timer will start immediately.';
+        label   = 'Yes, Grab It';
+        color   = Colors.purple;
+        icon    = Icons.handshake_outlined;
+        break;
+      case 'ungrab':
+        title   = 'Release / Unassign Ticket';
+        message = 'Are you sure you want to release this ticket? It will go back to "For Assignment" and the timer will reset.';
+        label   = 'Yes, Release';
+        color   = Colors.orange;
+        icon    = Icons.assignment_return_outlined;
+        break;
+      case 'resolve':
+        title   = 'Resolve Ticket';
+        message = 'Are you sure you want to mark this ticket as resolved? This action will stop the timer.';
+        label   = 'Yes, Resolve';
+        color   = Colors.teal;
+        icon    = Icons.task_alt_outlined;
+        break;
+      case 'cancel':
+        title   = 'Cancel Ticket';
+        message = 'Are you sure you want to cancel this ticket? This cannot be undone.';
+        label   = 'Yes, Cancel';
+        color   = Colors.orange;
+        icon    = Icons.block_outlined;
+        break;
+      default:
+        await _handleAction(action, ticketId);
+        return;
+    }
+
+    final ok = await _confirm(
+      title: title, message: message,
+      confirmLabel: label, confirmColor: color, icon: icon,
+    );
+    if (ok) await _handleAction(action, ticketId);
+  }
 
   Future<void> _fetchBySR(String? srNumber) async {
     if (srNumber == null || srNumber.trim().isEmpty) return;
@@ -91,12 +255,122 @@ class _TicketSidebarState extends State<TicketSidebar> {
     try {
       final data = await ApiTicket.getTicketByID(srNumber.trim());
       setState(() { _detail = data; _isLoading = false; });
+      _syncTimer();
+      if (_currentUsername.isEmpty) await _loadCurrentUser();
+      await _fetchRemarks(srNumber.trim());
     } catch (e) {
       setState(() {
         _error     = 'Could not load ticket details. Please try again.';
         _isLoading = false;
       });
     }
+  }
+
+  // ─── remarks ───────────────────────────────────────────────────────────────
+
+  Future<void> _fetchRemarks(String ticketId) async {
+    if (!mounted) return;
+    setState(() => _remarksLoading = true);
+    try {
+      final token = await ApiLogin.getToken();
+      if (token == null) return;
+      final res = await http.get(
+        Uri.parse('http://localhost:8080/api/user/ticket/$ticketId/remarks'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      if (res.statusCode == 200) {
+        final body = jsonDecode(res.body);
+        debugPrint('📝 remarks raw: ${res.body}'); // ← debug
+        final raw  = body['data'];
+        if (raw is List) {
+          setState(() {
+            _remarks = raw.map((e) {
+              // API wraps each item as {"remark": {...}}
+              final r = e is Map && e.containsKey('remark') ? e['remark'] : e;
+              return Map<String, dynamic>.from(r as Map);
+            }).toList();
+          });
+          _scrollRemarksToBottom();
+        } else {
+          setState(() => _remarks = []);
+        }
+      }
+    } catch (e) {
+      debugPrint('Failed to fetch remarks: $e');
+    } finally {
+      if (mounted) setState(() => _remarksLoading = false);
+    }
+  }
+
+  Future<void> _postRemark(String ticketId) async {
+    final msg = _remarkCtrl.text.trim();
+    if (msg.isEmpty) return;
+
+    // Try multiple sources for user_id
+    String userId = (_detail?['user_id'] ?? _detail?['id'] ?? '').toString();
+
+    // Fallback: decode user id from JWT token
+    if (userId.isEmpty || userId == 'null') {
+      try {
+        final token = await ApiLogin.getToken();
+        if (token != null) {
+          final parts   = token.split('.');
+          if (parts.length == 3) {
+            final payload = utf8.decode(
+                base64Url.decode(base64Url.normalize(parts[1])));
+            final map = jsonDecode(payload) as Map<String, dynamic>;
+            userId = (map['id'] ?? map['user_id'] ?? map['sub'] ?? '').toString();
+          }
+        }
+      } catch (_) {}
+    }
+
+    if (userId.isEmpty || userId == 'null') {
+      _showSnackbar('Could not determine user ID. Please re-login.',
+          color: Colors.redAccent);
+      return;
+    }
+    setState(() => _postingRemark = true);
+    try {
+      final token = await ApiLogin.getToken();
+      if (token == null) return;
+      final res = await http.post(
+        Uri.parse('http://localhost:8080/api/user/ticket/remark'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'ticket_id': ticketId,
+          'user_id':   userId,
+          'message':   msg,
+        }),
+      );
+      if (res.statusCode == 200) {
+        _remarkCtrl.clear();
+        await _fetchRemarks(ticketId);
+      } else {
+        final body = jsonDecode(res.body);
+        _showSnackbar(body['message'] ?? 'Failed to post remark',
+            color: Colors.redAccent);
+      }
+    } catch (e) {
+      _showSnackbar('Error: $e', color: Colors.redAccent);
+    } finally {
+      if (mounted) setState(() => _postingRemark = false);
+    }
+  }
+
+  void _scrollRemarksToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_remarkScroll.hasClients) {
+        _remarkScroll.animateTo(
+          _remarkScroll.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
   }
 
   // ─── field helpers ─────────────────────────────────────────────────────────
@@ -294,30 +568,7 @@ class _TicketSidebarState extends State<TicketSidebar> {
   // ─── confirm cancel dialog ─────────────────────────────────────────────────
 
   Future<void> _confirmAndCancel(String ticketId) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppTheme.surface,
-        title: const Text('Cancel Ticket',
-            style: TextStyle(color: AppTheme.textPrimary)),
-        content: const Text(
-          'Are you sure you want to cancel this ticket? This cannot be undone.',
-          style: TextStyle(color: AppTheme.textSecondary),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('No'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Yes, Cancel'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true) await _handleAction('cancel', ticketId);
+    await _confirmAndAct('cancel', ticketId);
   }
 
   // ─── loading / error ───────────────────────────────────────────────────────
@@ -399,6 +650,10 @@ class _TicketSidebarState extends State<TicketSidebar> {
                 children: [
                   _buildProgressStepper(ticket),
                   const SizedBox(height: 16),
+                  if (_grabStartTime != null) ...[
+                    _buildResolutionTimer(),
+                    const SizedBox(height: 12),
+                  ],
                   _buildApprovalChain(),
                   const SizedBox(height: 12),
                   _buildActionButtons(ticket),
@@ -743,6 +998,78 @@ class _TicketSidebarState extends State<TicketSidebar> {
     );
   }
 
+  // ─── resolution timer widget ───────────────────────────────────────────────
+
+  Widget _buildResolutionTimer() {
+    final isRunning = _isAssigned && !_isResolved && !_isCancelled;
+    final label     = _formatElapsed(_elapsedSeconds);
+    final color     = isRunning
+        ? (_elapsedSeconds > 7200 ? Colors.redAccent : Colors.teal)
+        : (_isResolved ? Colors.teal : Colors.orange);
+    final statusLabel = isRunning
+        ? 'In Progress — Timer Running'
+        : (_isResolved ? 'Resolved — Final Time' : 'Released — Timer Reset');
+
+    return _card(
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.12),
+              shape: BoxShape.circle,
+              border: Border.all(color: color.withOpacity(0.4)),
+            ),
+            child: Icon(
+              isRunning ? Icons.timer_outlined : Icons.timer_off_outlined,
+              color: color, size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(statusLabel,
+                    style: TextStyle(
+                        color: AppTheme.textMuted,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.6)),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    Text(label,
+                        style: TextStyle(
+                            color: color,
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            fontFeatures: const [FontFeature.tabularFigures()])),
+                    if (isRunning) ...[
+                      const SizedBox(width: 8),
+                      SizedBox(
+                        width: 10, height: 10,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2, color: color,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                if (_grabStartTime != null)
+                  Text(
+                    'Started: ${_grabStartTime!.year}-${_p(_grabStartTime!.month)}-${_p(_grabStartTime!.day)}'
+                        '  ${_p(_grabStartTime!.hour)}:${_p(_grabStartTime!.minute)}',
+                    style: const TextStyle(color: AppTheme.textMuted, fontSize: 10),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ─── approval chain ────────────────────────────────────────────────────────
   //
   // Shows the actual name of whoever endorsed / approved / assigned / resolved.
@@ -958,7 +1285,7 @@ class _TicketSidebarState extends State<TicketSidebar> {
               label: 'Endorse',
               icon: Icons.thumb_up_alt_outlined,
               color: Colors.green,
-              onTap: () => _handleAction('endorse', ticket.id),
+              onTap: () => _confirmAndAct('endorse', ticket.id),
             ),
             const SizedBox(width: 12),
             _actionBtn(
@@ -996,7 +1323,7 @@ class _TicketSidebarState extends State<TicketSidebar> {
               label: 'Approve',
               icon: Icons.verified_outlined,
               color: Colors.blue,
-              onTap: () => _handleAction('approve', ticket.id),
+              onTap: () => _confirmAndAct('approve', ticket.id),
             ),
             const SizedBox(width: 12),
             _actionBtn(
@@ -1034,7 +1361,7 @@ class _TicketSidebarState extends State<TicketSidebar> {
               label: 'Grab Ticket',
               icon: Icons.handshake_outlined,
               color: Colors.purple,
-              onTap: () => _handleAction('grab', ticket.id),
+              onTap: () => _confirmAndAct('grab', ticket.id),
             ),
             const SizedBox(width: 12),
             _actionBtn(
@@ -1046,16 +1373,37 @@ class _TicketSidebarState extends State<TicketSidebar> {
           ],
         );
       }
+      // Check if this resolver is the assignee (can ungrab or resolve)
+      final currentAssignee = _field(['assigned_to', 'assignee', 'resolver_name', 'resolver'])
+          .toLowerCase().trim();
+      final isMyTicket = currentAssignee == _currentUsername;
+
       if (!resolveDone) {
         return _actionCard(
           debugLabel: 'resolver (assigned) · $_normalizedStatus',
           children: [
-            _actionBtn(
-              label: 'Resolve',
-              icon: Icons.task_alt_outlined,
-              color: Colors.teal,
-              onTap: () => _handleAction('resolve', ticket.id),
-            ),
+            if (isMyTicket) ...[
+              _actionBtn(
+                label: 'Resolve',
+                icon: Icons.task_alt_outlined,
+                color: Colors.teal,
+                onTap: () => _confirmAndAct('resolve', ticket.id),
+              ),
+              const SizedBox(width: 12),
+              _actionBtn(
+                label: 'Unassign',
+                icon: Icons.assignment_return_outlined,
+                color: Colors.orange,
+                onTap: () => _confirmAndAct('ungrab', ticket.id),
+              ),
+            ] else ...[
+              const Icon(Icons.lock_outline, color: Colors.grey, size: 18),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text('This ticket is assigned to another resolver.',
+                    style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+              ),
+            ],
           ],
         );
       }
@@ -1180,6 +1528,11 @@ class _TicketSidebarState extends State<TicketSidebar> {
           _showSnackbar(result['message'] ?? 'Ticket assigned to you ✓',
               color: Colors.purple);
           break;
+        case 'ungrab':
+          result = await ApiUpdateTicket.ungrabTicket(token, ticketId);
+          _showSnackbar(result['message'] ?? 'Ticket released successfully',
+              color: Colors.orange);
+          break;
         case 'reject':
           result = await ApiUpdateTicket.rejectTicket(token, ticketId);
           _showSnackbar(result['message'] ?? 'Ticket rejected',
@@ -1208,37 +1561,229 @@ class _TicketSidebarState extends State<TicketSidebar> {
     }
   }
 
-  // ─── reply section ─────────────────────────────────────────────────────────
+  // ─── remarks section ───────────────────────────────────────────────────────
 
   Widget _buildReplySection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _sectionLabel('Reply'),
-        const SizedBox(height: 8),
-        TextField(
-          maxLines: 3,
-          decoration: InputDecoration(
-            filled: true,
-            fillColor: AppTheme.surface,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: AppTheme.border),
+    final ticketId = widget.ticket?.id ?? '';
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+
+          // ── Header ────────────────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+            child: Row(
+              children: [
+                const Icon(Icons.chat_bubble_outline,
+                    size: 14, color: AppTheme.textMuted),
+                const SizedBox(width: 6),
+                Text(
+                  'REMARKS  (${_remarks.length})',
+                  style: const TextStyle(
+                    color: AppTheme.textMuted,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+                const Spacer(),
+                // Refresh button
+                GestureDetector(
+                  onTap: () => _fetchRemarks(ticketId),
+                  child: const Icon(Icons.refresh,
+                      size: 14, color: AppTheme.textMuted),
+                ),
+              ],
             ),
-            hintText: 'Write a reply…',
-            hintStyle: const TextStyle(color: AppTheme.textMuted),
           ),
-          style: const TextStyle(color: AppTheme.textPrimary),
-        ),
-        const SizedBox(height: 10),
-        Align(
-          alignment: Alignment.centerRight,
-          child: ElevatedButton(
-            onPressed: () {},
-            child: const Text('Post Reply'),
+
+          const SizedBox(height: 8),
+          const Divider(height: 1, color: AppTheme.border),
+
+          // ── Messages list ─────────────────────────────────────────────────
+          SizedBox(
+            height: 240,
+            child: _remarksLoading
+                ? const Center(
+                child: CircularProgressIndicator(strokeWidth: 2))
+                : _remarks.isEmpty
+                ? Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: const [
+                  Icon(Icons.chat_bubble_outline,
+                      color: AppTheme.textMuted, size: 28),
+                  SizedBox(height: 8),
+                  Text('No remarks yet.',
+                      style: TextStyle(
+                          color: AppTheme.textMuted, fontSize: 12)),
+                ],
+              ),
+            )
+                : ListView.builder(
+              controller: _remarkScroll,
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 12, vertical: 8),
+              itemCount: _remarks.length,
+              itemBuilder: (_, i) => _buildRemarkBubble(_remarks[i]),
+            ),
           ),
-        ),
-      ],
+
+          const Divider(height: 1, color: AppTheme.border),
+
+          // ── Input box ─────────────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.all(10),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _remarkCtrl,
+                    maxLines: 3,
+                    minLines: 1,
+                    style: const TextStyle(
+                        color: AppTheme.textPrimary, fontSize: 13),
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: AppTheme.sidebarBg,
+                      hintText: 'Write a remark…',
+                      hintStyle: const TextStyle(
+                          color: AppTheme.textMuted, fontSize: 13),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide:
+                        const BorderSide(color: AppTheme.border),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide:
+                        const BorderSide(color: AppTheme.border),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(
+                            color: Colors.blue, width: 1.5),
+                      ),
+                    ),
+                    onSubmitted: (_) => _postRemark(ticketId),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _postingRemark
+                    ? const SizedBox(
+                    width: 36,
+                    height: 36,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                    : GestureDetector(
+                  onTap: () => _postRemark(ticketId),
+                  child: Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: Colors.blue,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.send,
+                        color: Colors.white, size: 18),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRemarkBubble(Map<String, dynamic> remark) {
+    final message   = remark['message']?.toString() ?? '';
+    final userId    = remark['user_id']?.toString() ?? '';
+    final createdAt = remark['created_at']?.toString() ?? '';
+    final isMe      = userId == (_detail?['user_id'] ?? _detail?['id'] ?? '').toString();
+
+    // Format time
+    String timeStr = '';
+    final dt = DateTime.tryParse(createdAt)?.toLocal();
+    if (dt != null) {
+      timeStr = '${_p(dt.hour)}:${_p(dt.minute)}  '
+          '${dt.year}-${_p(dt.month)}-${_p(dt.day)}';
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment:
+        isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+        children: [
+          if (!isMe) ...[
+            CircleAvatar(
+              radius: 14,
+              backgroundColor: Colors.blueGrey.shade700,
+              child: Text(
+                userId.isNotEmpty ? userId[0].toUpperCase() : '?',
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold),
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
+          Flexible(
+            child: Column(
+              crossAxisAlignment:
+              isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isMe
+                        ? Colors.blue.withOpacity(0.18)
+                        : AppTheme.sidebarBg,
+                    borderRadius: BorderRadius.only(
+                      topLeft: const Radius.circular(12),
+                      topRight: const Radius.circular(12),
+                      bottomLeft: Radius.circular(isMe ? 12 : 2),
+                      bottomRight: Radius.circular(isMe ? 2 : 12),
+                    ),
+                    border: Border.all(
+                      color: isMe
+                          ? Colors.blue.withOpacity(0.35)
+                          : AppTheme.border,
+                    ),
+                  ),
+                  child: Text(
+                    message,
+                    style: const TextStyle(
+                        color: AppTheme.textPrimary,
+                        fontSize: 13,
+                        height: 1.45),
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  timeStr,
+                  style: const TextStyle(
+                      color: AppTheme.textMuted, fontSize: 10),
+                ),
+              ],
+            ),
+          ),
+          if (isMe) const SizedBox(width: 8),
+        ],
+      ),
     );
   }
 

@@ -72,7 +72,7 @@ class ApiAttachment {
     try {
       final headers = await _authHeaders();
       final res = await http.get(
-        Uri.parse('$_baseUrl/attachments/$attachmentId'),
+        Uri.parse('$_baseUrl/upload/attachments/$attachmentId'),
         headers: headers,
       );
       if (res.statusCode == 200) return res.bodyBytes;

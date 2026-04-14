@@ -39,7 +39,7 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
 
   // ── Pagination ────────────────────────────────────────────
   int _currentPage = 1;
-  static const int _perPage = 10;
+  static const int _perPage = 20;
 
   // ── Data ──────────────────────────────────────────────────
   bool _loading = true;

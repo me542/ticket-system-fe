@@ -39,6 +39,15 @@ class ApiUpdateTicket {
   }
 
   // ================================
+  // ✅ UNGRAB/UNASSIGN TICKET
+  // PUT /api/user/ticket/ungrab/:id
+  // ================================
+  static Future<Map<String, dynamic>> ungrabTicket(
+      String token, String ticketId) async {
+    return _put("$baseUrl/ticket/ungrab/$ticketId", token);
+  }
+
+  // ================================
   // ✅ RESOLVE TICKET
   // PUT /api/user/ticket/resolve/:id
   // ================================
