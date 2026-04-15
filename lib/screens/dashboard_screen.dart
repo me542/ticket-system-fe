@@ -59,7 +59,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   // ── Computed filtered list ────────────────────────────────
   List<Ticket> get _filteredTickets {
-    // 1. Apply status filter
     List<Ticket> list;
     switch (_selectedFilter) {
       case 'For':
@@ -84,7 +83,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         list = List.from(_tickets);
     }
 
-    // 2. Apply search query
     if (_searchQuery.isEmpty) return list;
     final q = _searchQuery.toLowerCase();
     return list
@@ -186,6 +184,51 @@ class _DashboardScreenState extends State<DashboardScreen> {
       );
     }).toList();
 
+    // ── Derive activity items from tickets ──────────────────
+    final activities = <ActivityItem>[];
+
+    for (final t in tickets) {
+      // Submitted event for every ticket
+      activities.add(ActivityItem(
+        ticketId: t.id,
+        ticketTitle: t.title,
+        actor: t.submitter,
+        message: '${t.submitter} submitted ${t.id}',
+        time: t.createdAt,
+        type: ActivityType.submitted,
+      ));
+
+      // Status-based follow-up event
+      if (t.status == TicketStatus.inProgress ||
+          t.status == TicketStatus.resolved ||
+          t.status == TicketStatus.cancelled) {
+        final actType = t.status == TicketStatus.inProgress
+            ? ActivityType.moved
+            : t.status == TicketStatus.resolved
+            ? ActivityType.resolved
+            : ActivityType.cancelled;
+
+        final actionWord = t.status == TicketStatus.inProgress
+            ? 'moved to In Progress'
+            : t.status == TicketStatus.resolved
+            ? 'resolved'
+            : 'cancelled';
+
+        activities.add(ActivityItem(
+          ticketId: t.id,
+          ticketTitle: t.title,
+          actor: t.submitter,
+          message: '${t.submitter} $actionWord ${t.id}',
+          time: t.createdAt.add(const Duration(hours: 1)),
+          type: actType,
+        ));
+      }
+    }
+
+    // Sort newest first, keep top 20
+    activities.sort((a, b) => b.time.compareTo(a.time));
+    final recentActivities = activities.take(20).toList();
+
     // Compute stats
     final total = tickets.length;
     final forAssessment =
@@ -205,6 +248,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _tickets
         ..clear()
         ..addAll(tickets);
+      _activities
+        ..clear()
+        ..addAll(recentActivities);
       _categoryCount
         ..clear()
         ..addAll(categoryCount);
@@ -290,7 +336,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           const SizedBox(width: 20),
 
-          // ── Real search bar ──────────────────────────────
+          // ── Search bar ───────────────────────────────────
           Expanded(
             child: Container(
               height: 36,
@@ -320,7 +366,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                     ),
                   ),
-                  // Clear button
                   if (_searchQuery.isNotEmpty)
                     GestureDetector(
                       onTap: () => _searchController.clear(),
@@ -386,7 +431,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           const SizedBox(width: 8),
 
-          // ── New Ticket button — awaits dialog then refreshes ──
+          // ── New Ticket button ────────────────────────────
           ElevatedButton.icon(
             onPressed: () async {
               await showDialog(
@@ -394,7 +439,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 barrierDismissible: false,
                 builder: (_) => const CreateTicketDialog(),
               );
-              // Re-fetch tickets so new one appears immediately
               _loadTickets();
             },
             icon: const Icon(Icons.add, size: 16),
@@ -532,7 +576,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   fontSize: 15,
                   fontWeight: FontWeight.w700)),
           const SizedBox(width: 8),
-          // Show filtered count vs total
           Text(
             _searchQuery.isNotEmpty || _selectedFilter != 'All'
                 ? '${_filteredTickets.length} of ${_tickets.length}'
@@ -541,7 +584,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 color: AppTheme.textSecondary, fontSize: 12),
           ),
           const Spacer(),
-          // ── Filter buttons ───────────────────────────────
           Row(
             children: _filters.map((f) {
               final isSelected = _selectedFilter == f;
@@ -666,9 +708,48 @@ class _DashboardScreenState extends State<DashboardScreen> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppTheme.border),
       ),
-      child: const Center(
-        child: Text('No recent activity',
-            style: TextStyle(color: AppTheme.textSecondary)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text(
+                'Recent Activity',
+                style: TextStyle(
+                  color: AppTheme.textPrimary,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const Spacer(),
+              if (_activities.isNotEmpty)
+                Text(
+                  '${_activities.length}',
+                  style: const TextStyle(
+                    color: AppTheme.textSecondary,
+                    fontSize: 11,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (_activities.isEmpty)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: Text(
+                  'No recent activity',
+                  style: TextStyle(
+                      color: AppTheme.textSecondary, fontSize: 12),
+                ),
+              ),
+            )
+          else
+            ...(_activities.take(4).map((item) => _ActivityTile(
+              item: item,
+              color: _activityColor(item.type),
+            ))),
+        ],
       ),
     );
   }
@@ -743,6 +824,96 @@ class _CategoryBar extends StatelessWidget {
               textAlign: TextAlign.right),
         ),
       ],
+    );
+  }
+}
+
+// ── Activity tile ─────────────────────────────────────────────
+class _ActivityTile extends StatelessWidget {
+  final ActivityItem item;
+  final Color color;
+
+  const _ActivityTile({required this.item, required this.color});
+
+  String get _actionLabel {
+    switch (item.type) {
+      case ActivityType.submitted:
+        return 'submitted';
+      case ActivityType.moved:
+        return 'moved to In Progress';
+      case ActivityType.resolved:
+        return 'resolved';
+      case ActivityType.cancelled:
+        return 'cancelled';
+      case ActivityType.assigned:
+        return 'assigned';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Colored dot
+          Container(
+            width: 8,
+            height: 8,
+            margin: const EdgeInsets.only(top: 3),
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Actor + action
+                RichText(
+                  text: TextSpan(
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.textSecondary,
+                    ),
+                    children: [
+                      TextSpan(
+                        text: item.actor,
+                        style: const TextStyle(
+                          color: AppTheme.textPrimary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      TextSpan(text: ' $_actionLabel'),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 2),
+                // Ticket ID + title
+                Text(
+                  '${item.ticketId} · ${item.ticketTitle}',
+                  style: const TextStyle(
+                      fontSize: 11, color: AppTheme.textMuted),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                // Time ago
+                Text(
+                  item.timeAgo,
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: AppTheme.textMuted.withOpacity(0.7),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

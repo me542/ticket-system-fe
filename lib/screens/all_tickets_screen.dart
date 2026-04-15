@@ -243,6 +243,9 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
           r['updated_at'] ?? '',
           r['cancelled_by'] ?? '',
           r['cancelled_at'] ?? '',
+          r['started_at'] ?? '',
+          r['resolved_at'] ?? '',
+          r['resolution_minutes'] ?? '',
         ];
 
         for (var col = 0; col < vals.length; col++) {
@@ -600,6 +603,9 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
       _ColDef('Updated At',   'updated_at',   160, false),
       _ColDef('Cancelled By', 'cancelled_by', 120, true),
       _ColDef('Cancelled At', 'cancelled_at', 160, false),
+      _ColDef('Started At', 'started_at', 160, false),
+      _ColDef('Resolved At', 'resolved', 160, false),
+      _ColDef('Resolution Minutes', 'resolution_minutes', 160, false),
     ];
 
     final totalWidth = cols.fold(0.0, (sum, c) => sum + c.width);
