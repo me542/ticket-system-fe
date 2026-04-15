@@ -27,7 +27,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Ticket System',
+      title: 'IDIYANALE',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
       // If token exists → go straight to MainShell, else LoginScreen

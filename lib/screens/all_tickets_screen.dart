@@ -214,7 +214,8 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
         'Ticket ID', 'Creator', 'Category', 'Subject', 'Institution',
         'Type', 'Description', 'Priority', 'Assignee', 'Endorser',
         'Approver', 'Status', 'Created At', 'Updated At',
-        'Cancelled By', 'Cancelled At',
+        'Cancelled By', 'Cancelled At', 'Started_at', 'Resolved_at',
+        'Resolution_Minutes',
       ];
 
       for (var col = 0; col < headers.length; col++) {
@@ -259,6 +260,7 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
       final widths = [
         16.0, 14.0, 22.0, 30.0, 20.0, 14.0, 40.0, 10.0,
         14.0, 14.0, 14.0, 14.0, 20.0, 20.0, 14.0, 20.0,
+        20.0, 20.0, 20.0,
       ];
       for (var i = 0; i < widths.length; i++) {
         sheet.setColumnWidth(i, widths[i]);

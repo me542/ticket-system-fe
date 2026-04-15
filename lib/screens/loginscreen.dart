@@ -675,38 +675,40 @@ class _LoginScreenState extends State<LoginScreen> {
             children: [
               // Logo
               Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF268A15),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Center(
-                  child: Text(
-                    'TS',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.w400,
-                    ),
+                child: Center(
+                  child: Image.asset(
+                    '/Users/bakawan-user/Desktop/ticket-system-fe/lib/assets/favicon1.png', // 👈 your asset path
+                    width: 200,
+                    height: 200,
+                    fit: BoxFit.contain,
                   ),
                 ),
               ),
-              const SizedBox(height: 5),
-              const Text(
-                'Ticket System',
-                style: TextStyle(
-                  color: Color(0xFF268A15),
-                  fontSize: 28,
-                  fontWeight: FontWeight.w500,
+
+              ShaderMask(
+                shaderCallback: (bounds) => const LinearGradient(
+                  colors: [
+                    Color(0xFFDAB76B),
+                    Color(0xFFA0813D),
+                  ],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ).createShader(bounds),
+                child: const Text(
+                  'IDIYANALE',
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
                 ),
               ),
-              const SizedBox(height: 5),
+
               const Text(
-                'Test',
+                'Bakawan Ticketing System',
                 style: TextStyle(
                   color: Color(0xFF8A92A3),
-                  fontSize: 14,
+                  fontSize: 16,
                   fontWeight: FontWeight.w400,
                 ),
               ),

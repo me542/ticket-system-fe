@@ -30,25 +30,12 @@ class AppSidebar extends StatelessWidget {
             child: Row(
               children: [
                 Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF268A15), Color(0xFF268A15)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Center(
-                    child: Text(
-                      'TS',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                        letterSpacing: 0.5,
-                      ),
+                  child: Center(
+                    child: Image.asset(
+                      '/Users/bakawan-user/Desktop/ticket-system-fe/lib/assets/favicon1.png', // 👈 your asset path
+                      width: 60,
+                      height: 60,
+                      fit: BoxFit.contain,
                     ),
                   ),
                 ),
@@ -57,19 +44,19 @@ class AppSidebar extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'TICKET SYSTEM',
+                      'IDIYANALE',
                       style: TextStyle(
-                        color: AppTheme.textPrimary,
+                        color: Color(0xFFDAB76B),
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
                         letterSpacing: 1.2,
                       ),
                     ),
                     Text(
-                      'V1.0.1',
+                      'Bakawan Ticketing System',
                       style: TextStyle(
                         color: AppTheme.textSecondary,
-                        fontSize: 9,
+                        fontSize: 7 ,
                         letterSpacing: 1.0,
                       ),
                     ),
