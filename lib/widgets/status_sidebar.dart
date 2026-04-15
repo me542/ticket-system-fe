@@ -17,11 +17,7 @@ class TicketSidebar extends StatefulWidget {
   final Ticket? ticket;
   final VoidCallback onClose;
 
-  const TicketSidebar({
-    super.key,
-    required this.ticket,
-    required this.onClose,
-  });
+  const TicketSidebar({super.key, required this.ticket, required this.onClose});
 
   @override
   State<TicketSidebar> createState() => _TicketSidebarState();
@@ -32,21 +28,21 @@ class _TicketSidebarState extends State<TicketSidebar> {
   bool _isLoading = false;
   String? _error;
 
-  String _currentUserRole     = '';
-  String _currentUsername     = '';
-  bool   _actionLoading       = false;
+  String _currentUserRole = '';
+  String _currentUsername = '';
+  bool _actionLoading = false;
 
   // ─── resolution timer ──────────────────────────────────────────────────────
-  Timer?    _resolutionTimer;
-  int       _elapsedSeconds  = 0;   // seconds since grab
-  DateTime? _grabStartTime;         // parsed from started_at
+  Timer? _resolutionTimer;
+  int _elapsedSeconds = 0; // seconds since grab
+  DateTime? _grabStartTime; // parsed from started_at
 
   // ─── remarks ───────────────────────────────────────────────────────────────
-  List<Map<String, dynamic>> _remarks        = [];
-  bool                       _remarksLoading = false;
-  bool                       _postingRemark  = false;
-  final TextEditingController _remarkCtrl    = TextEditingController();
-  final ScrollController      _remarkScroll  = ScrollController();
+  List<Map<String, dynamic>> _remarks = [];
+  bool _remarksLoading = false;
+  bool _postingRemark = false;
+  final TextEditingController _remarkCtrl = TextEditingController();
+  final ScrollController _remarkScroll = ScrollController();
 
   // ─── lifecycle ─────────────────────────────────────────────────────────────
 
@@ -56,8 +52,8 @@ class _TicketSidebarState extends State<TicketSidebar> {
     final currentScroll = _scrollController.position.pixels;
     return (maxScroll - currentScroll) < 100; // threshold
   }
-  final ScrollController _scrollController = ScrollController();
 
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
@@ -74,21 +70,21 @@ class _TicketSidebarState extends State<TicketSidebar> {
     }
   }
 
-
-
   // ─── load current user ─────────────────────────────────────────────────────
 
   Future<void> _loadCurrentUser() async {
     try {
       final savedUsername = await ApiLogin.getUsername();
-      final users         = await ApiGetUser.fetchUsers();
+      final users = await ApiGetUser.fetchUsers();
 
       String role = '';
       String username = savedUsername ?? '';
 
       if (savedUsername != null && savedUsername.isNotEmpty) {
         final match = users.firstWhere(
-              (u) => (u['username'] ?? '').toLowerCase() == savedUsername.toLowerCase(),
+              (u) =>
+          (u['username'] ?? '').toLowerCase() ==
+              savedUsername.toLowerCase(),
           orElse: () => {},
         );
         role = match['role'] ?? '';
@@ -117,12 +113,17 @@ class _TicketSidebarState extends State<TicketSidebar> {
     _resolutionTimer?.cancel();
 
     final startedRaw = _detail?['started_at']?.toString() ?? '';
-    final startedAt  = startedRaw.isNotEmpty ? DateTime.tryParse(startedRaw)?.toLocal() : null;
+    final startedAt = startedRaw.isNotEmpty
+        ? DateTime.tryParse(startedRaw)?.toLocal()
+        : null;
 
     // Only run timer when ticket is in-progress (grabbed but not yet resolved)
     if (startedAt != null && _isAssigned && !_isResolved && !_isCancelled) {
-      _grabStartTime  = startedAt;
-      _elapsedSeconds = DateTime.now().difference(startedAt).inSeconds.clamp(0, 999999);
+      _grabStartTime = startedAt;
+      _elapsedSeconds = DateTime.now()
+          .difference(startedAt)
+          .inSeconds
+          .clamp(0, 999999);
 
       _resolutionTimer = Timer.periodic(const Duration(seconds: 1), (_) {
         if (mounted) setState(() => _elapsedSeconds++);
@@ -130,14 +131,19 @@ class _TicketSidebarState extends State<TicketSidebar> {
     } else {
       // If resolved, freeze the elapsed time at finish
       if (startedAt != null && (_isResolved || _isCancelled)) {
-        final endedRaw = _detail?['resolved_at']?.toString() ?? _detail?['updated_at']?.toString() ?? '';
-        final endedAt  = endedRaw.isNotEmpty ? DateTime.tryParse(endedRaw)?.toLocal() : null;
-        _grabStartTime  = startedAt;
+        final endedRaw =
+            _detail?['resolved_at']?.toString() ??
+                _detail?['updated_at']?.toString() ??
+                '';
+        final endedAt = endedRaw.isNotEmpty
+            ? DateTime.tryParse(endedRaw)?.toLocal()
+            : null;
+        _grabStartTime = startedAt;
         _elapsedSeconds = endedAt != null
             ? endedAt.difference(startedAt).inSeconds.clamp(0, 999999)
             : DateTime.now().difference(startedAt).inSeconds.clamp(0, 999999);
       } else {
-        _grabStartTime  = null;
+        _grabStartTime = null;
         _elapsedSeconds = 0;
       }
     }
@@ -167,7 +173,7 @@ class _TicketSidebarState extends State<TicketSidebar> {
     required String title,
     required String message,
     required String confirmLabel,
-    required Color  confirmColor,
+    required Color confirmColor,
     IconData icon = Icons.help_outline,
   }) async {
     final result = await showDialog<bool>(
@@ -175,23 +181,35 @@ class _TicketSidebarState extends State<TicketSidebar> {
       builder: (ctx) => AlertDialog(
         backgroundColor: AppTheme.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Row(children: [
-          Icon(icon, color: confirmColor, size: 20),
-          const SizedBox(width: 8),
-          Text(title, style: const TextStyle(color: AppTheme.textPrimary, fontSize: 16)),
-        ]),
-        content: Text(message,
-            style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
+        title: Row(
+          children: [
+            Icon(icon, color: confirmColor, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              title,
+              style: const TextStyle(color: AppTheme.textPrimary, fontSize: 16),
+            ),
+          ],
+        ),
+        content: Text(
+          message,
+          style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel', style: TextStyle(color: AppTheme.textMuted)),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: AppTheme.textMuted),
+            ),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: confirmColor,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
             onPressed: () => Navigator.pop(ctx, true),
             child: Text(confirmLabel),
@@ -204,51 +222,65 @@ class _TicketSidebarState extends State<TicketSidebar> {
 
   Future<void> _confirmAndAct(String action, String ticketId) async {
     late String title, message, label;
-    late Color  color;
+    late Color color;
     late IconData icon;
 
     switch (action) {
       case 'endorse':
-        title   = 'Endorse Ticket';
-        message = 'Are you sure you want to endorse this ticket? It will be forwarded for approval.';
-        label   = 'Yes, Endorse';
-        color   = Colors.green;
-        icon    = Icons.thumb_up_alt_outlined;
+        title = 'Endorse Ticket';
+        message =
+        'Are you sure you want to endorse this ticket? It will be forwarded for approval.';
+        label = 'Yes, Endorse';
+        color = Colors.green;
+        icon = Icons.thumb_up_alt_outlined;
         break;
       case 'approve':
-        title   = 'Approve Ticket';
-        message = 'Are you sure you want to approve this ticket? It will be made available for assignment.';
-        label   = 'Yes, Approve';
-        color   = Colors.blue;
-        icon    = Icons.verified_outlined;
+        title = 'Approve Ticket';
+        message =
+        'Are you sure you want to approve this ticket? It will be made available for assignment.';
+        label = 'Yes, Approve';
+        color = Colors.blue;
+        icon = Icons.verified_outlined;
         break;
       case 'grab':
-        title   = 'Grab / Assign Ticket';
-        message = 'Are you sure you want to grab this ticket? The resolution timer will start immediately.';
-        label   = 'Yes, Grab It';
-        color   = Colors.purple;
-        icon    = Icons.handshake_outlined;
+        title = 'Grab / Assign Ticket';
+        message =
+        'Are you sure you want to grab this ticket? The resolution timer will start immediately.';
+        label = 'Yes, Grab It';
+        color = Colors.purple;
+        icon = Icons.handshake_outlined;
         break;
       case 'ungrab':
-        title   = 'Release / Unassign Ticket';
-        message = 'Are you sure you want to release this ticket? It will go back to "For Assignment" and the timer will reset.';
-        label   = 'Yes, Release';
-        color   = Colors.orange;
-        icon    = Icons.assignment_return_outlined;
+        title = 'Release / Unassign Ticket';
+        message =
+        'Are you sure you want to release this ticket? It will go back to "For Assignment" and the timer will reset.';
+        label = 'Yes, Release';
+        color = Colors.orange;
+        icon = Icons.assignment_return_outlined;
         break;
       case 'resolve':
-        title   = 'Resolve Ticket';
-        message = 'Are you sure you want to mark this ticket as resolved? This action will stop the timer.';
-        label   = 'Yes, Resolve';
-        color   = Colors.teal;
-        icon    = Icons.task_alt_outlined;
+        title = 'Resolve Ticket';
+        message =
+        'Are you sure you want to mark this ticket as resolved? This action will stop the timer.';
+        label = 'Yes, Resolve';
+        color = Colors.teal;
+        icon = Icons.task_alt_outlined;
+        break;
+      case 'hold':
+        title = 'Hold Ticket';
+        message =
+        'Are you sure you want to Hold? This action will pause the timer.';
+        label = 'Yes, Hold timer';
+        color = Colors.orange;
+        icon = Icons.task_alt_outlined;
         break;
       case 'cancel':
-        title   = 'Cancel Ticket';
-        message = 'Are you sure you want to cancel this ticket? This cannot be undone.';
-        label   = 'Yes, Cancel';
-        color   = Colors.orange;
-        icon    = Icons.block_outlined;
+        title = 'Cancel Ticket';
+        message =
+        'Are you sure you want to cancel this ticket? This cannot be undone.';
+        label = 'Yes, Cancel';
+        color = Colors.red;
+        icon = Icons.block_outlined;
         break;
       default:
         await _handleAction(action, ticketId);
@@ -256,24 +288,34 @@ class _TicketSidebarState extends State<TicketSidebar> {
     }
 
     final ok = await _confirm(
-      title: title, message: message,
-      confirmLabel: label, confirmColor: color, icon: icon,
+      title: title,
+      message: message,
+      confirmLabel: label,
+      confirmColor: color,
+      icon: icon,
     );
     if (ok) await _handleAction(action, ticketId);
   }
 
   Future<void> _fetchBySR(String? srNumber) async {
     if (srNumber == null || srNumber.trim().isEmpty) return;
-    setState(() { _isLoading = true; _error = null; _detail = null; });
+    setState(() {
+      _isLoading = true;
+      _error = null;
+      _detail = null;
+    });
     try {
       final data = await ApiTicket.getTicketByID(srNumber.trim());
-      setState(() { _detail = data; _isLoading = false; });
+      setState(() {
+        _detail = data;
+        _isLoading = false;
+      });
       _syncTimer();
       if (_currentUsername.isEmpty) await _loadCurrentUser();
       await _fetchRemarks(srNumber.trim());
     } catch (e) {
       setState(() {
-        _error     = 'Could not load ticket details. Please try again.';
+        _error = 'Could not load ticket details. Please try again.';
         _isLoading = false;
       });
     }
@@ -313,7 +355,6 @@ class _TicketSidebarState extends State<TicketSidebar> {
     }
   }
 
-
   Future<void> _postRemark(String ticketId) async {
     final msg = _remarkCtrl.text.trim();
     if (msg.isEmpty) return;
@@ -327,17 +368,21 @@ class _TicketSidebarState extends State<TicketSidebar> {
           final parts = token.split('.');
           if (parts.length == 3) {
             final payload = utf8.decode(
-                base64Url.decode(base64Url.normalize(parts[1])));
+              base64Url.decode(base64Url.normalize(parts[1])),
+            );
             final map = jsonDecode(payload) as Map<String, dynamic>;
-            userId = (map['id'] ?? map['user_id'] ?? map['sub'] ?? '').toString();
+            userId = (map['id'] ?? map['user_id'] ?? map['sub'] ?? '')
+                .toString();
           }
         }
       } catch (_) {}
     }
 
     if (userId.isEmpty || userId == 'null') {
-      _showSnackbar('Could not determine user ID. Please re-login.',
-          color: Colors.redAccent);
+      _showSnackbar(
+        'Could not determine user ID. Please re-login.',
+        color: Colors.redAccent,
+      );
       return;
     }
 
@@ -358,8 +403,10 @@ class _TicketSidebarState extends State<TicketSidebar> {
 
       await _fetchRemarks(ticketId); // this will handle scroll properly
     } catch (e) {
-      _showSnackbar(e.toString().replaceFirst('Exception: ', ''),
-          color: Colors.redAccent);
+      _showSnackbar(
+        e.toString().replaceFirst('Exception: ', ''),
+        color: Colors.redAccent,
+      );
     } finally {
       if (mounted) setState(() => _postingRemark = false);
     }
@@ -395,10 +442,9 @@ class _TicketSidebarState extends State<TicketSidebar> {
 
   // ─── status helpers ────────────────────────────────────────────────────────
 
-  String get _rawStatus =>
-      _field(['status'], fallback: widget.ticket?.status.name ?? '')
-          .toLowerCase()
-          .trim();
+  String get _rawStatus => _field([
+    'status',
+  ], fallback: widget.ticket?.status.name ?? '').toLowerCase().trim();
 
   String get _normalizedStatus {
     switch (_rawStatus.replaceAll(' ', '').replaceAll('_', '')) {
@@ -432,20 +478,21 @@ class _TicketSidebarState extends State<TicketSidebar> {
   }
 
   bool get _isSubmitted => _normalizedStatus == 'submitted';
-  bool get _isEndorsed  => _normalizedStatus == 'endorsed';
-  bool get _isApproved  => _normalizedStatus == 'approved';
-  bool get _isAssigned  => _normalizedStatus == 'assigned';
-  bool get _isResolved  => _normalizedStatus == 'resolved';
+  bool get _isEndorsed => _normalizedStatus == 'endorsed';
+  bool get _isApproved => _normalizedStatus == 'approved';
+  bool get _isAssigned => _normalizedStatus == 'assigned';
+  bool get _isResolved => _normalizedStatus == 'resolved';
   bool get _isCancelled => _normalizedStatus == 'cancelled';
 
   // ─── who created this ticket ───────────────────────────────────────────────
 
   /// Returns true if the logged-in user is the one who submitted this ticket.
   bool get _isCreator {
-    final submitter = _field(
-      ['username', 'submitter', 'created_by'],
-      fallback: widget.ticket?.submitter ?? '',
-    ).toLowerCase().trim();
+    final submitter = _field([
+      'username',
+      'submitter',
+      'created_by',
+    ], fallback: widget.ticket?.submitter ?? '').toLowerCase().trim();
     return _currentUsername.isNotEmpty && _currentUsername == submitter;
   }
 
@@ -453,20 +500,29 @@ class _TicketSidebarState extends State<TicketSidebar> {
 
   Color get _statusColor {
     switch (widget.ticket?.status) {
-      case TicketStatus.forAssessment: return AppTheme.statusAssessment;
-      case TicketStatus.inProgress:    return AppTheme.statusProgress;
-      case TicketStatus.resolved:      return AppTheme.statusResolved;
-      case TicketStatus.cancelled:     return AppTheme.statusCancelled;
-      default:                         return AppTheme.statusAssessment;
+      case TicketStatus.forAssessment:
+        return AppTheme.statusAssessment;
+      case TicketStatus.inProgress:
+        return AppTheme.statusProgress;
+      case TicketStatus.resolved:
+        return AppTheme.statusResolved;
+      case TicketStatus.cancelled:
+        return AppTheme.statusCancelled;
+      default:
+        return AppTheme.statusAssessment;
     }
   }
 
   Color get _priorityColor {
     switch (widget.ticket?.priority) {
-      case TicketPriority.priority1: return AppTheme.priority1;
-      case TicketPriority.priority2: return AppTheme.priority2;
-      case TicketPriority.priority3: return AppTheme.priority3;
-      default:                       return AppTheme.priority3;
+      case TicketPriority.priority1:
+        return AppTheme.priority1;
+      case TicketPriority.priority2:
+        return AppTheme.priority2;
+      case TicketPriority.priority3:
+        return AppTheme.priority3;
+      default:
+        return AppTheme.priority3;
     }
   }
 
@@ -503,6 +559,7 @@ class _TicketSidebarState extends State<TicketSidebar> {
   Widget _buildHeader(Ticket ticket) {
     // Cancel is only shown to the ticket creator while still active
     final canCancel = _isCreator && !_isResolved && !_isCancelled;
+    final canHold = _isCreator && !_isResolved && !_isCancelled;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
@@ -522,17 +579,20 @@ class _TicketSidebarState extends State<TicketSidebar> {
             ),
           ),
 
-          // ── Cancel button (creator only) ────────────────────────────────
-          if (canCancel)
+          if (canHold) ...[
             Tooltip(
-              message: 'Cancel Ticket',
+              message: 'Hold Ticket',
               child: MouseRegion(
                 cursor: SystemMouseCursors.click,
                 child: GestureDetector(
-                  onTap: _actionLoading ? null : () => _confirmAndCancel(ticket.id),
+                  onTap: _actionLoading
+                      ? null
+                      : () => _confirmAndHold(ticket.id),
                   child: Container(
-                    margin: const EdgeInsets.only(right: 4),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.orange.withOpacity(0.12),
                       borderRadius: BorderRadius.circular(6),
@@ -541,25 +601,81 @@ class _TicketSidebarState extends State<TicketSidebar> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: const [
-                        Icon(Icons.block_outlined, size: 14, color: Colors.orange),
+                        Icon(
+                          Icons.pause_outlined,
+                          size: 14,
+                          color: Colors.orange,
+                        ),
                         SizedBox(width: 5),
-                        Text('Cancel',
-                            style: TextStyle(
-                                color: Colors.orange,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600)),
+                        Text(
+                          'Hold',
+                          style: TextStyle(
+                            color: Colors.orange,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ],
                     ),
                   ),
                 ),
               ),
             ),
+            const SizedBox(width: 8), // 👈 spacing
+          ],
+
+          if (canCancel) ...[
+            Tooltip(
+              message: 'Cancel Ticket',
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: GestureDetector(
+                  onTap: _actionLoading
+                      ? null
+                      : () => _confirmAndCancel(ticket.id),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: Colors.red.withOpacity(0.5)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Icon(Icons.block_outlined, size: 14, color: Colors.red),
+                        SizedBox(width: 5),
+                        Text(
+                          'Cancel',
+                          style: TextStyle(
+                            color: Colors.red,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8), // 👈 spacing
+          ],
 
           IconButton(
             onPressed: () => _fetchBySR(ticket.id),
-            icon: const Icon(Icons.refresh, color: AppTheme.textSecondary, size: 20),
+            icon: const Icon(
+              Icons.refresh,
+              color: AppTheme.textSecondary,
+              size: 20,
+            ),
             tooltip: 'Refresh',
           ),
+          const SizedBox(width: 4),
+
           IconButton(
             onPressed: widget.onClose,
             icon: const Icon(Icons.close, color: AppTheme.textSecondary),
@@ -575,6 +691,10 @@ class _TicketSidebarState extends State<TicketSidebar> {
     await _confirmAndAct('cancel', ticketId);
   }
 
+  Future<void> _confirmAndHold(String ticketId) async {
+    await _confirmAndAct('hold', ticketId);
+  }
+
   // ─── loading / error ───────────────────────────────────────────────────────
 
   Widget _buildLoading() => const Center(
@@ -583,8 +703,10 @@ class _TicketSidebarState extends State<TicketSidebar> {
       children: [
         CircularProgressIndicator(),
         SizedBox(height: 16),
-        Text('Loading ticket details…',
-            style: TextStyle(color: AppTheme.textSecondary)),
+        Text(
+          'Loading ticket details…',
+          style: TextStyle(color: AppTheme.textSecondary),
+        ),
       ],
     ),
   );
@@ -597,9 +719,11 @@ class _TicketSidebarState extends State<TicketSidebar> {
         children: [
           const Icon(Icons.error_outline, color: Colors.redAccent, size: 40),
           const SizedBox(height: 12),
-          Text(_error!,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.redAccent)),
+          Text(
+            _error!,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.redAccent),
+          ),
           const SizedBox(height: 16),
           ElevatedButton.icon(
             onPressed: () => _fetchBySR(widget.ticket?.id),
@@ -627,11 +751,13 @@ class _TicketSidebarState extends State<TicketSidebar> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(children: [
-                    _chip(ticket.statusLabel, _statusColor),
-                    const SizedBox(width: 8),
-                    _chip(ticket.priorityLabel, _priorityColor),
-                  ]),
+                  Row(
+                    children: [
+                      _chip(ticket.statusLabel, _statusColor),
+                      const SizedBox(width: 8),
+                      _chip(ticket.priorityLabel, _priorityColor),
+                    ],
+                  ),
                   const SizedBox(height: 16),
                   _buildSubjectCard(ticket),
                   const SizedBox(height: 12),
@@ -652,7 +778,10 @@ class _TicketSidebarState extends State<TicketSidebar> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildProgressStepper(ticket),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: _buildProgressStepper(ticket),
+                  ),
                   const SizedBox(height: 16),
                   if (_grabStartTime != null) ...[
                     _buildResolutionTimer(),
@@ -680,21 +809,33 @@ class _TicketSidebarState extends State<TicketSidebar> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(children: [
-            const Icon(Icons.confirmation_number, color: Colors.orange, size: 18),
-            const SizedBox(width: 8),
-            Text('SR #${ticket.id}',
+          Row(
+            children: [
+              const Icon(
+                Icons.confirmation_number,
+                color: Colors.orange,
+                size: 18,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'SR #${ticket.id}',
                 style: const TextStyle(
-                    color: Colors.orange,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13)),
-          ]),
+                  color: Colors.orange,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 6),
-          Text(subject,
-              style: const TextStyle(
-                  color: AppTheme.textPrimary,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600)),
+          Text(
+            subject,
+            style: const TextStyle(
+              color: AppTheme.textPrimary,
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ],
       ),
     );
@@ -703,26 +844,35 @@ class _TicketSidebarState extends State<TicketSidebar> {
   // ─── details card ──────────────────────────────────────────────────────────
 
   Widget _buildDetailsCard(Ticket ticket) {
-    final category    = _field(['category'], fallback: ticket.categoryLabel);
-    final submitter   = _field(['username', 'submitter', 'created_by'], fallback: ticket.submitter);
+    final category = _field(['category'], fallback: ticket.categoryLabel);
+    final submitter = _field([
+      'username',
+      'submitter',
+      'created_by',
+    ], fallback: ticket.submitter);
     final institution = _field(['institution', 'organization', 'company']);
-    final ticketType  = _field(['tickettype', 'ticket_type', 'type']);
-    final createdRaw  = _field(['CreatedAt', 'created_at', 'createdAt', 'date_created']);
-    final createdAt   = _parseDate(createdRaw) ?? ticket.createdAt;
-    final createdStr  =
+    final ticketType = _field(['tickettype', 'ticket_type', 'type']);
+    final createdRaw = _field([
+      'CreatedAt',
+      'created_at',
+      'createdAt',
+      'date_created',
+    ]);
+    final createdAt = _parseDate(createdRaw) ?? ticket.createdAt;
+    final createdStr =
         '${createdAt.year}-${_p(createdAt.month)}-${_p(createdAt.day)}'
         '  ${_p(createdAt.hour)}:${_p(createdAt.minute)}:${_p(createdAt.second)}';
 
     return _card(
       child: Column(
         children: [
-          _detailRow(Icons.category_outlined, 'Category',     category),
-          _detailRow(Icons.person_outline,    'Submitter',    submitter),
+          _detailRow(Icons.category_outlined, 'Category', category),
+          _detailRow(Icons.person_outline, 'Submitter', submitter),
           if (institution != '—')
             _detailRow(Icons.business_outlined, 'Organization', institution),
           if (ticketType != '—')
-            _detailRow(Icons.label_outline,   'Type',         ticketType),
-          _detailRow(Icons.access_time,       'Created',      createdStr),
+            _detailRow(Icons.label_outline, 'Type', ticketType),
+          _detailRow(Icons.access_time, 'Created', createdStr),
         ],
       ),
     );
@@ -738,15 +888,20 @@ class _TicketSidebarState extends State<TicketSidebar> {
           const SizedBox(width: 8),
           SizedBox(
             width: 90,
-            child: Text(label,
-                style: const TextStyle(
-                    color: AppTheme.textMuted,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500)),
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: AppTheme.textMuted,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
           ),
           Expanded(
-            child: Text(value,
-                style: const TextStyle(color: AppTheme.textPrimary, fontSize: 12)),
+            child: Text(
+              value,
+              style: const TextStyle(color: AppTheme.textPrimary, fontSize: 12),
+            ),
           ),
         ],
       ),
@@ -756,8 +911,11 @@ class _TicketSidebarState extends State<TicketSidebar> {
   // ─── description ───────────────────────────────────────────────────────────
 
   Widget _buildDescriptionCard() {
-    final desc = _field(['description', 'details', 'body'],
-        fallback: widget.ticket?.description ?? '');
+    final desc = _field([
+      'description',
+      'details',
+      'body',
+    ], fallback: widget.ticket?.description ?? '');
     return _card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -767,7 +925,10 @@ class _TicketSidebarState extends State<TicketSidebar> {
           Text(
             desc.isEmpty ? 'No description provided.' : desc,
             style: const TextStyle(
-                color: AppTheme.textSecondary, fontSize: 13, height: 1.55),
+              color: AppTheme.textSecondary,
+              fontSize: 13,
+              height: 1.55,
+            ),
           ),
         ],
       ),
@@ -789,12 +950,13 @@ class _TicketSidebarState extends State<TicketSidebar> {
           const SizedBox(height: 10),
           ...attachments.map((att) {
             final filePath = (att['file_path'] ?? '').toString();
-            final fileName =
-            (att['file_name'] ?? filePath.split('/').last).toString();
-            final url     = filePath;
-            final isImage = RegExp(r'\.(jpg|jpeg|png|gif|webp|bmp)$',
-                caseSensitive: false)
-                .hasMatch(fileName);
+            final fileName = (att['file_name'] ?? filePath.split('/').last)
+                .toString();
+            final url = filePath;
+            final isImage = RegExp(
+              r'\.(jpg|jpeg|png|gif|webp|bmp)$',
+              caseSensitive: false,
+            ).hasMatch(fileName);
 
             return Container(
               margin: const EdgeInsets.only(bottom: 8),
@@ -813,14 +975,17 @@ class _TicketSidebarState extends State<TicketSidebar> {
                         onTap: () => _fetchAndOpen(url, fileName),
                         child: ClipRRect(
                           borderRadius: const BorderRadius.vertical(
-                              top: Radius.circular(8)),
+                            top: Radius.circular(8),
+                          ),
                           child: _AuthImage(url: url, height: 160),
                         ),
                       ),
                     ),
                   Padding(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 8),
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                     child: Row(
                       children: [
                         Icon(
@@ -832,10 +997,14 @@ class _TicketSidebarState extends State<TicketSidebar> {
                         ),
                         const SizedBox(width: 10),
                         Expanded(
-                          child: Text(fileName,
-                              style: const TextStyle(
-                                  color: AppTheme.textPrimary, fontSize: 12),
-                              overflow: TextOverflow.ellipsis),
+                          child: Text(
+                            fileName,
+                            style: const TextStyle(
+                              color: AppTheme.textPrimary,
+                              fontSize: 12,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                         const SizedBox(width: 8),
                         if (url.isNotEmpty)
@@ -888,11 +1057,14 @@ class _TicketSidebarState extends State<TicketSidebar> {
             children: [
               Icon(icon, size: 13, color: color),
               const SizedBox(width: 5),
-              Text(label,
-                  style: TextStyle(
-                      color: color,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500)),
+              Text(
+                label,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
             ],
           ),
         ),
@@ -900,8 +1072,11 @@ class _TicketSidebarState extends State<TicketSidebar> {
     );
   }
 
-  Future<void> _fetchAndOpen(String url, String fileName,
-      {bool download = false}) async {
+  Future<void> _fetchAndOpen(
+      String url,
+      String fileName, {
+        bool download = false,
+      }) async {
     try {
       if (download) {
         await ApiAttachment.downloadFile(url, fileName);
@@ -915,29 +1090,35 @@ class _TicketSidebarState extends State<TicketSidebar> {
 
   void _showSnackbar(String msg, {Color color = Colors.black87}) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg),
-      backgroundColor: color,
-      behavior: SnackBarBehavior.floating,
-      duration: const Duration(seconds: 3),
-    ));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: color,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 3),
+      ),
+    );
   }
 
   // ─── progress stepper ──────────────────────────────────────────────────────
 
   Widget _buildProgressStepper(Ticket ticket) {
     const steps = [
-      'Submitted', 'Endorsed', 'Approved',
-      'Assigned', 'In Progress', 'Resolved'
+      'Submitted',
+      'Endorsed',
+      'Approved',
+      'Assigned',
+      'In Progress',
+      'Resolved',
     ];
 
     int active = 0;
     if (_isEndorsed) active = 1;
     if (_isApproved) active = 2;
     if (_isAssigned) active = 3;
-    if (_isAssigned &&
-        _rawStatus.replaceAll(' ', '') == 'inprogress') active = 4;
-    if (_isResolved)  active = 5;
+    if (_isAssigned && _rawStatus.replaceAll(' ', '') == 'inprogress')
+      active = 4;
+    if (_isResolved) active = 5;
     if (_isCancelled) active = 5;
 
     return Column(
@@ -947,41 +1128,52 @@ class _TicketSidebarState extends State<TicketSidebar> {
         const SizedBox(height: 12),
         Row(
           children: List.generate(steps.length, (i) {
-            final done    = i <= active;
+            final done = i <= active;
             final current = i == active;
             return Expanded(
               child: Column(
                 children: [
-                  Row(children: [
-                    if (i != 0)
-                      Expanded(
+                  Row(
+                    children: [
+                      if (i != 0)
+                        Expanded(
                           child: Container(
-                              height: 2,
-                              color: i <= active
-                                  ? Colors.green
-                                  : Colors.grey.shade800)),
-                    CircleAvatar(
-                      radius: 13,
-                      backgroundColor: done
-                          ? (current
-                          ? Colors.green.shade600
-                          : Colors.green)
-                          : Colors.grey.shade800,
-                      child: done
-                          ? const Icon(Icons.check,
-                          color: Colors.white, size: 13)
-                          : Text('${i + 1}',
+                            height: 2,
+                            color: i <= active
+                                ? Colors.green
+                                : Colors.grey.shade800,
+                          ),
+                        ),
+                      CircleAvatar(
+                        radius: 13,
+                        backgroundColor: done
+                            ? (current ? Colors.green.shade600 : Colors.green)
+                            : Colors.grey.shade800,
+                        child: done
+                            ? const Icon(
+                          Icons.check,
+                          color: Colors.white,
+                          size: 13,
+                        )
+                            : Text(
+                          '${i + 1}',
                           style: const TextStyle(
-                              color: Colors.white, fontSize: 10)),
-                    ),
-                    if (i != steps.length - 1)
-                      Expanded(
+                            color: Colors.white,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ),
+                      if (i != steps.length - 1)
+                        Expanded(
                           child: Container(
-                              height: 2,
-                              color: i < active
-                                  ? Colors.green
-                                  : Colors.grey.shade800)),
-                  ]),
+                            height: 2,
+                            color: i < active
+                                ? Colors.green
+                                : Colors.grey.shade800,
+                          ),
+                        ),
+                    ],
+                  ),
                   const SizedBox(height: 5),
                   Text(
                     steps[i],
@@ -989,8 +1181,7 @@ class _TicketSidebarState extends State<TicketSidebar> {
                     style: TextStyle(
                       fontSize: 9,
                       color: done ? Colors.white : Colors.grey,
-                      fontWeight:
-                      current ? FontWeight.bold : FontWeight.normal,
+                      fontWeight: current ? FontWeight.bold : FontWeight.normal,
                     ),
                   ),
                 ],
@@ -1006,8 +1197,8 @@ class _TicketSidebarState extends State<TicketSidebar> {
 
   Widget _buildResolutionTimer() {
     final isRunning = _isAssigned && !_isResolved && !_isCancelled;
-    final label     = _formatElapsed(_elapsedSeconds);
-    final color     = isRunning
+    final label = _formatElapsed(_elapsedSeconds);
+    final color = isRunning
         ? (_elapsedSeconds > 7200 ? Colors.redAccent : Colors.teal)
         : (_isResolved ? Colors.teal : Colors.orange);
     final statusLabel = isRunning
@@ -1026,7 +1217,8 @@ class _TicketSidebarState extends State<TicketSidebar> {
             ),
             child: Icon(
               isRunning ? Icons.timer_outlined : Icons.timer_off_outlined,
-              color: color, size: 20,
+              color: color,
+              size: 20,
             ),
           ),
           const SizedBox(width: 12),
@@ -1034,27 +1226,35 @@ class _TicketSidebarState extends State<TicketSidebar> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(statusLabel,
-                    style: TextStyle(
-                        color: AppTheme.textMuted,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.6)),
+                Text(
+                  statusLabel,
+                  style: TextStyle(
+                    color: AppTheme.textMuted,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.6,
+                  ),
+                ),
                 const SizedBox(height: 2),
                 Row(
                   children: [
-                    Text(label,
-                        style: TextStyle(
-                            color: color,
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            fontFeatures: const [FontFeature.tabularFigures()])),
+                    Text(
+                      label,
+                      style: TextStyle(
+                        color: color,
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
                     if (isRunning) ...[
                       const SizedBox(width: 8),
                       SizedBox(
-                        width: 10, height: 10,
+                        width: 10,
+                        height: 10,
                         child: CircularProgressIndicator(
-                          strokeWidth: 2, color: color,
+                          strokeWidth: 2,
+                          color: color,
                         ),
                       ),
                     ],
@@ -1064,7 +1264,10 @@ class _TicketSidebarState extends State<TicketSidebar> {
                   Text(
                     'Started: ${_grabStartTime!.year}-${_p(_grabStartTime!.month)}-${_p(_grabStartTime!.day)}'
                         '  ${_p(_grabStartTime!.hour)}:${_p(_grabStartTime!.minute)}',
-                    style: const TextStyle(color: AppTheme.textMuted, fontSize: 10),
+                    style: const TextStyle(
+                      color: AppTheme.textMuted,
+                      fontSize: 10,
+                    ),
                   ),
               ],
             ),
@@ -1084,12 +1287,23 @@ class _TicketSidebarState extends State<TicketSidebar> {
     // Adjust these key lists to match whatever your backend returns.
     final endorserName = _field(['endorser', 'endorser_name', 'endorsed_by']);
     final approverName = _field(['approver', 'approver_name', 'approved_by']);
-    final assigneeName = _field(['assigned_to', 'assignee', 'resolver_name', 'resolver']);
+    final assigneeName = _field([
+      'assigned_to',
+      'assignee',
+      'resolver_name',
+      'resolver',
+    ]);
     final resolverName = assigneeName; // same person resolves after grab
 
-    final endorseDone = _isEndorsed || _isApproved || _isAssigned || _isResolved || _isCancelled;
-    final approveDone = _isApproved || _isAssigned || _isResolved || _isCancelled;
-    final assignDone  = _isAssigned || _isResolved || _isCancelled;
+    final endorseDone =
+        _isEndorsed ||
+            _isApproved ||
+            _isAssigned ||
+            _isResolved ||
+            _isCancelled;
+    final approveDone =
+        _isApproved || _isAssigned || _isResolved || _isCancelled;
+    final assignDone = _isAssigned || _isResolved || _isCancelled;
     final resolveDone = _isResolved || _isCancelled;
 
     return _card(
@@ -1101,12 +1315,12 @@ class _TicketSidebarState extends State<TicketSidebar> {
 
           // ── Step 1: Endorser ────────────────────────────────────────────
           _chainRow(
-            name:        endorserName != '—' ? endorserName : 'No endorser assigned',
-            role:        'Endorser',
-            isDone:      endorseDone,
-            isActive:    !endorseDone,
-            isLocked:    false,
-            statusText:  endorseDone ? 'Endorsed ✓' : 'Awaiting',
+            name: endorserName != '—' ? endorserName : 'No endorser assigned',
+            role: 'Endorser',
+            isDone: endorseDone,
+            isActive: !endorseDone,
+            isLocked: false,
+            statusText: endorseDone ? 'Endorsed ✓' : 'Awaiting',
             statusColor: endorseDone ? Colors.green : Colors.orange,
           ),
 
@@ -1114,12 +1328,12 @@ class _TicketSidebarState extends State<TicketSidebar> {
 
           // ── Step 2: Approver ────────────────────────────────────────────
           _chainRow(
-            name:        approverName != '—' ? approverName : 'No approver assigned',
-            role:        'Approver',
-            isDone:      approveDone,
-            isActive:    endorseDone && !approveDone,
-            isLocked:    !endorseDone,
-            statusText:  approveDone
+            name: approverName != '—' ? approverName : 'No approver assigned',
+            role: 'Approver',
+            isDone: approveDone,
+            isActive: endorseDone && !approveDone,
+            isLocked: !endorseDone,
+            statusText: approveDone
                 ? 'Approved ✓'
                 : (endorseDone ? 'Awaiting' : 'Locked'),
             statusColor: approveDone
@@ -1131,12 +1345,12 @@ class _TicketSidebarState extends State<TicketSidebar> {
 
           // ── Step 3: Assignee ────────────────────────────────────────────
           _chainRow(
-            name:        assigneeName != '—' ? assigneeName : 'No assignee yet',
-            role:        'Assigned To',
-            isDone:      assignDone,
-            isActive:    approveDone && !assignDone,
-            isLocked:    !approveDone,
-            statusText:  assignDone
+            name: assigneeName != '—' ? assigneeName : 'No assignee yet',
+            role: 'Assigned To',
+            isDone: assignDone,
+            isActive: approveDone && !assignDone,
+            isLocked: !approveDone,
+            statusText: assignDone
                 ? 'Assigned ✓'
                 : (approveDone ? 'Awaiting' : 'Locked'),
             statusColor: assignDone
@@ -1148,12 +1362,12 @@ class _TicketSidebarState extends State<TicketSidebar> {
 
           // ── Step 4: Resolver ────────────────────────────────────────────
           _chainRow(
-            name:        resolverName != '—' ? resolverName : 'Awaiting assignee',
-            role:        'Resolver',
-            isDone:      resolveDone,
-            isActive:    assignDone && !resolveDone,
-            isLocked:    !assignDone,
-            statusText:  _isCancelled
+            name: resolverName != '—' ? resolverName : 'Awaiting assignee',
+            role: 'Resolver',
+            isDone: resolveDone,
+            isActive: assignDone && !resolveDone,
+            isLocked: !assignDone,
+            statusText: _isCancelled
                 ? 'Cancelled'
                 : (resolveDone
                 ? 'Resolved ✓'
@@ -1172,11 +1386,11 @@ class _TicketSidebarState extends State<TicketSidebar> {
   Widget _chainRow({
     required String name,
     required String role,
-    required bool   isDone,
-    required bool   isActive,
-    required bool   isLocked,
+    required bool isDone,
+    required bool isActive,
+    required bool isLocked,
     required String statusText,
-    required Color  statusColor,
+    required Color statusColor,
   }) {
     // Derive initials from the actual name
     final initials = _initialsFrom(name);
@@ -1195,12 +1409,20 @@ class _TicketSidebarState extends State<TicketSidebar> {
             radius: 18,
             backgroundColor: avatarColor,
             child: isLocked
-                ? const Icon(Icons.lock_outline, color: Colors.white54, size: 16)
+                ? const Icon(
+              Icons.lock_outline,
+              color: Colors.white54,
+              size: 16,
+            )
                 : isDone
                 ? const Icon(Icons.check, color: Colors.white, size: 16)
-                : Text(initials,
-                style: const TextStyle(
-                    color: Colors.white, fontWeight: FontWeight.bold)),
+                : Text(
+              initials,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -1215,25 +1437,28 @@ class _TicketSidebarState extends State<TicketSidebar> {
                     fontStyle: isLocked ? FontStyle.italic : FontStyle.normal,
                   ),
                 ),
-                Text(role,
-                    style:
-                    const TextStyle(color: Colors.grey, fontSize: 11)),
+                Text(
+                  role,
+                  style: const TextStyle(color: Colors.grey, fontSize: 11),
+                ),
               ],
             ),
           ),
           Container(
-            padding:
-            const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
               color: statusColor.withOpacity(0.12),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: statusColor.withOpacity(0.4)),
             ),
-            child: Text(statusText,
-                style: TextStyle(
-                    color: statusColor,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600)),
+            child: Text(
+              statusText,
+              style: TextStyle(
+                color: statusColor,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
@@ -1254,29 +1479,47 @@ class _TicketSidebarState extends State<TicketSidebar> {
     final role = _currentUserRole.toLowerCase().trim();
 
     if (role.isEmpty) {
-      return _actionCard(children: const [
-        SizedBox(height: 20, width: 20,
-            child: CircularProgressIndicator(strokeWidth: 2)),
-      ]);
+      return _actionCard(
+        children: const [
+          SizedBox(
+            height: 20,
+            width: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ],
+      );
     }
 
-    final endorseDone = _isEndorsed || _isApproved || _isAssigned || _isResolved || _isCancelled;
-    final approveDone = _isApproved || _isAssigned || _isResolved || _isCancelled;
-    final assignDone  = _isAssigned || _isResolved || _isCancelled;
+    final endorseDone =
+        _isEndorsed ||
+            _isApproved ||
+            _isAssigned ||
+            _isResolved ||
+            _isCancelled;
+    final approveDone =
+        _isApproved || _isAssigned || _isResolved || _isCancelled;
+    final assignDone = _isAssigned || _isResolved || _isCancelled;
     final resolveDone = _isResolved || _isCancelled;
 
     final isEndorser = role == 'endorser' || role.startsWith('endorser');
     final isApprover = role == 'approver' || role.startsWith('approver');
-    final isResolver = role == 'resolver' || role.startsWith('resolver') || role.contains('resolv');
+    final isResolver =
+        role == 'resolver' ||
+            role.startsWith('resolver') ||
+            role.contains('resolv');
 
     // ── Cancelled ────────────────────────────────────────────────────────────
     if (_isCancelled) {
-      return _actionCard(children: [
-        const Icon(Icons.cancel, color: Colors.redAccent, size: 18),
-        const SizedBox(width: 8),
-        const Text('This ticket has been cancelled.',
-            style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
-      ]);
+      return _actionCard(
+        children: [
+          const Icon(Icons.cancel, color: Colors.redAccent, size: 18),
+          const SizedBox(width: 8),
+          const Text(
+            'This ticket has been cancelled.',
+            style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
+          ),
+        ],
+      );
     }
 
     // ── ENDORSER ─────────────────────────────────────────────────────────────
@@ -1301,23 +1544,31 @@ class _TicketSidebarState extends State<TicketSidebar> {
           ],
         );
       }
-      return _actionCard(children: [
-        const Icon(Icons.check_circle_outline, color: Colors.green, size: 18),
-        const SizedBox(width: 8),
-        const Text('Ticket has been endorsed.',
-            style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
-      ]);
+      return _actionCard(
+        children: [
+          const Icon(Icons.check_circle_outline, color: Colors.green, size: 18),
+          const SizedBox(width: 8),
+          const Text(
+            'Ticket has been endorsed.',
+            style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
+          ),
+        ],
+      );
     }
 
     // ── APPROVER ─────────────────────────────────────────────────────────────
     if (isApprover) {
       if (!endorseDone) {
-        return _actionCard(children: [
-          const Icon(Icons.lock_outline, color: Colors.grey, size: 18),
-          const SizedBox(width: 8),
-          const Text('Waiting for endorsement first.',
-              style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
-        ]);
+        return _actionCard(
+          children: [
+            const Icon(Icons.lock_outline, color: Colors.grey, size: 18),
+            const SizedBox(width: 8),
+            const Text(
+              'Waiting for endorsement first.',
+              style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
+            ),
+          ],
+        );
       }
       if (!approveDone) {
         return _actionCard(
@@ -1339,23 +1590,31 @@ class _TicketSidebarState extends State<TicketSidebar> {
           ],
         );
       }
-      return _actionCard(children: [
-        const Icon(Icons.check_circle_outline, color: Colors.green, size: 18),
-        const SizedBox(width: 8),
-        const Text('Ticket has been approved.',
-            style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
-      ]);
+      return _actionCard(
+        children: [
+          const Icon(Icons.check_circle_outline, color: Colors.green, size: 18),
+          const SizedBox(width: 8),
+          const Text(
+            'Ticket has been approved.',
+            style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
+          ),
+        ],
+      );
     }
 
     // ── RESOLVER ─────────────────────────────────────────────────────────────
     if (isResolver) {
       if (!approveDone) {
-        return _actionCard(children: [
-          const Icon(Icons.lock_outline, color: Colors.grey, size: 18),
-          const SizedBox(width: 8),
-          const Text('Waiting for approval first.',
-              style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
-        ]);
+        return _actionCard(
+          children: [
+            const Icon(Icons.lock_outline, color: Colors.grey, size: 18),
+            const SizedBox(width: 8),
+            const Text(
+              'Waiting for approval first.',
+              style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
+            ),
+          ],
+        );
       }
       if (!assignDone) {
         return _actionCard(
@@ -1378,8 +1637,12 @@ class _TicketSidebarState extends State<TicketSidebar> {
         );
       }
       // Check if this resolver is the assignee (can ungrab or resolve)
-      final currentAssignee = _field(['assigned_to', 'assignee', 'resolver_name', 'resolver'])
-          .toLowerCase().trim();
+      final currentAssignee = _field([
+        'assigned_to',
+        'assignee',
+        'resolver_name',
+        'resolver',
+      ]).toLowerCase().trim();
       final isMyTicket = currentAssignee == _currentUsername;
 
       if (!resolveDone) {
@@ -1404,27 +1667,35 @@ class _TicketSidebarState extends State<TicketSidebar> {
               const Icon(Icons.lock_outline, color: Colors.grey, size: 18),
               const SizedBox(width: 8),
               const Expanded(
-                child: Text('This ticket is assigned to another resolver.',
-                    style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+                child: Text(
+                  'This ticket is assigned to another resolver.',
+                  style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
+                ),
               ),
             ],
           ],
         );
       }
-      return _actionCard(children: [
-        const Icon(Icons.check_circle, color: Colors.teal, size: 18),
-        const SizedBox(width: 8),
-        const Text('Ticket has been resolved.',
-            style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
-      ]);
+      return _actionCard(
+        children: [
+          const Icon(Icons.check_circle, color: Colors.teal, size: 18),
+          const SizedBox(width: 8),
+          const Text(
+            'Ticket has been resolved.',
+            style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
+          ),
+        ],
+      );
     }
 
     // ── Fallback ──────────────────────────────────────────────────────────────
     return _actionCard(
       debugLabel: 'role: "$role" · status: "$_normalizedStatus"',
       children: const [
-        Text('No actions available for your role at this stage.',
-            style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+        Text(
+          'No actions available for your role at this stage.',
+          style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
+        ),
       ],
     );
   }
@@ -1447,11 +1718,13 @@ class _TicketSidebarState extends State<TicketSidebar> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
               decoration: BoxDecoration(
-                  color: Colors.black26,
-                  borderRadius: BorderRadius.circular(4)),
-              child: Text(debugLabel,
-                  style:
-                  const TextStyle(color: Colors.grey, fontSize: 9)),
+                color: Colors.black26,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                debugLabel,
+                style: const TextStyle(color: Colors.grey, fontSize: 9),
+              ),
             ),
           ],
           const SizedBox(height: 10),
@@ -1476,25 +1749,26 @@ class _TicketSidebarState extends State<TicketSidebar> {
       child: GestureDetector(
         onTap: _actionLoading ? null : onTap,
         child: Container(
-          padding:
-          const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           decoration: BoxDecoration(
             color: color.withOpacity(0.13),
             borderRadius: BorderRadius.circular(8),
             border: Border.all(color: color.withOpacity(0.55)),
           ),
           child: Row(
-            mainAxisSize:
-            fullWidth ? MainAxisSize.max : MainAxisSize.min,
+            mainAxisSize: fullWidth ? MainAxisSize.max : MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(icon, size: 16, color: color),
               const SizedBox(width: 7),
-              Text(label,
-                  style: TextStyle(
-                      color: color,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600)),
+              Text(
+                label,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ],
           ),
         ),
@@ -1510,8 +1784,10 @@ class _TicketSidebarState extends State<TicketSidebar> {
     try {
       final token = await ApiLogin.getToken();
       if (token == null || token.isEmpty) {
-        _showSnackbar('Not authenticated. Please log in again.',
-            color: Colors.redAccent);
+        _showSnackbar(
+          'Not authenticated. Please log in again.',
+          color: Colors.redAccent,
+        );
         return;
       }
 
@@ -1519,38 +1795,52 @@ class _TicketSidebarState extends State<TicketSidebar> {
       switch (action) {
         case 'endorse':
           result = await ApiUpdateTicket.endorseTicket(token, ticketId);
-          _showSnackbar(result['message'] ?? 'Ticket endorsed ✓',
-              color: Colors.green);
+          _showSnackbar(
+            result['message'] ?? 'Ticket endorsed ✓',
+            color: Colors.green,
+          );
           break;
         case 'approve':
           result = await ApiUpdateTicket.approveTicket(token, ticketId);
-          _showSnackbar(result['message'] ?? 'Ticket approved ✓',
-              color: Colors.blue);
+          _showSnackbar(
+            result['message'] ?? 'Ticket approved ✓',
+            color: Colors.blue,
+          );
           break;
         case 'grab':
           result = await ApiUpdateTicket.assignTicket(token, ticketId);
-          _showSnackbar(result['message'] ?? 'Ticket assigned to you ✓',
-              color: Colors.purple);
+          _showSnackbar(
+            result['message'] ?? 'Ticket assigned to you ✓',
+            color: Colors.purple,
+          );
           break;
         case 'ungrab':
           result = await ApiUpdateTicket.ungrabTicket(token, ticketId);
-          _showSnackbar(result['message'] ?? 'Ticket released successfully',
-              color: Colors.orange);
+          _showSnackbar(
+            result['message'] ?? 'Ticket released successfully',
+            color: Colors.orange,
+          );
           break;
         case 'reject':
           result = await ApiUpdateTicket.rejectTicket(token, ticketId);
-          _showSnackbar(result['message'] ?? 'Ticket rejected',
-              color: Colors.redAccent);
+          _showSnackbar(
+            result['message'] ?? 'Ticket rejected',
+            color: Colors.redAccent,
+          );
           break;
         case 'resolve':
           result = await ApiUpdateTicket.resolveTicket(token, ticketId);
-          _showSnackbar(result['message'] ?? 'Ticket resolved ✓',
-              color: Colors.teal);
+          _showSnackbar(
+            result['message'] ?? 'Ticket resolved ✓',
+            color: Colors.teal,
+          );
           break;
         case 'cancel':
           result = await ApiUpdateTicket.cancelTicket(token, ticketId);
-          _showSnackbar(result['message'] ?? 'Ticket cancelled',
-              color: Colors.orange);
+          _showSnackbar(
+            result['message'] ?? 'Ticket cancelled',
+            color: Colors.orange,
+          );
           break;
         default:
           _showSnackbar('Unknown action: $action', color: Colors.orange);
@@ -1579,14 +1869,16 @@ class _TicketSidebarState extends State<TicketSidebar> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-
           // ── Header ────────────────────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
             child: Row(
               children: [
-                const Icon(Icons.chat_bubble_outline,
-                    size: 14, color: AppTheme.textMuted),
+                const Icon(
+                  Icons.chat_bubble_outline,
+                  size: 14,
+                  color: AppTheme.textMuted,
+                ),
                 const SizedBox(width: 6),
                 Text(
                   'REMARKS  (${_remarks.length})',
@@ -1601,8 +1893,11 @@ class _TicketSidebarState extends State<TicketSidebar> {
                 // Refresh button
                 GestureDetector(
                   onTap: () => _fetchRemarks(ticketId),
-                  child: const Icon(Icons.refresh,
-                      size: 14, color: AppTheme.textMuted),
+                  child: const Icon(
+                    Icons.refresh,
+                    size: 14,
+                    color: AppTheme.textMuted,
+                  ),
                 ),
               ],
             ),
@@ -1615,15 +1910,17 @@ class _TicketSidebarState extends State<TicketSidebar> {
           SizedBox(
             height: 240,
             child: _remarksLoading
-                ? const Center(
-                child: CircularProgressIndicator(strokeWidth: 2))
+                ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
                 : _remarks.isEmpty
                 ? Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: const [
-                  Icon(Icons.chat_bubble_outline,
-                      color: AppTheme.textMuted, size: 32),
+                  Icon(
+                    Icons.chat_bubble_outline,
+                    color: AppTheme.textMuted,
+                    size: 32,
+                  ),
                   SizedBox(height: 10),
                   Text(
                     'No remarks yet',
@@ -1653,10 +1950,11 @@ class _TicketSidebarState extends State<TicketSidebar> {
               ),
               itemCount: _remarks.length,
               itemBuilder: (_, i) {
-                final remark = _remarks[_remarks.length - 1 - i]; // 👈 reverse data
+                final remark =
+                _remarks[_remarks.length - 1 - i]; // 👈 reverse data
                 return _buildRemarkBubble(remark);
               },
-            )
+            ),
           ),
 
           const Divider(height: 1, color: AppTheme.border),
@@ -1673,29 +1971,35 @@ class _TicketSidebarState extends State<TicketSidebar> {
                     maxLines: 3,
                     minLines: 1,
                     style: const TextStyle(
-                        color: AppTheme.textPrimary, fontSize: 13),
+                      color: AppTheme.textPrimary,
+                      fontSize: 13,
+                    ),
                     decoration: InputDecoration(
                       filled: true,
                       fillColor: AppTheme.sidebarBg,
                       hintText: 'Write a remark…',
                       hintStyle: const TextStyle(
-                          color: AppTheme.textMuted, fontSize: 13),
+                        color: AppTheme.textMuted,
+                        fontSize: 13,
+                      ),
                       contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 10),
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
-                        borderSide:
-                        const BorderSide(color: AppTheme.border),
+                        borderSide: const BorderSide(color: AppTheme.border),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
-                        borderSide:
-                        const BorderSide(color: AppTheme.border),
+                        borderSide: const BorderSide(color: AppTheme.border),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                         borderSide: const BorderSide(
-                            color: Colors.blue, width: 1.5),
+                          color: Colors.blue,
+                          width: 1.5,
+                        ),
                       ),
                     ),
                     onSubmitted: (_) => _postRemark(ticketId),
@@ -1704,9 +2008,10 @@ class _TicketSidebarState extends State<TicketSidebar> {
                 const SizedBox(width: 8),
                 _postingRemark
                     ? const SizedBox(
-                    width: 36,
-                    height: 36,
-                    child: CircularProgressIndicator(strokeWidth: 2))
+                  width: 36,
+                  height: 36,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
                     : GestureDetector(
                   onTap: () => _postRemark(ticketId),
                   child: Container(
@@ -1716,8 +2021,11 @@ class _TicketSidebarState extends State<TicketSidebar> {
                       color: Colors.blue,
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Icon(Icons.send,
-                        color: Colors.white, size: 18),
+                    child: const Icon(
+                      Icons.send,
+                      color: Colors.white,
+                      size: 18,
+                    ),
                   ),
                 ),
               ],
@@ -1729,12 +2037,10 @@ class _TicketSidebarState extends State<TicketSidebar> {
   }
 
   Widget _buildRemarkBubble(Map<String, dynamic> remark) {
-    final message      = remark['message']?.toString() ?? '';
+    final message = remark['message']?.toString() ?? '';
     final remarkUserId = remark['user_id']?.toString() ?? '';
-    final username     = remark['username']?.toString() ?? '';
-    final createdAt    = remark['created_at']?.toString() ?? '';
-
-
+    final username = remark['username']?.toString() ?? '';
+    final createdAt = remark['created_at']?.toString() ?? '';
 
     // Match on username first, fall back to user_id vs detail id
     bool isMe = false;
@@ -1742,16 +2048,20 @@ class _TicketSidebarState extends State<TicketSidebar> {
       isMe = _currentUsername.toLowerCase() == username.toLowerCase();
     }
     if (!isMe && remarkUserId.isNotEmpty) {
-      final myId = (_detail?['logged_in_user_id'] ??
-          _detail?['current_user_id'] ?? '').toString();
+      final myId =
+      (_detail?['logged_in_user_id'] ?? _detail?['current_user_id'] ?? '')
+          .toString();
       if (myId.isNotEmpty) isMe = remarkUserId == myId;
     }
 
     final String displayName = username.isNotEmpty
         ? username
-        : (remarkUserId.length > 8 ? remarkUserId.substring(0, 8) : remarkUserId);
-    final String avatarLetter =
-    displayName.isNotEmpty ? displayName[0].toUpperCase() : '?';
+        : (remarkUserId.length > 8
+        ? remarkUserId.substring(0, 8)
+        : remarkUserId);
+    final String avatarLetter = displayName.isNotEmpty
+        ? displayName[0].toUpperCase()
+        : '?';
 
     final avatarColors = [
       Colors.blueGrey.shade600,
@@ -1767,17 +2077,19 @@ class _TicketSidebarState extends State<TicketSidebar> {
     String timeStr = '';
     final dt = DateTime.tryParse(createdAt)?.toLocal();
     if (dt != null) {
-      final h12   = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
-      final ampm  = dt.hour < 12 ? 'AM' : 'PM';
-      timeStr = '$h12:${_p(dt.minute)} $ampm · ${dt.year}-${_p(dt.month)}-${_p(dt.day)}';
+      final h12 = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+      final ampm = dt.hour < 12 ? 'AM' : 'PM';
+      timeStr =
+      '$h12:${_p(dt.minute)} $ampm · ${dt.year}-${_p(dt.month)}-${_p(dt.day)}';
     }
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
-        mainAxisAlignment:
-        isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment: isMe
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
         children: [
           // ── Avatar for others ───────────────────────────────────────────
           if (!isMe) ...[
@@ -1787,9 +2099,10 @@ class _TicketSidebarState extends State<TicketSidebar> {
               child: Text(
                 avatarLetter,
                 style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold),
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
             const SizedBox(width: 8),
@@ -1798,8 +2111,9 @@ class _TicketSidebarState extends State<TicketSidebar> {
           // ── Bubble + meta ───────────────────────────────────────────────
           Flexible(
             child: Column(
-              crossAxisAlignment:
-              isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+              crossAxisAlignment: isMe
+                  ? CrossAxisAlignment.end
+                  : CrossAxisAlignment.start,
               children: [
                 // Sender name above bubble (others only)
                 if (!isMe)
@@ -1818,15 +2132,17 @@ class _TicketSidebarState extends State<TicketSidebar> {
                 // Bubble
                 Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 13, vertical: 9),
+                    horizontal: 13,
+                    vertical: 9,
+                  ),
                   decoration: BoxDecoration(
                     color: isMe
-                        ? const Color(0xFF1A6FD4)   // solid blue — "me"
-                        : const Color(0xFF1E2A38),   // dark card — others
+                        ? const Color(0xFF1A6FD4) // solid blue — "me"
+                        : const Color(0xFF1E2A38), // dark card — others
                     borderRadius: BorderRadius.only(
-                      topLeft:     const Radius.circular(16),
-                      topRight:    const Radius.circular(16),
-                      bottomLeft:  Radius.circular(isMe ? 16 : 3),
+                      topLeft: const Radius.circular(16),
+                      topRight: const Radius.circular(16),
+                      bottomLeft: Radius.circular(isMe ? 16 : 3),
                       bottomRight: Radius.circular(isMe ? 3 : 16),
                     ),
                   ),
@@ -1846,7 +2162,9 @@ class _TicketSidebarState extends State<TicketSidebar> {
                   child: Text(
                     timeStr,
                     style: const TextStyle(
-                        color: AppTheme.textMuted, fontSize: 10),
+                      color: AppTheme.textMuted,
+                      fontSize: 10,
+                    ),
                   ),
                 ),
               ],
@@ -1893,9 +2211,10 @@ class _TicketSidebarState extends State<TicketSidebar> {
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-            width: 6,
-            height: 6,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+          width: 6,
+          height: 6,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
         const SizedBox(width: 6),
         Text(text, style: TextStyle(color: color, fontSize: 12)),
       ],
@@ -1937,23 +2256,28 @@ class _AuthImageState extends State<_AuthImage> {
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
           return Container(
-              height: widget.height,
-              color: AppTheme.surface,
-              child: const Center(
-                  child: CircularProgressIndicator(strokeWidth: 2)));
+            height: widget.height,
+            color: AppTheme.surface,
+            child: const Center(
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          );
         }
         if (snap.data == null) {
           return Container(
-              height: widget.height,
-              color: AppTheme.surface,
-              child: const Center(
-                  child: Icon(Icons.broken_image,
-                      color: Colors.grey, size: 32)));
+            height: widget.height,
+            color: AppTheme.surface,
+            child: const Center(
+              child: Icon(Icons.broken_image, color: Colors.grey, size: 32),
+            ),
+          );
         }
-        return Image.memory(snap.data!,
-            fit: BoxFit.cover,
-            width: double.infinity,
-            height: widget.height);
+        return Image.memory(
+          snap.data!,
+          fit: BoxFit.cover,
+          width: double.infinity,
+          height: widget.height,
+        );
       },
     );
   }
