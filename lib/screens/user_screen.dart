@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../core/services/api_login.dart';
 import '../core/services/api_user_data.dart';
 import '../core/services/api_user.dart';
-import '../data/app_theme.dart';
+import '../data/light_theme.dart';
 
 class UserScreen extends StatefulWidget {
   const UserScreen({super.key});
@@ -15,6 +15,8 @@ class _UserScreenState extends State<UserScreen> {
   final List<Map<String, String>> users = [];
   bool isLoading = false;
   String _currentUserRole = '';
+
+
 
   @override
   void initState() {
@@ -335,7 +337,7 @@ class _UserScreenState extends State<UserScreen> {
     final passwordController = TextEditingController();
 
     String selectedPosition = 'Cloud Ops';
-    String selectedRole = 'enduser';
+    String selectedRole = 'user';
 
     bool fullNameValid = true;
     bool userNameValid = true;
@@ -462,7 +464,7 @@ class _UserScreenState extends State<UserScreen> {
                     value: selectedRole,
                     items: const [
                       DropdownMenuItem(
-                          value: 'enduser', child: Text('End User')),
+                          value: 'user', child: Text('User')),
                       DropdownMenuItem(
                           value: 'endorser', child: Text('Endorser')),
                       DropdownMenuItem(
@@ -549,13 +551,13 @@ class _UserScreenState extends State<UserScreen> {
         : 'N/A';
 
     String selectedRole = [
-      'enduser',
+      'user',
       'endorser',
       'approver',
       'resolver'
     ].contains(user['role'])
         ? user['role']!
-        : 'enduser';
+        : 'user';
 
     String selectedStatus =
     user['status'] == 'inactive' ? 'inactive' : 'active';
@@ -619,7 +621,7 @@ class _UserScreenState extends State<UserScreen> {
                     value: selectedRole,
                     items: const [
                       DropdownMenuItem(
-                          value: 'enduser', child: Text('End User')),
+                          value: 'user', child: Text('User')),
                       DropdownMenuItem(
                           value: 'endorser', child: Text('Endorser')),
                       DropdownMenuItem(

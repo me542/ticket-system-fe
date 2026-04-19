@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/ticket.dart';
-import '../data/app_theme.dart';
+import '../data/light_theme.dart';
 
 class TicketRow extends StatelessWidget {
   final Ticket ticket;
@@ -28,6 +28,8 @@ class TicketRow extends StatelessWidget {
         return AppTheme.priority2;
       case TicketPriority.priority3:
         return AppTheme.priority3;
+      case TicketPriority.priority4:
+        return AppTheme.priority4;
     }
   }
 
@@ -35,7 +37,7 @@ class TicketRow extends StatelessWidget {
     if (ticket.submitterInitials == 'S') return AppTheme.accent;
     if (ticket.submitterInitials == 'JV') return const Color(0xFF059669);
     if (ticket.submitterInitials == 'JB') return const Color(0xFFF59E0B);
-    return const Color(0xFFEF4444);
+    return const Color(0xFF268A15);
   }
 
   @override

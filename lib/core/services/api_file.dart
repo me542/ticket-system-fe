@@ -15,7 +15,7 @@ class ApiTicket {
     required int priority,
     required String description,
     required String endorser,
-    PlatformFile? file,
+    PlatformFile? file, required String subcategory,
   }) async {
     try {
       final token = await ApiLogin.getToken();
@@ -114,6 +114,9 @@ class ApiTicket {
               'updated_at':   pick(['updated_at', 'UpdatedAt', 'updatedAt']),
               'cancelled_by': pick(['cancelled_by','CancelledBy','cancelledBy']),
               'cancelled_at': pick(['cancelled_at','CancelledAt','cancelledAt']),
+              'started_at':   pick(['started_at', 'StartedAt', 'startedAt']),
+              'resolved_at':  pick(['resolved_at', 'ResolvedAt', 'resolvedAt']),
+              'resolution_minutes': pick(['resolution_minutes', 'ResolutionMinutes', 'resolutionMinutes']),
             };
           }).toList();
         }

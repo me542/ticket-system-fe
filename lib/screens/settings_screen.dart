@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../core/services/api_login.dart';
 import '../core/services/api_user_data.dart';
-import '../data/app_theme.dart';
+import '../data/light_theme.dart';
+import '../main.dart'; // for themeModeNotifier
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -12,9 +14,8 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _emailNotifications = true;
-  bool _darkMode = true;
+  bool _darkMode = false;
 
-  // User info
   String _username = '';
   String _fullName = '';
   String _email = '';
@@ -25,22 +26,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void initState() {
     super.initState();
     _loadUserInfo();
+    _darkMode = themeModeNotifier.value == ThemeMode.dark;
   }
 
-  /// Load user info from API
   Future<void> _loadUserInfo() async {
     try {
       final username = await ApiLogin.getUsername();
       final users = await ApiGetUser.fetchUsers();
-
       final currentUser = users.firstWhere(
             (user) => user['username'] == username,
         orElse: () => {},
       );
-
       setState(() {
         _username = username;
-        _fullName = currentUser['name'] ?? '';       // ← use 'name' key from API
+        _fullName = currentUser['name'] ?? '';
         _email = currentUser['email'] ?? username + '@example.com';
         _role = currentUser['role'] ?? 'User';
         _position = currentUser['position'] ?? '';
@@ -89,7 +88,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Profile section (read-only)
+                // Profile section
                 _section('Profile', [
                   _settingRow('Full Name', trailing: _displayText(_fullName)),
                   _settingRow('Username', trailing: _displayText(_username)),
@@ -119,7 +118,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     'Dark Mode',
                     trailing: Switch(
                       value: _darkMode,
-                      onChanged: (v) => setState(() => _darkMode = v),
+                      onChanged: (v) async {
+                        setState(() => _darkMode = v);
+
+                        // update global theme
+                        themeModeNotifier.value = v ? ThemeMode.dark : ThemeMode.light;
+
+                        // save preference
+                        final prefs = await SharedPreferences.getInstance();
+                        await prefs.setBool('darkMode', v);
+                      },
+
                       activeColor: AppTheme.accent,
                     ),
                   ),
@@ -128,7 +137,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
                 ElevatedButton(
                   onPressed: () {
-                    // TODO: Implement save changes logic
+                    // implement save changes if you need
                     print('💾 Save button pressed');
                   },
                   style: ElevatedButton.styleFrom(

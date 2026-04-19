@@ -1,20 +1,13 @@
 enum TicketStatus { forAssessment, inProgress, resolved, cancelled }
-enum TicketPriority { priority1, priority2, priority3 }
-
-enum TicketCategory {
-  customerPremise,
-  softwareInstallation,
-  storageServer,
-  networkConnection,
-  databaseUserAccounts,
-  applicationsAmazon,
-  endpointDesktop,
-}
+enum TicketPriority { priority1, priority2, priority3, priority4 }
 
 class Ticket {
   final String id;
   final String title;
-  final TicketCategory category;
+
+  // ✅ fully dynamic from API
+  final String categoryName;
+
   final TicketStatus status;
   final TicketPriority priority;
   final String submitter;
@@ -25,7 +18,7 @@ class Ticket {
   const Ticket({
     required this.id,
     required this.title,
-    required this.category,
+    required this.categoryName,
     required this.status,
     required this.priority,
     required this.submitter,
@@ -34,24 +27,8 @@ class Ticket {
     required this.description,
   });
 
-  String get categoryLabel {
-    switch (category) {
-      case TicketCategory.customerPremise:
-        return 'IT Related - Customer Premise E.';
-      case TicketCategory.softwareInstallation:
-        return 'IT Related - Software - Installation';
-      case TicketCategory.storageServer:
-        return 'IT Related - Storage - Server';
-      case TicketCategory.networkConnection:
-        return 'IT Related - Network - Connection';
-      case TicketCategory.databaseUserAccounts:
-        return 'IT Related - Database - User Accounts';
-      case TicketCategory.applicationsAmazon:
-        return 'IT Related - Applications - Amazon';
-      case TicketCategory.endpointDesktop:
-        return 'IT Related - Endpoint - Desktop';
-    }
-  }
+  // ✅ no hardcode at all
+  String get categoryLabel => categoryName;
 
   String get statusLabel {
     switch (status) {
@@ -74,7 +51,24 @@ class Ticket {
         return 'Priority 2';
       case TicketPriority.priority3:
         return 'Priority 3';
+      case TicketPriority.priority4:
+        return 'Priority 4';
     }
+  }
+
+  // ✅ clean API mapping
+  factory Ticket.fromJson(Map<String, dynamic> json) {
+    return Ticket(
+      id: json['id'].toString(),
+      title: json['title'] ?? '',
+      categoryName: json['category'] ?? '',
+      status: mapStatus(json['status'] ?? ''),
+      priority: mapPriority(json['priority'] ?? ''),
+      submitter: json['submitter'] ?? '',
+      submitterInitials: json['submitterInitials'] ?? '',
+      createdAt: DateTime.tryParse(json['createdAt'] ?? '') ?? DateTime.now(),
+      description: json['description'] ?? '',
+    );
   }
 }
 
@@ -105,14 +99,28 @@ class ActivityItem {
 
 enum ActivityType { submitted, moved, resolved, cancelled, assigned }
 
-TicketCategory mapCategory(String cat) {
-  final c = cat.toLowerCase();
-  if (c.contains('customer premise')) return TicketCategory.customerPremise;
-  if (c.contains('software')) return TicketCategory.softwareInstallation;
-  if (c.contains('storage')) return TicketCategory.storageServer;
-  if (c.contains('network')) return TicketCategory.networkConnection;
-  if (c.contains('database')) return TicketCategory.databaseUserAccounts;
-  if (c.contains('applications')) return TicketCategory.applicationsAmazon;
-  if (c.contains('endpoint')) return TicketCategory.endpointDesktop;
-  return TicketCategory.customerPremise;
+
+// ─────────────────────────────────────────────
+// MAPPERS (still needed for logic)
+// ─────────────────────────────────────────────
+
+TicketStatus mapStatus(String status) {
+  final s = status.toLowerCase();
+
+  if (s.contains('progress')) return TicketStatus.inProgress;
+  if (s.contains('resolved')) return TicketStatus.resolved;
+  if (s.contains('cancel')) return TicketStatus.cancelled;
+
+  return TicketStatus.forAssessment;
+}
+
+TicketPriority mapPriority(String priority) {
+  final p = priority.toLowerCase();
+
+  if (p.contains('1')) return TicketPriority.priority1;
+  if (p.contains('2')) return TicketPriority.priority2;
+  if (p.contains('3')) return TicketPriority.priority3;
+  if (p.contains('4')) return TicketPriority.priority4;
+
+  return TicketPriority.priority4;
 }

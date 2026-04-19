@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/services/api_login.dart';
-import '../data/app_theme.dart';
+import '../data/light_theme.dart';
 import '../screens/loginscreen.dart';
-
 
 class AppSidebar extends StatelessWidget {
   final String currentRoute;
@@ -18,6 +17,8 @@ class AppSidebar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final roleFuture = ApiLogin.getRole(); // ✅ reuse for all role checks
+
     return Container(
       width: 220,
       color: AppTheme.sidebarBg,
@@ -29,15 +30,11 @@ class AppSidebar extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
             child: Row(
               children: [
-                Container(
-                  child: Center(
-                    child: Image.asset(
-                      '/Users/bakawan-user/Desktop/ticket-system-fe/lib/assets/favicon1.png', // 👈 your asset path
-                      width: 60,
-                      height: 60,
-                      fit: BoxFit.contain,
-                    ),
-                  ),
+                Image.asset(
+                  '/Users/bakawan-user/Desktop/ticket-system-fe/lib/assets/favicon1.png',
+                  width: 60,
+                  height: 60,
+                  fit: BoxFit.contain,
                 ),
                 const SizedBox(width: 12),
                 const Column(
@@ -56,7 +53,7 @@ class AppSidebar extends StatelessWidget {
                       'Bakawan Ticketing System',
                       style: TextStyle(
                         color: AppTheme.textSecondary,
-                        fontSize: 7 ,
+                        fontSize: 7,
                         letterSpacing: 1.0,
                       ),
                     ),
@@ -68,11 +65,13 @@ class AppSidebar extends StatelessWidget {
 
           // MAIN section
           _sectionLabel('MAIN'),
+
           _navItem(
             icon: Icons.dashboard_outlined,
             label: 'Dashboard',
             route: 'dashboard',
           ),
+
           _navItem(
             icon: Icons.confirmation_number_outlined,
             label: 'All Tickets',
@@ -80,13 +79,46 @@ class AppSidebar extends StatelessWidget {
             badge: allTicketsCount,
           ),
 
-          const SizedBox(height: 16),
-          _sectionLabel('MANAGEMENT'),
-          _navItem(
-            icon: Icons.people_outline,
-            label: 'User',
-            route: 'users',
+          // ✅ REPORTS (ADMIN ONLY)
+          FutureBuilder<String>(
+            future: roleFuture,
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) return const SizedBox();
+
+              if (snapshot.data == 'admin') {
+                return _navItem(
+                  icon: Icons.report,
+                  label: 'Reports',
+                  route: 'reports',
+                );
+              }
+
+              return const SizedBox.shrink();
+            },
           ),
+
+          const SizedBox(height: 16),
+
+          _sectionLabel('MANAGEMENT'),
+
+          // ✅ USERS (ADMIN ONLY)
+          FutureBuilder<String>(
+            future: roleFuture,
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) return const SizedBox();
+
+              if (snapshot.data == 'admin') {
+                return _navItem(
+                  icon: Icons.people_outline,
+                  label: 'User',
+                  route: 'users',
+                );
+              }
+
+              return const SizedBox.shrink();
+            },
+          ),
+
           _navItem(
             icon: Icons.settings_outlined,
             label: 'Settings',
@@ -95,7 +127,7 @@ class AppSidebar extends StatelessWidget {
 
           const Spacer(),
 
-          // User profile at bottom using FutureBuilder
+          // User profile at bottom
           FutureBuilder(
             future: Future.wait([
               ApiLogin.getUsername(),
@@ -117,7 +149,8 @@ class AppSidebar extends StatelessWidget {
 
               return Container(
                 margin: const EdgeInsets.all(12),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 decoration: BoxDecoration(
                   color: AppTheme.surfaceElevated,
                   borderRadius: BorderRadius.circular(10),
@@ -138,28 +171,29 @@ class AppSidebar extends StatelessWidget {
                     ),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            username,
-                            style: const TextStyle(
-                              color: AppTheme.textPrimary,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
+                      child: Text(
+                        username,
+                        style: const TextStyle(
+                          color: AppTheme.textPrimary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.logout, size: 16, color: AppTheme.textSecondary),
+                      icon: const Icon(
+                        Icons.logout,
+                        size: 16,
+                        color: AppTheme.textSecondary,
+                      ),
                       onPressed: () async {
                         await ApiLogin.logout();
                         Navigator.pushAndRemoveUntil(
                           context,
-                          MaterialPageRoute(builder: (context) => const LoginScreen()),
+                          MaterialPageRoute(
+                            builder: (context) => const LoginScreen(),
+                          ),
                               (route) => false,
                         );
                       },
@@ -198,6 +232,7 @@ class AppSidebar extends StatelessWidget {
     int? badge,
   }) {
     final isActive = currentRoute == route;
+
     return GestureDetector(
       onTap: () => onNavigate(route),
       child: Container(
@@ -219,9 +254,11 @@ class AppSidebar extends StatelessWidget {
               child: Text(
                 label,
                 style: TextStyle(
-                  color: isActive ? AppTheme.textPrimary : AppTheme.textSecondary,
+                  color:
+                  isActive ? AppTheme.textPrimary : AppTheme.textSecondary,
                   fontSize: 13,
-                  fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+                  fontWeight:
+                  isActive ? FontWeight.w600 : FontWeight.normal,
                 ),
               ),
             ),
@@ -231,5 +268,3 @@ class AppSidebar extends StatelessWidget {
     );
   }
 }
-
-

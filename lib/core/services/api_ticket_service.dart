@@ -6,7 +6,9 @@ import 'api_login.dart';
 class TicketService {
   static const String baseUrl = 'http://localhost:8080/api/user';
 
-  /// CREATE NEW TICKET
+  // ─────────────────────────────────────────────
+  // CREATE TICKET
+  // ─────────────────────────────────────────────
   static Future<bool> create({
     required String subject,
     required String ticketType,
@@ -23,6 +25,7 @@ class TicketService {
 
       final uri = Uri.parse('$baseUrl/ticket/create');
       final request = http.MultipartRequest('POST', uri);
+
       request.headers['Authorization'] = 'Bearer $token';
 
       request.fields['subject'] = subject;
@@ -34,124 +37,161 @@ class TicketService {
       request.fields['endorser'] = endorser;
 
       if (attachment != null && attachment.bytes != null) {
-        request.files.add(http.MultipartFile.fromBytes(
-          'attachments',
-          attachment.bytes!,
-          filename: attachment.name,
-        ));
+        request.files.add(
+          http.MultipartFile.fromBytes(
+            'attachments',
+            attachment.bytes!,
+            filename: attachment.name,
+          ),
+        );
       }
 
       final response = await request.send();
       final body = await response.stream.bytesToString();
 
-      print('Create Ticket Status: ${response.statusCode}');
-      print('Create Ticket Response: $body');
+      print('CREATE STATUS: ${response.statusCode}');
+      print('CREATE BODY: $body');
 
       return response.statusCode == 201;
     } catch (e) {
-      print('Error creating ticket: $e');
+      print('CREATE ERROR: $e');
       return false;
     }
   }
 
-  /// GET ALL TICKETS
+  // ─────────────────────────────────────────────
+  // GET ALL TICKETS (FIXED + ROBUST)
+  // ─────────────────────────────────────────────
   static Future<List<Map<String, dynamic>>> getAll() async {
     try {
       final token = await ApiLogin.getToken();
-      if (token == null) return [];
+      if (token == null) {
+        print("NO TOKEN FOUND");
+        return [];
+      }
 
       final uri = Uri.parse('$baseUrl/list/all/tickets');
-      final res = await http.get(uri, headers: {'Authorization': 'Bearer $token'});
 
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body)['data'];
-        if (data is List) {
-          return data.map<Map<String, dynamic>>((e) {
-            return {
-              'ticket_id': e['ticket_id'] ?? e['ticket']?['ticket_id'] ?? '',
-              'subject': e['subject'] ?? e['ticket']?['subject'] ?? '',
-              'priority': e['priority'] ?? e['ticket']?['priority'] ?? 0,
-              'status': e['status'] ?? e['ticket']?['status'] ?? '',
-              'description': e['description'] ?? e['ticket']?['description'] ?? '',
-              'username': e['username'] ??
-                  e['user']?['username'] ??
-                  e['ticket']?['username'] ??
-                  'Unknown',
-              'category': e['category'] ??
-                  e['ticket']?['category'] ??
-                  e['user']?['category'] ??
-                  '',
-              'created_at': e['created_at'] ?? '',
-            };
-          }).toList();
+      final res = await http.get(uri, headers: {
+        'Authorization': 'Bearer $token',
+      });
+
+      print("STATUS: ${res.statusCode}");
+      print("BODY: ${res.body}");
+
+      if (res.statusCode != 200) return [];
+
+      final decoded = jsonDecode(res.body);
+
+      List<dynamic> list = [];
+
+      // ── HANDLE ALL POSSIBLE API STRUCTURES ──
+      if (decoded is List) {
+        list = decoded;
+      } else if (decoded is Map<String, dynamic>) {
+        if (decoded['data'] is List) {
+          list = decoded['data'];
+        } else if (decoded['data'] is Map &&
+            decoded['data']['tickets'] is List) {
+          list = decoded['data']['tickets'];
+        } else if (decoded['tickets'] is List) {
+          list = decoded['tickets'];
         }
       }
 
-      print('Failed to fetch tickets: ${res.body}');
-      return [];
+      print("PARSED TICKETS COUNT: ${list.length}");
+
+      return list.map<Map<String, dynamic>>((e) {
+        return {
+          'ticket_id': e['ticket_id'] ?? e['ticket']?['ticket_id'] ?? '',
+          'subject': e['subject'] ?? e['ticket']?['subject'] ?? '',
+          'priority': e['priority'] ?? e['ticket']?['priority'] ?? 0,
+          'status': e['status'] ?? e['ticket']?['status'] ?? '',
+          'description': e['description'] ?? e['ticket']?['description'] ?? '',
+          'username': e['username'] ??
+              e['user']?['username'] ??
+              e['ticket']?['username'] ??
+              'Unknown',
+          'category': e['category'] ??
+              e['ticket']?['category'] ??
+              '',
+          'created_at': e['created_at'] ?? '',
+          'resolved_at': e['resolved_at'] ?? '',
+          'resolution_minutes':
+          e['resolution_minutes'] ?? 0,
+        };
+      }).toList();
     } catch (e) {
-      print('Error fetching tickets: $e');
+      print('GET ALL ERROR: $e');
       return [];
     }
   }
 
-  /// GET SINGLE TICKET BY ID
+  // ─────────────────────────────────────────────
+  // GET BY ID
+  // ─────────────────────────────────────────────
   static Future<Map<String, dynamic>?> getById(String ticketId) async {
     try {
       final token = await ApiLogin.getToken();
       if (token == null) return null;
 
       final uri = Uri.parse('$baseUrl/ticket/$ticketId');
-      final res = await http.get(uri, headers: {'Authorization': 'Bearer $token'});
 
-      print('getById Response: ${res.body}'); // 🔹 Debug
+      final res = await http.get(uri, headers: {
+        'Authorization': 'Bearer $token',
+      });
 
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body)['data'];
+      print("GET BY ID: ${res.body}");
 
-        // Handle nested ticket or flat
-        if (data == null) return null;
-        if (data['ticket'] != null) return data['ticket'];
-        return data;
-      }
+      if (res.statusCode != 200) return null;
 
-      print('Failed to fetch ticket by ID: ${res.body}');
-      return null;
+      final decoded = jsonDecode(res.body)['data'];
+
+      if (decoded == null) return null;
+
+      if (decoded['ticket'] != null) return decoded['ticket'];
+
+      return decoded;
     } catch (e) {
-      print('Error fetching ticket by ID: $e');
+      print('GET BY ID ERROR: $e');
       return null;
     }
   }
 
-  /// GET TICKETS FOR LOGGED-IN USER
+  // ─────────────────────────────────────────────
+  // GET USER TICKETS
+  // ─────────────────────────────────────────────
   static Future<List<Map<String, dynamic>>> getUserTickets() async {
     try {
       final token = await ApiLogin.getToken();
       if (token == null) return [];
 
       final uri = Uri.parse('$baseUrl/ticket/user');
-      final res = await http.get(uri, headers: {'Authorization': 'Bearer $token'});
 
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body)['data'];
-        if (data is List) {
-          return data.map<Map<String, dynamic>>((e) {
-            return {
-              'ticket_id': e['ticket_id'] ?? '',
-              'subject': e['subject'] ?? '',
-              'priority': e['priority'] ?? 0,
-              'status': e['status'] ?? '',
-              'description': e['description'] ?? '',
-              'created_at': e['created_at'] ?? '',
-            };
-          }).toList();
-        }
-      }
+      final res = await http.get(uri, headers: {
+        'Authorization': 'Bearer $token',
+      });
 
-      print('Failed to fetch user tickets: ${res.body}');
-      return [];
+      print("USER TICKETS: ${res.body}");
+
+      if (res.statusCode != 200) return [];
+
+      final decoded = jsonDecode(res.body);
+
+      List<dynamic> list = decoded['data'] ?? [];
+
+      return list.map<Map<String, dynamic>>((e) {
+        return {
+          'ticket_id': e['ticket_id'] ?? '',
+          'subject': e['subject'] ?? '',
+          'priority': e['priority'] ?? 0,
+          'status': e['status'] ?? '',
+          'description': e['description'] ?? '',
+          'created_at': e['created_at'] ?? '',
+        };
+      }).toList();
     } catch (e) {
-      print('Error fetching user tickets: $e');
+      print('USER TICKETS ERROR: $e');
       return [];
     }
   }

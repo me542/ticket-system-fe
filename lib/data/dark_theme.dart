@@ -18,6 +18,7 @@ class AppTheme {
   static const Color priority1 = Color(0xFFEF4444);
   static const Color priority2 = Color(0xFFF59E0B);
   static const Color priority3 = Color(0xFF6366F1);
+  static const Color priority4 = Color(0xFF268A15);
 
   static const Color catCustomer = Color(0xFFEF4444);
   static const Color catSoftware = Color(0xFFF59E0B);
@@ -27,8 +28,10 @@ class AppTheme {
   static const Color catDatabase = Color(0xFF14B8A6);       // Teal
   static const Color catEndpoint = Color(0xFFF472B6);
 
+  // dark mode sidebar
   static const Color sidebarBg = Color(0xFF13151F);
   static const Color sidebarActive = Color(0xFF1E2130);
+
 
   static ThemeData get darkTheme {
     return ThemeData(
