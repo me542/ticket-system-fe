@@ -20,6 +20,17 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
 
+  DateTime? _lastSeenActivityTime;
+
+  bool get _hasNewActivity {
+    if (_activities.isEmpty) return false;
+
+    if (_lastSeenActivityTime == null) return true;
+
+    return _activities.first.time.isAfter(_lastSeenActivityTime!);
+  }
+
+
   List<ActivityItem> get _visibleActivities {
     if (_isPrivileged) {
       return _activities;
@@ -65,6 +76,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   void _showNotificationPanel() {
     final overlay = Overlay.of(context);
+
+    _lastSeenActivityTime = _activities.isNotEmpty
+        ? _activities.first.time
+        : DateTime.now();
+
     _notificationOverlay = OverlayEntry(
       builder: (ctx) => Stack(children: [
         Positioned.fill(
@@ -600,14 +616,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 onPressed: _toggleNotificationPanel,
                 tooltip: 'Recent Activity',
               ),
-              if (_activities.isNotEmpty)
+              if (_hasNewActivity)
                 const Positioned(
-                  right: 8, top: 8,
+                  right: 8,
+                  top: 8,
                   child: CircleAvatar(
                     radius: 4,
                     backgroundColor: AppTheme.statusCancelled,
                   ),
                 ),
+
             ]),
           ),
 

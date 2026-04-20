@@ -269,6 +269,7 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
     }
   }
 
+
   // ── Export filtered data ──────────────────────────────────
   Future<void> _exportExcel() async {
     setState(() => _isExporting = true);
@@ -406,11 +407,11 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
   // ── Role accent color ─────────────────────────────────────
   Color get _roleColor {
     switch (_currentUserRole) {
-      case 'admin':    return Colors.white;
-      case 'endorser': return Colors.white;
-      case 'approver': return Colors.white;
-      case 'resolver': return Colors.white;
-      default:         return Colors.white;
+      case 'admin':    return Colors.black;
+      case 'endorser': return Colors.black;
+      case 'approver': return Colors.black;
+      case 'resolver': return Colors.black;
+      default:         return Colors.black;
     }
   }
 
@@ -690,6 +691,8 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
             ),
           ),
         ),
+
+        const SizedBox(height: 50),
 
         // Status filter pills
         Row(
@@ -1820,9 +1823,11 @@ class _DateRangePickerDialogState extends State<_DateRangePickerDialog> {
               decoration: const InputDecoration(
                 hintText: 'hh:mm:ss',
                 hintStyle: TextStyle(
-                    color: Color(0xFF2E4A63),
-                    fontSize: 13,
-                    fontStyle: FontStyle.italic),
+                  color: AppTheme.textSecondary,
+                  fontSize: 13,
+                  fontStyle: FontStyle.italic,
+                ),
+
                 border: InputBorder.none,
                 isDense: true,
                 contentPadding: EdgeInsets.zero,
@@ -1839,8 +1844,10 @@ class _DateRangePickerDialogState extends State<_DateRangePickerDialog> {
     final canApply = _mode == _RangeMode.relative || _startDate != null;
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
-      decoration: const BoxDecoration(
-        border: Border(top: BorderSide(color: Color(0xFF1E3A5F))),
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(color: AppTheme.border),
+        ),
       ),
       child: Row(children: [
         TextButton(
@@ -1856,9 +1863,11 @@ class _DateRangePickerDialogState extends State<_DateRangePickerDialog> {
             }
           },
           style: TextButton.styleFrom(
-            foregroundColor: const Color(0xFF8BA3BC),
-            padding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            foregroundColor: AppTheme.textMuted,
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 10,
+            ),
           ),
           child: const Text('Clear',
               style: TextStyle(fontSize: 13)),
@@ -1867,9 +1876,11 @@ class _DateRangePickerDialogState extends State<_DateRangePickerDialog> {
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
           style: TextButton.styleFrom(
-            foregroundColor: const Color(0xFF8BA3BC),
-            padding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            foregroundColor: AppTheme.textMuted,
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 10,
+            ),
           ),
           child: const Text('Cancel',
               style: TextStyle(fontSize: 13)),
@@ -1882,17 +1893,22 @@ class _DateRangePickerDialogState extends State<_DateRangePickerDialog> {
               : _applyAbsolute)
               : null,
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF268A15),
+            backgroundColor: AppTheme.accent,
             foregroundColor: Colors.white,
-            disabledBackgroundColor:
-            const Color(0xFF268A15).withOpacity(0.3),
+            disabledBackgroundColor: AppTheme.accent.withOpacity(0.3),
             padding: const EdgeInsets.symmetric(
-                horizontal: 20, vertical: 10),
+              horizontal: 20,
+              vertical: 10,
+            ),
             shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8)),
+              borderRadius: BorderRadius.circular(8),
+            ),
             textStyle: const TextStyle(
-                fontSize: 13, fontWeight: FontWeight.w600),
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
           ),
+
           child: const Text('Apply'),
         ),
       ]),

@@ -1181,7 +1181,7 @@ class _TicketSidebarState extends State<TicketSidebar> {
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 9,
-                      color: done ? Colors.white : Colors.grey,
+                      color: done ? Colors.green : Colors.grey,
                       fontWeight: current ? FontWeight.bold : FontWeight.normal,
                     ),
                   ),
@@ -2150,7 +2150,7 @@ class _TicketSidebarState extends State<TicketSidebar> {
                   child: Text(
                     message,
                     style: TextStyle(
-                      color: isMe ? Colors.white : AppTheme.textPrimary,
+                      color: isMe ? Colors.white : Colors.white,
                       fontSize: 13,
                       height: 1.45,
                     ),
