@@ -691,9 +691,7 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
                   child: _styledDropdown(
                     value: _organization,
                     items: const [
-                      'Bakawan Data Analytics',
-                      'FDSAP',
-                      'CMIT'
+                      'Bakawan Data Analytics'
                     ],
                     onChanged: (v) => setState(() => _organization = v!),
                   ),
@@ -1000,7 +998,7 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
   Widget _sectionLabel(String text) => Text(
     text.toUpperCase(),
     style: const TextStyle(
-      color: AppTheme.textMuted,
+      color: AppTheme.textPrimary,
       fontSize: 10,
       fontWeight: FontWeight.w700,
       letterSpacing: 0.8,

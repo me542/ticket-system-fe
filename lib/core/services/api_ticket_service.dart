@@ -60,7 +60,7 @@ class TicketService {
   }
 
   // ─────────────────────────────────────────────
-  // GET ALL TICKETS (FIXED + ROBUST)
+  // GET ALL TICKETS (FIXED)
   // ─────────────────────────────────────────────
   static Future<List<Map<String, dynamic>>> getAll() async {
     try {
@@ -85,7 +85,6 @@ class TicketService {
 
       List<dynamic> list = [];
 
-      // ── HANDLE ALL POSSIBLE API STRUCTURES ──
       if (decoded is List) {
         list = decoded;
       } else if (decoded is Map<String, dynamic>) {
@@ -102,23 +101,25 @@ class TicketService {
       print("PARSED TICKETS COUNT: ${list.length}");
 
       return list.map<Map<String, dynamic>>((e) {
+        // FIX: API wraps all ticket fields inside e['ticket']
+        // Previous code read from e directly — so all fields were empty
+        final Map<String, dynamic> t =
+        (e['ticket'] is Map)
+            ? Map<String, dynamic>.from(e['ticket'] as Map)
+            : Map<String, dynamic>.from(e as Map);
+
         return {
-          'ticket_id': e['ticket_id'] ?? e['ticket']?['ticket_id'] ?? '',
-          'subject': e['subject'] ?? e['ticket']?['subject'] ?? '',
-          'priority': e['priority'] ?? e['ticket']?['priority'] ?? 0,
-          'status': e['status'] ?? e['ticket']?['status'] ?? '',
-          'description': e['description'] ?? e['ticket']?['description'] ?? '',
-          'username': e['username'] ??
-              e['user']?['username'] ??
-              e['ticket']?['username'] ??
-              'Unknown',
-          'category': e['category'] ??
-              e['ticket']?['category'] ??
-              '',
-          'created_at': e['created_at'] ?? '',
-          'resolved_at': e['resolved_at'] ?? '',
-          'resolution_minutes':
-          e['resolution_minutes'] ?? 0,
+          'ticket_id':          t['ticket_id']    ?? '',
+          'subject':            t['subject']      ?? '',
+          'priority':           t['priority']     ?? 0,
+          'status':             t['status']       ?? '',
+          'description':        t['description']  ?? '',
+          'username':           t['username']     ?? 'Unknown',
+          'category':           t['category']     ?? '',
+          'created_at':         t['created_at']   ?? '',
+          'resolved_at':        t['resolved_at']  ?? '',
+          // FIX: cast directly to double — no string conversion
+          'resolution_time': (t['resolution_time'] as num?)?.toDouble() ?? 0.0,
         };
       }).toList();
     } catch (e) {
@@ -182,11 +183,11 @@ class TicketService {
 
       return list.map<Map<String, dynamic>>((e) {
         return {
-          'ticket_id': e['ticket_id'] ?? '',
-          'subject': e['subject'] ?? '',
-          'priority': e['priority'] ?? 0,
-          'status': e['status'] ?? '',
-          'description': e['description'] ?? '',
+          'ticket_id':  e['ticket_id']  ?? '',
+          'subject':    e['subject']    ?? '',
+          'priority':   e['priority']   ?? 0,
+          'status':     e['status']     ?? '',
+          'description':e['description']?? '',
           'created_at': e['created_at'] ?? '',
         };
       }).toList();

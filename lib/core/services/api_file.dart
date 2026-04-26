@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/cupertino.dart';
 import 'package:http/http.dart' as http;
 import 'package:file_picker/file_picker.dart';
 import 'api_login.dart';
@@ -15,7 +16,8 @@ class ApiTicket {
     required int priority,
     required String description,
     required String endorser,
-    PlatformFile? file, required String subcategory,
+    PlatformFile? file,
+    required String subcategory,
   }) async {
     try {
       final token = await ApiLogin.getToken();
@@ -55,8 +57,6 @@ class ApiTicket {
   }
 
   /// GET ALL TICKETS
-  /// Handles both flat and nested { "ticket": {...} } shapes.
-  /// Also handles GORM's CamelCase JSON keys (CreatedAt, UpdatedAt, etc.)
   static Future<List<Map<String, dynamic>>> getAllTickets() async {
     try {
       final token = await ApiLogin.getToken();
@@ -72,51 +72,35 @@ class ApiTicket {
 
         if (raw is List) {
           return raw.map<Map<String, dynamic>>((e) {
-            // Backend wraps as { "ticket": {...}, "attachments": [...] }
-            // Fall back to flat if no nested ticket key
-            final Map t =
-            (e['ticket'] is Map) ? e['ticket'] as Map : e as Map;
+            // API always wraps ticket data inside "ticket" key
+            final Map<String, dynamic> t =
+            (e['ticket'] is Map)
+                ? Map<String, dynamic>.from(e['ticket'] as Map)
+                : Map<String, dynamic>.from(e as Map);
 
-            // Pick the first non-empty value from a list of key candidates.
-            // This handles both snake_case (json tags) and CamelCase (GORM default).
-            String pick(List<String> keys) {
-              for (final k in keys) {
-                final v = t[k] ?? e[k];
-                if (v != null && v.toString().trim().isNotEmpty) {
-                  return v.toString().trim();
-                }
-              }
-              return '';
-            }
-
-            dynamic pickNum(List<String> keys) {
-              for (final k in keys) {
-                final v = t[k] ?? e[k];
-                if (v != null) return v;
-              }
-              return 0;
-            }
+            debugPrint("TICKET MAP: $t");
 
             return {
-              'ticket_id':    pick(['ticket_id', 'TicketID',    'ticketId']),
-              'subject':      pick(['subject',    'Subject']),
-              'category':     pick(['category',   'Category']),
-              'description':  pick(['description','Description']),
-              'institution':  pick(['institution','Institution']),
-              'tickettype':   pick(['tickettype', 'Tickettype', 'ticket_type', 'TicketType']),
-              'priority':     pickNum(['priority','Priority']),
-              'status':       pick(['status',     'Status']),
-              'username':     pick(['username',   'Username']),
-              'assignee':     pick(['assignee',   'Assignee']),
-              'endorser':     pick(['endorser',   'Endorser']),
-              'approver':     pick(['approver',   'Approver']),
-              'created_at':   pick(['created_at', 'CreatedAt', 'createdAt']),
-              'updated_at':   pick(['updated_at', 'UpdatedAt', 'updatedAt']),
-              'cancelled_by': pick(['cancelled_by','CancelledBy','cancelledBy']),
-              'cancelled_at': pick(['cancelled_at','CancelledAt','cancelledAt']),
-              'started_at':   pick(['started_at', 'StartedAt', 'startedAt']),
-              'resolved_at':  pick(['resolved_at', 'ResolvedAt', 'resolvedAt']),
-              'resolution_minutes': pick(['resolution_minutes', 'ResolutionMinutes', 'resolutionMinutes']),
+              'ticket_id':          t['ticket_id']          ?? '',
+              'subject':            t['subject']             ?? '',
+              'category':           t['category']            ?? '',
+              'description':        t['description']         ?? '',
+              'institution':        t['institution']         ?? '',
+              'tickettype':         t['tickettype']          ?? '',
+              'priority':           t['priority']            ?? '',
+              'status':             t['status']              ?? '',
+              'username':           t['username']            ?? '',
+              'assignee':           t['assignee']            ?? '',
+              'endorser':           t['endorser']            ?? '',
+              'approver':           t['approver']            ?? '',
+              'created_at':         t['created_at']          ?? '',
+              'updated_at':         t['updated_at']          ?? '',
+              'cancelled_by':       t['cancelled_by']        ?? '',
+              'cancelled_at':       t['cancelled_at'],
+              'started_at':         t['started_at'],
+              'resolved_at':        t['resolved_at'],
+              'resolution_minutes': t['resolution_minutes']  ?? '',
+              'resolution_time':    t['resolution_time']     ?? '', // ← fixed key + string
             };
           }).toList();
         }
@@ -153,7 +137,6 @@ class ApiTicket {
   }
 
   /// GET SINGLE TICKET BY SR NUMBER
-  /// Returns a flat map with all available fields regardless of nesting.
   static Future<Map<String, dynamic>?> getTicketByID(String ticketID) async {
     try {
       final token = await ApiLogin.getToken();

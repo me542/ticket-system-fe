@@ -723,6 +723,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   // ── Role accent color ─────────────────────────────────────
+  // Color get _roleColor {
+  //   switch (_currentUserRole.toLowerCase().trim()) {
+  //     case 'admin':    return Colors.white;
+  //     case 'endorser': return Colors.white;
+  //     case 'approver': return Colors.white;
+  //     case 'resolver': return Colors.white;
+  //     default:         return Colors.white;   // "user"
+  //   }
+  // }
+
   Color get _roleColor {
     switch (_currentUserRole.toLowerCase().trim()) {
       case 'admin':    return Colors.black;

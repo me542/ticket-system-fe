@@ -3,40 +3,49 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ticket_system/main.dart';
 import 'package:ticket_system/screens/loginscreen.dart';
-import 'package:ticket_system/data/dark_theme.dart';
 
 void main() {
-  // Reset SharedPreferences before each test
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
   });
 
   testWidgets('Shows LoginScreen when no token saved', (WidgetTester tester) async {
-    // No token in prefs → should show LoginScreen
     SharedPreferences.setMockInitialValues({});
 
-    await tester.pumpWidget(const MyApp(isLoggedIn: false));
-    await tester.pumpAndSettle();
+    await tester.pumpWidget(const MyApp());
+    await tester.pump(); // first frame
+    await tester.pump(const Duration(seconds: 1)); // wait for _checkAuth
 
     expect(find.byType(LoginScreen), findsOneWidget);
   });
 
-  testWidgets('Shows MainShell when token exists', (WidgetTester tester) async {
-    // Token present → should skip LoginScreen
+  testWidgets('Shows LoginScreen when token is invalid', (WidgetTester tester) async {
+    // Invalid/fake token that won't parse as a real JWT
     SharedPreferences.setMockInitialValues({'user_token': 'fake_test_token'});
 
-    await tester.pumpWidget(const MyApp(isLoggedIn: true));
-    await tester.pumpAndSettle();
+    await tester.pumpWidget(const MyApp());
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
 
-    expect(find.byType(MainShell), findsOneWidget);
-    expect(find.byType(LoginScreen), findsNothing);
+    expect(find.byType(LoginScreen), findsOneWidget);
   });
 
-  testWidgets('App uses dark theme', (WidgetTester tester) async {
-    await tester.pumpWidget(const MyApp(isLoggedIn: false));
+  testWidgets('Shows AuthGate loading state initially', (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues({});
+
+    await tester.pumpWidget(const MyApp());
+    await tester.pump(); // only first frame — before _checkAuth completes
+
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+  });
+
+  testWidgets('App uses light theme by default', (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues({});
+
+    await tester.pumpWidget(const MyApp());
     await tester.pumpAndSettle();
 
     final MaterialApp app = tester.widget(find.byType(MaterialApp));
-    expect(app.theme?.brightness, Brightness.dark);
+    expect(app.theme?.brightness, Brightness.light);
   });
 }

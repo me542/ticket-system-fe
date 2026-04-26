@@ -1,6 +1,8 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:universal_html/html.dart' as html;
 import 'api_user_data.dart';
 
 class ApiLogin {
@@ -10,7 +12,66 @@ class ApiLogin {
   static String? _username;
   static String? _role;
 
-  /// Login user and save token + user info
+  // ── sessionStorage helpers (web only) ─────────────────────────────────────
+  // sessionStorage is per-tab — unlike localStorage it is NOT shared across tabs.
+
+  static void _sessionSet(String key, String value) {
+    if (kIsWeb) {
+      html.window.sessionStorage[key] = value;
+    }
+  }
+
+  static String? _sessionGet(String key) {
+    if (kIsWeb) {
+      return html.window.sessionStorage[key];
+    }
+    return null;
+  }
+
+  static void _sessionClear() {
+    if (kIsWeb) {
+      html.window.sessionStorage.clear();
+    }
+  }
+
+  // ── Save to both sessionStorage (web) and SharedPreferences (mobile) ──────
+
+  static Future<void> _saveToStorage(String token, String username, String role) async {
+    // Web: use sessionStorage (per-tab, not shared)
+    _sessionSet('user_token', token);
+    _sessionSet('username',   username);
+    _sessionSet('role',       role);
+
+    // Mobile/desktop fallback: use SharedPreferences
+    if (!kIsWeb) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('user_token', token);
+      await prefs.setString('username',   username);
+      await prefs.setString('role',       role);
+    }
+  }
+
+  static Future<void> _clearStorage() async {
+    _sessionClear();
+
+    if (!kIsWeb) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
+    }
+  }
+
+  static Future<String?> _readFromStorage(String key) async {
+    // Web: read from sessionStorage first
+    if (kIsWeb) {
+      return _sessionGet(key);
+    }
+    // Mobile: read from SharedPreferences
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(key);
+  }
+
+  // ── Login ──────────────────────────────────────────────────────────────────
+
   static Future<Map<String, dynamic>> login({
     required String username,
     required String password,
@@ -32,36 +93,30 @@ class ApiLogin {
         final userData = data['data'];
 
         if (userData != null) {
-          _token = userData['token'];
+          _token    = userData['token'];
           _username = userData['username'];
-          _role = userData['role'];
+          _role     = userData['role'];
 
           print('🔑 TOKEN: $_token');
           print('🔑 USERNAME: $_username');
           print('🔑 ROLE FROM LOGIN: $_role');
 
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('user_token', _token ?? '');
-          await prefs.setString('username', _username ?? '');
-          await prefs.setString('role', _role ?? '');
+          // Save to sessionStorage (web) or SharedPreferences (mobile)
+          await _saveToStorage(_token ?? '', _username ?? '', _role ?? '');
 
-          // If role is empty from login response, fetch from users list
           if (_role == null || _role!.isEmpty) {
             print('⚠️ Role empty from login, fetching from users list...');
             await _fetchAndCacheRole();
           }
 
-          print('✅ [$tag] Saved token and user info to SharedPreferences');
+          print('✅ [$tag] Saved token and user info');
         }
 
         return {'success': true, 'data': data};
       } else {
         final error = jsonDecode(response.body);
         print('❌ [$tag] Login failed: ${error['message']}');
-        return {
-          'success': false,
-          'error': error['message'] ?? 'Login failed'
-        };
+        return {'success': false, 'error': error['message'] ?? 'Login failed'};
       }
     } catch (e) {
       print('💥 [$tag] Login error: $e');
@@ -69,10 +124,11 @@ class ApiLogin {
     }
   }
 
-  /// Fetch role from users list and cache it
+  // ── Fetch and cache role ───────────────────────────────────────────────────
+
   static Future<void> _fetchAndCacheRole() async {
     try {
-      final users = await ApiGetUser.fetchUsers();
+      final users          = await ApiGetUser.fetchUsers();
       final currentUsername = _username ?? '';
 
       final currentUser = users.firstWhere(
@@ -85,53 +141,53 @@ class ApiLogin {
 
       if (role.isNotEmpty) {
         _role = role;
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('role', role);
-        print('✅ Role cached to SharedPreferences: $role');
+        _sessionSet('role', role);
+        if (!kIsWeb) {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('role', role);
+        }
+        print('✅ Role cached: $role');
       }
     } catch (e) {
-      print('💥 Error fetching role from users list: $e');
+      print('💥 Error fetching role: $e');
     }
   }
 
-  /// ── NEW: quick check used by main() and auth guards ──────────────────────
-  /// Returns true if a non-empty token exists in SharedPreferences.
-  /// Does NOT make a network call — purely local.
+  // ── isLoggedIn ─────────────────────────────────────────────────────────────
+
   static Future<bool> isLoggedIn() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('user_token') ?? '';
-    return token.isNotEmpty;
+    final token = await _readFromStorage('user_token');
+    return (token ?? '').isNotEmpty;
   }
 
-  /// Get token
+  // ── getToken ───────────────────────────────────────────────────────────────
+
   static Future<String?> getToken({String? id}) async {
     final tag = id ?? 'ApiLogin.getToken';
     if (_token != null) {
       print('🔹 [$tag] Returning cached token');
       return _token;
     }
-
-    final prefs = await SharedPreferences.getInstance();
-    _token = prefs.getString('user_token');
-    print('🔹 [$tag] Loaded token from SharedPreferences: $_token');
+    _token = await _readFromStorage('user_token');
+    print('🔹 [$tag] Loaded token from storage: $_token');
     return _token;
   }
 
-  /// Get username
+  // ── getUsername ────────────────────────────────────────────────────────────
+
   static Future<String> getUsername({String? id}) async {
     final tag = id ?? 'ApiLogin.getUsername';
     if (_username != null) {
       print('🔹 [$tag] Returning cached username: $_username');
       return _username!;
     }
-
-    final prefs = await SharedPreferences.getInstance();
-    _username = prefs.getString('username') ?? 'Unknown';
-    print('🔹 [$tag] Loaded username from SharedPreferences: $_username');
+    _username = await _readFromStorage('username') ?? 'Unknown';
+    print('🔹 [$tag] Loaded username from storage: $_username');
     return _username!;
   }
 
-  /// Get role — falls back to fetching from users list if empty
+  // ── getRole ────────────────────────────────────────────────────────────────
+
   static Future<String> getRole({String? id}) async {
     final tag = id ?? 'ApiLogin.getRole';
 
@@ -140,40 +196,35 @@ class ApiLogin {
       return _role!;
     }
 
-    final prefs = await SharedPreferences.getInstance();
-    final savedRole = prefs.getString('role') ?? '';
-
+    final savedRole = await _readFromStorage('role') ?? '';
     if (savedRole.isNotEmpty) {
       _role = savedRole;
-      print('🔹 [$tag] Loaded role from SharedPreferences: $_role');
+      print('🔹 [$tag] Loaded role from storage: $_role');
       return _role!;
     }
 
-    print('⚠️ [$tag] Role not found in cache, fetching from users list...');
+    print('⚠️ [$tag] Role not found, fetching from users list...');
     await _fetchAndCacheRole();
-
-    print('🔹 [$tag] Final role: $_role');
     return _role ?? '';
   }
 
-  /// Get initials
+  // ── getInitials ────────────────────────────────────────────────────────────
+
   static Future<String> getInitials({String? id}) async {
-    final tag = id ?? 'ApiLogin.getInitials';
+    final tag  = id ?? 'ApiLogin.getInitials';
     final name = await getUsername(id: tag);
-    final initials = name.isNotEmpty ? name[0].toUpperCase() : 'U';
-    print('🔹 [$tag] Initials: $initials');
-    return initials;
+    return name.isNotEmpty ? name[0].toUpperCase() : 'U';
   }
 
-  /// Logout — clears everything and returns to LoginScreen
+  // ── logout ─────────────────────────────────────────────────────────────────
+
   static Future<void> logout({String? id}) async {
     final tag = id ?? 'ApiLogin.logout';
-    _token = null;
+    _token    = null;
     _username = null;
-    _role = null;
+    _role     = null;
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
-    print('✅ [$tag] Logged out and cleared SharedPreferences');
+    await _clearStorage();
+    print('✅ [$tag] Logged out and cleared storage');
   }
 }

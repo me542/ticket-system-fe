@@ -21,10 +21,8 @@ class _ReportsState extends State<Reports> {
 
   DateTime? _parseDate(dynamic raw) {
     if (raw == null) return null;
-
     String s = raw.toString().trim();
     if (s.isEmpty) return null;
-
     try {
       s = s.replaceFirst(' ', 'T');
       final regex = RegExp(r'(\+\d{2})$');
@@ -42,39 +40,68 @@ class _ReportsState extends State<Reports> {
       final data = await TicketService.getAll();
       _monthly = {};
 
+      debugPrint("PARSED TICKETS COUNT: ${data.length}");
+
       for (final t in data) {
+        debugPrint("RESOLUTION RAW: $t");
+
         final created = _parseDate(
           t['created_at'] ?? t['createdAt'] ?? t['date_created'],
         );
 
         final date = created ?? DateTime.now();
-        final key = "${date.year}-${date.month}";
+        final key = "${date.year}-${date.month.toString().padLeft(2, '0')}";
 
-        _monthly.putIfAbsent(key, () {
-          return {
-            'total': 0,
-            'resolved': 0,
-            'cancelled': 0,
-            'disapprove': 0,
-            'pending': 0,
-            'totalMinutes': 0.0,
-            'resolvedCount': 0,
-          };
+        _monthly.putIfAbsent(key, () => {
+          'total': 0,
+          'resolved': 0,
+          'cancelled': 0,
+          'disapprove': 0,
+          'pending': 0,
+          'totalMinutes': 0.0,
+          'resolvedCount': 0,
         });
 
         final m = _monthly[key]!;
-
         m['total']++;
 
         final status = (t['status'] ?? '').toString().toLowerCase();
 
-        final minutes =
-            double.tryParse(t['resolution_minutes']?.toString() ?? '0') ?? 0;
+        // FIX: use num.tryParse so it safely handles both num and String types
+        double parsedMinutes = 0.0;
+
+        final rawMinutes = t['resolution_minutes'];
+        if (rawMinutes != null) {
+          final parsed = num.tryParse(rawMinutes.toString()) ?? 0;
+          if (parsed > 0) parsedMinutes = parsed.toDouble();
+        }
+
+        // Fallback: compute from timestamps if resolution_minutes is still 0
+        if (parsedMinutes == 0.0) {
+          final resolved = _parseDate(
+            t['resolved_at'] ?? t['resolvedAt'],
+          );
+
+          debugPrint("CREATED: $created");
+          debugPrint("RESOLVED: $resolved");
+
+          if (created != null && resolved != null) {
+            final diff = resolved.difference(created).inMinutes.toDouble();
+            if (diff > 0) parsedMinutes = diff;
+          } else {
+            debugPrint("⚠️ Missing dates → cannot compute time");
+          }
+        }
+
+        debugPrint("PARSED MINUTES for ${t['ticket_id']}: $parsedMinutes");
 
         if (status.contains('resolved')) {
           m['resolved']++;
-          m['totalMinutes'] += minutes;
-          m['resolvedCount']++;
+          // FIX: only count toward average if we actually have a valid time
+          if (parsedMinutes > 0) {
+            m['totalMinutes'] += parsedMinutes;
+            m['resolvedCount']++;
+          }
         } else if (status.contains('cancel')) {
           m['cancelled']++;
         } else if (status.contains('disapprove')) {
@@ -93,25 +120,19 @@ class _ReportsState extends State<Reports> {
   String _month(String key) {
     final p = key.split('-');
     if (p.length != 2) return key;
-
     final y = int.tryParse(p[0]) ?? 0;
     final m = int.tryParse(p[1]) ?? 0;
-
     const months = [
-      '',
-      'Jan','Feb','Mar','Apr','May','Jun',
+      '', 'Jan','Feb','Mar','Apr','May','Jun',
       'Jul','Aug','Sep','Oct','Nov','Dec'
     ];
-
     return "${months[m]} $y";
   }
 
   List<List<String>> _rows() {
     final keys = _monthly.keys.toList()..sort();
-
     return keys.map((k) {
       final m = _monthly[k]!;
-
       return [
         _month(k),
         m['total'].toString(),
@@ -126,46 +147,40 @@ class _ReportsState extends State<Reports> {
 
   String _avg(Map<String, dynamic> m) {
     final count = m['resolvedCount'] ?? 0;
-    if (count == 0) return "0 min";
-
+    if (count == 0) return "N/A";
     final avg = (m['totalMinutes'] ?? 0) / count;
     return _formatMinutes(avg);
   }
 
   String _formatMinutes(double minutes) {
-    if (minutes <= 0) return "0 min";
-
+    if (minutes <= 0) return "N/A";
     if (minutes >= 60 * 24) {
       return "${(minutes / (60 * 24)).toStringAsFixed(1)} days";
     } else if (minutes >= 60) {
       return "${(minutes / 60).toStringAsFixed(1)} hrs";
     }
-
-    return "${minutes.toStringAsFixed(0)} min";
+    return "${minutes.toStringAsFixed(1)} min";
   }
 
   // ===================== STATS =====================
   Map<String, dynamic> _stats() {
-    int total = 0;
-    int resolved = 0;
+    double total = 0;
+    double resolved = 0;
     double totalMinutes = 0;
-    int resolvedCount = 0;
+    double resolvedCount = 0;
 
     _monthly.forEach((_, m) {
-      // total += m['total'] ?? 0;
-      // resolved += m['resolved'] ?? 0;
-      // totalMinutes += (m['totalMinutes'] ?? 0);
-      // resolvedCount += (m['resolvedCount'] ?? 0);
+      total += m['total'] ?? 0;
+      resolved += m['resolved'] ?? 0;
+      totalMinutes += (m['totalMinutes'] ?? 0);
+      resolvedCount += (m['resolvedCount'] ?? 0);
     });
 
     final completionRate = total == 0 ? 0 : (resolved / total) * 100;
-
-    final avgResolution =
-    resolvedCount == 0 ? 0 : totalMinutes / resolvedCount;
+    final avgResolution = resolvedCount == 0 ? 0 : totalMinutes / resolvedCount;
 
     final now = DateTime.now();
     final daysInMonth = DateTime(now.year, now.month + 1, 0).day;
-
     final avgPerDay = total == 0 ? 0 : total / daysInMonth;
 
     return {
@@ -198,7 +213,6 @@ class _ReportsState extends State<Reports> {
       "Date","Total","Resolved",
       "Cancelled","Disapprove","Pending","Avg Time"
     ];
-
     return Row(
       children: h.map((e) => _cell(e, header: true)).toList(),
     );
@@ -242,8 +256,7 @@ class _ReportsState extends State<Reports> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(title,
-                  style: const TextStyle(
-                      fontSize: 12, color: AppTheme.textMuted)),
+                  style: const TextStyle(fontSize: 12, color: AppTheme.textMuted)),
               const SizedBox(height: 8),
               Text(value,
                   style: const TextStyle(
@@ -258,17 +271,20 @@ class _ReportsState extends State<Reports> {
 
     return Row(
       children: [
-        card("Total Request (Month)", "${s['total']}"),
-        card("Avg Req / Day",
-            (s['avgPerDay'] as double).toStringAsFixed(1)),
+        card("Total Request (Month)", "${s['total'].toInt()}"),
+        card("Avg Req / Day", (s['avgPerDay'] as double).toStringAsFixed(1)),
         card(
           "Completion Rate",
           s['total'] == 0
               ? "No data"
               : "${(s['completionRate'] as double).toStringAsFixed(1)}%",
         ),
-        card("Avg Resolution Time",
-            _formatMinutes(s['avgResolution'])),
+        card(
+          "Avg Resolution Time",
+          s['avgResolution'] == 0
+              ? "No data"
+              : _formatMinutes((s['avgResolution'] as num).toDouble()),
+        ),
       ],
     );
   }
@@ -279,7 +295,7 @@ class _ReportsState extends State<Reports> {
 
     return Column(
       children: [
-        // TOP BAR (RESTORED DOWNLOAD UI)
+        // TOP BAR
         Container(
           height: 56,
           padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -298,7 +314,6 @@ class _ReportsState extends State<Reports> {
                 ),
               ),
               const Spacer(),
-
               ElevatedButton.icon(
                 onPressed: () {},
                 icon: const Icon(Icons.download, size: 16),
@@ -306,8 +321,7 @@ class _ReportsState extends State<Reports> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.accent,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -342,15 +356,13 @@ class _ReportsState extends State<Reports> {
                         Expanded(
                           child: ListView.builder(
                             itemCount: rows.length,
-                            itemBuilder: (_, i) =>
-                                _row(rows[i], i % 2 == 0),
+                            itemBuilder: (_, i) => _row(rows[i], i % 2 == 0),
                           ),
                         ),
                       ],
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 16),
                 _summary(),
               ],

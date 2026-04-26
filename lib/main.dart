@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'data/light_theme.dart';
@@ -8,11 +9,11 @@ import 'screens/user_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/loginscreen.dart';
 import 'screens/reports.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:universal_html/html.dart' as html;
 
-// Global ThemeMode notifier!
+// Global ThemeMode notifier
 final themeModeNotifier = ValueNotifier<ThemeMode>(ThemeMode.light);
-
-
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -21,15 +22,11 @@ void main() async {
   final darkMode = prefs.getBool('darkMode') ?? false;
   themeModeNotifier.value = darkMode ? ThemeMode.dark : ThemeMode.light;
 
-  final token = prefs.getString('user_token') ?? '';
-  final isLoggedIn = token.isNotEmpty;
-
-  runApp(MyApp(isLoggedIn: isLoggedIn));
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
-  final bool isLoggedIn;
-  const MyApp({super.key, required this.isLoggedIn});
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -39,19 +36,87 @@ class MyApp extends StatelessWidget {
         return MaterialApp(
           title: 'IDIYANALE',
           debugShowCheckedModeBanner: false,
-
-          theme: AppTheme.lightTheme,        // <-- light theme
-          //darkTheme: AppTheme.darkTheme,     // <-- dark theme
-          themeMode: themeMode,              // <-- controlled by your switch
-
-          home: isLoggedIn ? const MainShell() : const LoginScreen(),
+          theme: AppTheme.lightTheme,
+          themeMode: themeMode,
+          home: const AuthGate(),
         );
-
       },
     );
   }
 }
 
+// ── AuthGate ──────────────────────────────────────────────────────────────────
+class AuthGate extends StatefulWidget {
+  const AuthGate({super.key});
+
+  @override
+  State<AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<AuthGate> {
+  bool _isLoggedIn = false;
+  bool _checked    = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAuth();
+  }
+
+  Future<void> _checkAuth() async {
+    bool valid = false;
+
+    // Read from sessionStorage (per-tab) on web
+    if (kIsWeb) {
+      final token = html.window.sessionStorage['user_token'] ?? '';
+      if (token.isNotEmpty) {
+        try {
+          final parts = token.split('.');
+          if (parts.length == 3) {
+            final payload = utf8.decode(
+              base64Url.decode(base64Url.normalize(parts[1])),
+            );
+            final map = jsonDecode(payload) as Map<String, dynamic>;
+            final exp = map['exp'] as int?;
+            if (exp != null) {
+              final expiry = DateTime.fromMillisecondsSinceEpoch(exp * 1000);
+              valid = expiry.isAfter(DateTime.now());
+            } else {
+              valid = true;
+            }
+          }
+        } catch (_) {
+          valid = false;
+        }
+      }
+    } else {
+      // Mobile: use SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('user_token') ?? '';
+      valid = token.isNotEmpty;
+    }
+
+    if (mounted) {
+      setState(() {
+        _isLoggedIn = valid;
+        _checked    = true;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_checked) {
+      return const Scaffold(
+        backgroundColor: AppTheme.sidebarBg,
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+    return _isLoggedIn ? const MainShell() : const LoginScreen();
+  }
+}
+
+// ── MainShell ─────────────────────────────────────────────────────────────────
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
 

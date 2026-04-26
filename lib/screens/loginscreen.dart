@@ -50,17 +50,15 @@ class _LoginScreenState extends State<LoginScreen> {
     );
 
     if (response['success'] == true) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => const MainShell(),
-        ),
+      // ← Replace entire navigator stack, go back to AuthGate to re-check token
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const AuthGate()),
+            (route) => false, // remove ALL previous routes
       );
     } else {
       setState(() {
         emailError = ' ';
-        passwordError =
-            response['error'] ?? 'Invalid email or password';
+        passwordError = response['error'] ?? 'Invalid email or password';
       });
     }
   }

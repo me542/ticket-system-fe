@@ -10,6 +10,7 @@ import '../core/services/api_user_data.dart';
 import '../models/ticket.dart';
 import '../widgets/status_sidebar.dart';
 import '../data/light_theme.dart';
+import 'dart:ui';
 
 class AllTicketsScreen extends StatefulWidget {
   const AllTicketsScreen({super.key});
@@ -328,7 +329,7 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
           r['cancelled_at']       ?? '',
           r['started_at']         ?? '',
           r['resolved_at']        ?? '',
-          r['resolution_minutes'] ?? '',
+          r['resolution_time'] ?? '',
         ];
 
         for (var col = 0; col < vals.length; col++) {
@@ -405,6 +406,16 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
   }
 
   // ── Role accent color ─────────────────────────────────────
+  // Color get _roleColor {
+  //   switch (_currentUserRole) {
+  //     case 'admin':    return Colors.white;
+  //     case 'endorser': return Colors.white;
+  //     case 'approver': return Colors.white;
+  //     case 'resolver': return Colors.white;
+  //     default:         return Colors.white;
+  //   }
+  // }
+
   Color get _roleColor {
     switch (_currentUserRole) {
       case 'admin':    return Colors.black;
@@ -783,7 +794,7 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
       _ColDef('Cancelled At',       'cancelled_at',       160, false),
       _ColDef('Started At',         'started_at',         160, false),
       _ColDef('Resolved At',        'resolved_at',        160, false),
-      _ColDef('Resolution Minutes', 'resolution_minutes', 160, false),
+      _ColDef('Resolution Times', 'resolution_time', 160, false),
     ];
 
     final totalWidth = cols.fold(0.0, (sum, c) => sum + c.width);

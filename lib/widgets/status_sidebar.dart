@@ -12,7 +12,6 @@ import '../data/light_theme.dart';
 import '../models/ticket.dart';
 import 'package:ticket_system/core/services/api_update_ticket.dart';
 import '../core/services/api_remarks.dart';
-import '../core/services/api_hold.dart';
 
 class TicketSidebar extends StatefulWidget {
   final Ticket? ticket;
@@ -28,15 +27,30 @@ class _TicketSidebarState extends State<TicketSidebar> {
   Map<String, dynamic>? _detail;
   bool _isLoading = false;
   String? _error;
-
   String _currentUserRole = '';
   String _currentUsername = '';
   bool _actionLoading = false;
+  bool hold = false;
+  bool get _isAdmin => _currentUserRole.trim().toLowerCase() == 'admin';
+
+  bool get isMyTicket {
+    // List all possible assignee fields your backend might return:
+    final assignee = _field([
+      'assigned_to',
+      'assignee',
+      'resolver_name',
+      'resolver',
+    ]).toLowerCase().trim();
+
+    return _currentUsername.isNotEmpty && assignee.isNotEmpty && assignee == _currentUsername;
+  }
+
 
   // ─── resolution timer ──────────────────────────────────────────────────────
   Timer? _resolutionTimer;
   int _elapsedSeconds = 0; // seconds since grab
   DateTime? _grabStartTime; // parsed from started_at
+
 
   // ─── remarks ───────────────────────────────────────────────────────────────
   List<Map<String, dynamic>> _remarks = [];
@@ -118,36 +132,63 @@ class _TicketSidebarState extends State<TicketSidebar> {
         ? DateTime.tryParse(startedRaw)?.toLocal()
         : null;
 
-    // Only run timer when ticket is in-progress (grabbed but not yet resolved)
-    if (startedAt != null && _isAssigned && !_isResolved && !_isCancelled) {
-      _grabStartTime = startedAt;
-      _elapsedSeconds = DateTime.now()
-          .difference(startedAt)
-          .inSeconds
-          .clamp(0, 999999);
+    // No started_at means ticket hasn't been grabbed yet
+    if (startedAt == null) {
+      _grabStartTime = null;
+      _elapsedSeconds = 0;
+      return;
+    }
 
-      _resolutionTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-        if (mounted) setState(() => _elapsedSeconds++);
-      });
-    } else {
-      // If resolved, freeze the elapsed time at finish
-      if (startedAt != null && (_isResolved || _isCancelled)) {
-        final endedRaw =
-            _detail?['resolved_at']?.toString() ??
-                _detail?['updated_at']?.toString() ??
-                '';
-        final endedAt = endedRaw.isNotEmpty
-            ? DateTime.tryParse(endedRaw)?.toLocal()
-            : null;
-        _grabStartTime = startedAt;
-        _elapsedSeconds = endedAt != null
-            ? endedAt.difference(startedAt).inSeconds.clamp(0, 999999)
-            : DateTime.now().difference(startedAt).inSeconds.clamp(0, 999999);
-      } else {
-        _grabStartTime = null;
-        _elapsedSeconds = 0;
+    // Always set _grabStartTime so the timer widget stays visible once grabbed
+    _grabStartTime = startedAt;
+
+    // Total hold seconds already accumulated from previous holds
+    final totalHoldSeconds =
+    ((_detail?['total_hold_seconds']) as num? ?? 0).toDouble();
+
+    // If currently on hold, include time elapsed since hold started
+    double currentHoldSeconds = 0;
+    if (hold) {
+      final holdStartedRaw = _detail?['hold_started_at']?.toString() ?? '';
+      final holdStartedAt = holdStartedRaw.isNotEmpty
+          ? DateTime.tryParse(holdStartedRaw)?.toLocal()
+          : null;
+      if (holdStartedAt != null) {
+        currentHoldSeconds =
+            DateTime.now().difference(holdStartedAt).inSeconds.toDouble();
       }
     }
+
+    // Net elapsed = wall clock time since grab − all hold time
+    int netElapsed({DateTime? endAt}) {
+      final wall = (endAt ?? DateTime.now()).difference(startedAt).inSeconds;
+      final holdSecs = (totalHoldSeconds + currentHoldSeconds).round();
+      return (wall - holdSecs).clamp(0, 999999);
+    }
+
+    // ── Resolved / Cancelled → freeze at finish time ──────────────────────
+    if (_isResolved || _isCancelled) {
+      final endedRaw = _detail?['resolved_at']?.toString() ??
+          _detail?['updated_at']?.toString() ??
+          '';
+      final endedAt = endedRaw.isNotEmpty
+          ? DateTime.tryParse(endedRaw)?.toLocal()
+          : null;
+      _elapsedSeconds = netElapsed(endAt: endedAt);
+      return; // no ticker — frozen
+    }
+
+    // ── On hold → show frozen net time, no ticker ─────────────────────────
+    if (hold) {
+      _elapsedSeconds = netElapsed();
+      return; // no ticker — paused
+    }
+
+    // ── Active in-progress → tick every second ───────────────────────────
+    _elapsedSeconds = netElapsed();
+    _resolutionTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() => _elapsedSeconds++);
+    });
   }
 
   @override
@@ -283,6 +324,13 @@ class _TicketSidebarState extends State<TicketSidebar> {
         color = Colors.red;
         icon = Icons.block_outlined;
         break;
+      case 'reject':
+        title = 'Reject Ticket';
+        message = 'Are you sure you want to reject this ticket? This will cancel it.';
+        label = 'Yes, Reject';
+        color = Colors.red;
+        icon = Icons.thumb_down_alt_outlined;
+        break;
       default:
         await _handleAction(action, ticketId);
         return;
@@ -300,19 +348,38 @@ class _TicketSidebarState extends State<TicketSidebar> {
 
   Future<void> _fetchBySR(String? srNumber) async {
     if (srNumber == null || srNumber.trim().isEmpty) return;
+
     setState(() {
       _isLoading = true;
       _error = null;
       _detail = null;
     });
+
     try {
-      final data = await ApiTicket.getTicketByID(srNumber.trim());
+      final response = await ApiTicket.getTicketByID(srNumber.trim());
+
+      // 🔥 normalize response (handles both direct + wrapped API)
+      final ticket = (response is Map && response?['data'] != null)
+          ? response!['data']
+          : response;
+
       setState(() {
-        _detail = data;
+        _detail = ticket;
+
+        hold = (ticket is Map)
+            ? (ticket['onhold'] ??
+            ticket['on_hold'] ??
+            ticket['is_on_hold'] ??
+            false)
+            : false;
+
         _isLoading = false;
       });
+
       _syncTimer();
+
       if (_currentUsername.isEmpty) await _loadCurrentUser();
+
       await _fetchRemarks(srNumber.trim());
     } catch (e) {
       setState(() {
@@ -321,6 +388,8 @@ class _TicketSidebarState extends State<TicketSidebar> {
       });
     }
   }
+
+
 
   // ─── remarks ───────────────────────────────────────────────────────────────
 
@@ -560,7 +629,11 @@ class _TicketSidebarState extends State<TicketSidebar> {
   Widget _buildHeader(Ticket ticket) {
     // Cancel is only shown to the ticket creator while still active
     final canCancel = _isCreator && !_isResolved && !_isCancelled;
-    final canHold = _isCreator && !_isResolved && !_isCancelled;
+    final canHold = (_isCreator || _isAdmin || isMyTicket)
+        && _isAssigned && !_isResolved && !_isCancelled && !hold;
+
+    final canResume = (_isCreator || _isAdmin || isMyTicket)
+        && _isAssigned && !_isResolved && !_isCancelled && hold;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
@@ -623,6 +696,36 @@ class _TicketSidebarState extends State<TicketSidebar> {
               ),
             ),
             const SizedBox(width: 8), // 👈 spacing
+          ],
+          if (canResume) ...[
+            Tooltip(
+              message: 'Resume Ticket',
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: GestureDetector(
+                  onTap: _actionLoading
+                      ? null
+                      : () => _confirmAndAct('unhold', ticket.id),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: Colors.green.withOpacity(0.5)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Icon(Icons.play_arrow_outlined, size: 14, color: Colors.green),
+                        SizedBox(width: 5),
+                        Text('Resume', style: TextStyle(color: Colors.green, fontSize: 12, fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
           ],
 
           if (canCancel) ...[
@@ -1197,12 +1300,20 @@ class _TicketSidebarState extends State<TicketSidebar> {
   // ─── resolution timer widget ───────────────────────────────────────────────
 
   Widget _buildResolutionTimer() {
-    final isRunning = _isAssigned && !_isResolved && !_isCancelled;
+    // ← change this line:
+    final isRunning = _isAssigned && !_isResolved && !_isCancelled && !hold;
+    final isOnHold = hold && !_isResolved && !_isCancelled;
+
     final label = _formatElapsed(_elapsedSeconds);
-    final color = isRunning
+    final color = isOnHold
+        ? Colors.orange
+        : isRunning
         ? (_elapsedSeconds > 7200 ? Colors.redAccent : Colors.teal)
-        : (_isResolved ? Colors.teal : Colors.orange);
-    final statusLabel = isRunning
+        : (_isResolved ? Colors.teal : Colors.grey);
+
+    final statusLabel = isOnHold
+        ? 'On Hold — Timer Paused ⏸'
+        : isRunning
         ? 'In Progress — Timer Running'
         : (_isResolved ? 'Resolved — Final Time' : 'Released — Timer Reset');
 
@@ -1217,7 +1328,11 @@ class _TicketSidebarState extends State<TicketSidebar> {
               border: Border.all(color: color.withOpacity(0.4)),
             ),
             child: Icon(
-              isRunning ? Icons.timer_outlined : Icons.timer_off_outlined,
+              isOnHold
+                  ? Icons.pause_circle_outline
+                  : isRunning
+                  ? Icons.timer_outlined
+                  : Icons.timer_off_outlined,
               color: color,
               size: 20,
             ),
@@ -1258,6 +1373,10 @@ class _TicketSidebarState extends State<TicketSidebar> {
                           color: color,
                         ),
                       ),
+                    ],
+                    if (isOnHold) ...[
+                      const SizedBox(width: 8),
+                      Icon(Icons.pause, size: 14, color: Colors.orange),
                     ],
                   ],
                 ),
@@ -1486,6 +1605,19 @@ class _TicketSidebarState extends State<TicketSidebar> {
             height: 20,
             width: 20,
             child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ],
+      );
+    }
+
+    if (hold) {
+      return _actionCard(
+        children: [
+          const Icon(Icons.pause_circle_outline, color: Colors.orange, size: 18),
+          const SizedBox(width: 8),
+          const Text(
+            'Ticket is on hold. No actions available.',
+            style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
           ),
         ],
       );
@@ -1724,7 +1856,7 @@ class _TicketSidebarState extends State<TicketSidebar> {
               ),
               child: Text(
                 debugLabel,
-                style: const TextStyle(color: Colors.grey, fontSize: 9),
+                style: const TextStyle(color: Colors.white, fontSize: 9),
               ),
             ),
           ],
@@ -1843,6 +1975,20 @@ class _TicketSidebarState extends State<TicketSidebar> {
             color: Colors.orange,
           );
           break;
+      // ✅ ADD HOLD
+        case 'hold':
+          result = await ApiUpdateTicket.holdTicket(token, ticketId);
+          _showSnackbar(result['message'] ?? 'Ticket put on hold ⏸',
+              color: Colors.orange);
+          break;
+
+      // ✅ ADD RESUME / UNHOLD
+        case 'unhold':
+          result = await ApiUpdateTicket.resumeTicket(token, ticketId);
+          _showSnackbar(result['message'] ?? 'Ticket resumed ▶',
+              color: Colors.green);
+          break;
+
         default:
           _showSnackbar('Unknown action: $action', color: Colors.orange);
           return;
@@ -2231,7 +2377,6 @@ class _TicketSidebarState extends State<TicketSidebar> {
 }
 
 // ─── Auth-aware image widget ───────────────────────────────────────────────────
-
 class _AuthImage extends StatefulWidget {
   final String url;
   final double height;
