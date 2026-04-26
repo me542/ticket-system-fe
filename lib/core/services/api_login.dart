@@ -85,9 +85,6 @@ class ApiLogin {
         body: jsonEncode({'username': username, 'password': password}),
       );
 
-      print('🔹 [$tag] Login status: ${response.statusCode}');
-      print('🔹 [$tag] Login response: ${response.body}');
-
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = jsonDecode(response.body);
         final userData = data['data'];
@@ -97,29 +94,19 @@ class ApiLogin {
           _username = userData['username'];
           _role     = userData['role'];
 
-          print('🔑 TOKEN: $_token');
-          print('🔑 USERNAME: $_username');
-          print('🔑 ROLE FROM LOGIN: $_role');
-
           // Save to sessionStorage (web) or SharedPreferences (mobile)
           await _saveToStorage(_token ?? '', _username ?? '', _role ?? '');
 
           if (_role == null || _role!.isEmpty) {
-            print('⚠️ Role empty from login, fetching from users list...');
             await _fetchAndCacheRole();
           }
-
-          print('✅ [$tag] Saved token and user info');
         }
-
         return {'success': true, 'data': data};
       } else {
         final error = jsonDecode(response.body);
-        print('❌ [$tag] Login failed: ${error['message']}');
         return {'success': false, 'error': error['message'] ?? 'Login failed'};
       }
     } catch (e) {
-      print('💥 [$tag] Login error: $e');
       return {'success': false, 'error': e.toString()};
     }
   }
@@ -137,7 +124,6 @@ class ApiLogin {
       );
 
       final role = currentUser['role'] ?? '';
-      print('✅ Fetched role from users list: $role');
 
       if (role.isNotEmpty) {
         _role = role;
@@ -146,10 +132,9 @@ class ApiLogin {
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('role', role);
         }
-        print('✅ Role cached: $role');
       }
     } catch (e) {
-      print('💥 Error fetching role: $e');
+      //
     }
   }
 
@@ -165,11 +150,9 @@ class ApiLogin {
   static Future<String?> getToken({String? id}) async {
     final tag = id ?? 'ApiLogin.getToken';
     if (_token != null) {
-      print('🔹 [$tag] Returning cached token');
       return _token;
     }
     _token = await _readFromStorage('user_token');
-    print('🔹 [$tag] Loaded token from storage: $_token');
     return _token;
   }
 
@@ -178,11 +161,9 @@ class ApiLogin {
   static Future<String> getUsername({String? id}) async {
     final tag = id ?? 'ApiLogin.getUsername';
     if (_username != null) {
-      print('🔹 [$tag] Returning cached username: $_username');
       return _username!;
     }
     _username = await _readFromStorage('username') ?? 'Unknown';
-    print('🔹 [$tag] Loaded username from storage: $_username');
     return _username!;
   }
 
@@ -192,18 +173,14 @@ class ApiLogin {
     final tag = id ?? 'ApiLogin.getRole';
 
     if (_role != null && _role!.isNotEmpty) {
-      print('🔹 [$tag] Returning cached role: $_role');
       return _role!;
     }
 
     final savedRole = await _readFromStorage('role') ?? '';
     if (savedRole.isNotEmpty) {
       _role = savedRole;
-      print('🔹 [$tag] Loaded role from storage: $_role');
       return _role!;
     }
-
-    print('⚠️ [$tag] Role not found, fetching from users list...');
     await _fetchAndCacheRole();
     return _role ?? '';
   }
@@ -217,7 +194,6 @@ class ApiLogin {
   }
 
   // ── logout ─────────────────────────────────────────────────────────────────
-
   static Future<void> logout({String? id}) async {
     final tag = id ?? 'ApiLogin.logout';
     _token    = null;
@@ -225,6 +201,5 @@ class ApiLogin {
     _role     = null;
 
     await _clearStorage();
-    print('✅ [$tag] Logged out and cleared storage');
   }
 }

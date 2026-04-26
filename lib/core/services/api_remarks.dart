@@ -19,20 +19,16 @@ class ApiRemarks {
       headers: {'Authorization': 'Bearer $token'},
     );
 
-    debugPrint('📝 GET remarks [$ticketId] → ${res.statusCode}');
-
     if (res.statusCode == 200) {
       final body = jsonDecode(res.body);
 
       final raw = body['data'];
 
       if (raw == null) {
-        debugPrint('⚠️ No remarks (null)');
         return [];
       }
 
       if (raw is! List) {
-        debugPrint('⚠️ Unexpected format: $raw');
         return [];
       }
 
@@ -79,8 +75,6 @@ class ApiRemarks {
       },
       body: jsonEncode(body),
     );
-
-    debugPrint('📤 POST remark [$ticketId] → ${res.statusCode}');
 
     if (res.statusCode == 200) {
       final body = jsonDecode(res.body) as Map<String, dynamic>;

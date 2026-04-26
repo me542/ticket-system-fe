@@ -4,8 +4,6 @@ enum TicketPriority { priority1, priority2, priority3, priority4 }
 class Ticket {
   final String id;
   final String title;
-
-  // ✅ fully dynamic from API
   final String categoryName;
 
   final TicketStatus status;

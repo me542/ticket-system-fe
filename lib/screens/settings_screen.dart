@@ -45,7 +45,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _position = currentUser['position'] ?? '';
       });
     } catch (e) {
-      print('💥 Error loading user info: $e');
       setState(() {
         _username = '';
         _fullName = '';
@@ -137,8 +136,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
                 ElevatedButton(
                   onPressed: () {
-                    // implement save changes if you need
-                    print('💾 Save button pressed');
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.accent,

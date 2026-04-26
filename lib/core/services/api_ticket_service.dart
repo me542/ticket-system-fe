@@ -123,7 +123,6 @@ class TicketService {
         };
       }).toList();
     } catch (e) {
-      print('GET ALL ERROR: $e');
       return [];
     }
   }

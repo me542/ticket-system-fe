@@ -11,7 +11,6 @@ class ApiGetUser {
       final token = await ApiLogin.getToken();
 
       if (token == null || token.isEmpty) {
-        print('⚠️ No token found — user may not be logged in');
         return [];
       }
 
@@ -22,9 +21,6 @@ class ApiGetUser {
           'Authorization': 'Bearer $token',
         },
       );
-
-      print('📡 Fetch users status: ${response.statusCode}');
-      print('📋 Response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> jsonResponse = jsonDecode(response.body);
@@ -60,12 +56,9 @@ class ApiGetUser {
           };
         }).toList();
       } else {
-        print('❌ FAILED: ${response.statusCode} → ${response.body}');
         return [];
       }
     } catch (e, stack) {
-      print('💥 ERROR fetching users: $e');
-      print('📋 STACK TRACE: $stack');
       return [];
     }
   }

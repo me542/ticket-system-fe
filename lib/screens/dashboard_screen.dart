@@ -259,8 +259,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         role = users.first['role'] ?? '';
       }
 
-      debugPrint('🔐 dashboard user: "$username"  role: "$role"');
-
       if (mounted) {
         setState(() {
           _currentUsername = username.toLowerCase().trim();
@@ -269,7 +267,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         });
       }
     } catch (e) {
-      debugPrint('Could not load current user: $e');
       if (mounted) setState(() => _userLoaded = true);
     }
 

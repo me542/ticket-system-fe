@@ -109,8 +109,6 @@ class _TicketSidebarState extends State<TicketSidebar> {
         role = users.first['role'] ?? '';
       }
 
-      debugPrint('👤 user: "$username"  role: "$role"');
-
       if (mounted) {
         setState(() {
           _currentUserRole = role.toLowerCase().trim();
@@ -118,7 +116,6 @@ class _TicketSidebarState extends State<TicketSidebar> {
         });
       }
     } catch (e) {
-      debugPrint('Could not load current user: $e');
     }
   }
 
@@ -416,7 +413,6 @@ class _TicketSidebarState extends State<TicketSidebar> {
         }
       }
     } catch (e) {
-      debugPrint('Failed to fetch remarks: $e');
       if (mounted) {
         setState(() {
           _remarksLoading = false;
@@ -542,7 +538,6 @@ class _TicketSidebarState extends State<TicketSidebar> {
       case 'canceled':
         return 'cancelled';
       default:
-        debugPrint('⚠️  Unknown ticket status: "$_rawStatus"');
         return _rawStatus.replaceAll(' ', '');
     }
   }

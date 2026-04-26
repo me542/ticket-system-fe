@@ -226,8 +226,6 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
         role = users.first['role'] ?? '';
       }
 
-      debugPrint('🔐 all-tickets user: "$username"  role: "$role"');
-
       if (mounted) {
         setState(() {
           _currentUsername = username.toLowerCase().trim();
@@ -236,7 +234,6 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
         });
       }
     } catch (e) {
-      debugPrint('Could not load user: $e');
       if (mounted) setState(() => _userLoaded = true);
     }
 
@@ -264,7 +261,6 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
         );
       }).toList();
     } catch (e) {
-      debugPrint('Error fetching tickets: $e');
     } finally {
       if (mounted) setState(() => _loading = false);
     }

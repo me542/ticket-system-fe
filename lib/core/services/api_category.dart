@@ -20,11 +20,9 @@ class ApiCategory {
 
         // backend returns ARRAY directly
         return List<Map<String, dynamic>>.from(body);
-      } else {
-        print('fetchCategories failed: ${res.body}');
       }
     } catch (e) {
-      print('fetchCategories error: $e');
+      // optionally handle error silently or rethrow
     }
     return [];
   }
@@ -45,9 +43,7 @@ class ApiCategory {
         body: jsonEncode({'name': name, 'subcategories': subcategories}),
       );
       if (res.statusCode == 200) return true;
-      print('addCategoryWithSubcategories: ${res.body}');
     } catch (e) {
-      print('addCategoryWithSubcategories error: $e');
     }
     return false;
   }
@@ -69,7 +65,7 @@ class ApiCategory {
       );
       return res.statusCode == 200;
     } catch (e) {
-      print('updateCategory error: $e');
+      //
     }
     return false;
   }
@@ -86,7 +82,7 @@ class ApiCategory {
       );
       return res.statusCode == 200;
     } catch (e) {
-      print('deleteCategory error: $e');
+      //
     }
     return false;
   }
@@ -103,7 +99,7 @@ class ApiCategory {
       );
       return res.statusCode == 200;
     } catch (e) {
-      print('deleteSubcategory error: $e');
+      //
     }
     return false;
   }

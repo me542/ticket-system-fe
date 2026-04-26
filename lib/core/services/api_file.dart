@@ -47,11 +47,9 @@ class ApiTicket {
 
       final response = await request.send();
       final resBody = await response.stream.bytesToString();
-      print('CREATE STATUS: ${response.statusCode}');
-      print('CREATE BODY: $resBody');
       return response.statusCode == 201;
     } catch (e) {
-      print('CREATE ERROR: $e');
+      //
       return false;
     }
   }
@@ -77,8 +75,6 @@ class ApiTicket {
             (e['ticket'] is Map)
                 ? Map<String, dynamic>.from(e['ticket'] as Map)
                 : Map<String, dynamic>.from(e as Map);
-
-            debugPrint("TICKET MAP: $t");
 
             return {
               'ticket_id':          t['ticket_id']          ?? '',
@@ -108,7 +104,7 @@ class ApiTicket {
       }
       return [];
     } catch (e) {
-      print('GET ALL ERROR: $e');
+      //
       return [];
     }
   }
@@ -127,11 +123,9 @@ class ApiTicket {
         final data = jsonDecode(res.body);
         return data['data'] ?? [];
       }
-
-      print('USER TICKETS FAILED: ${res.body}');
       return [];
     } catch (e) {
-      print('USER TICKETS ERROR: $e');
+      //
       return [];
     }
   }
@@ -145,12 +139,6 @@ class ApiTicket {
       final uri = Uri.parse('$baseUrl/tickets/$ticketID');
       final res = await http.get(
           uri, headers: {'Authorization': 'Bearer $token'});
-
-      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      print('getTicketByID  SR: $ticketID');
-      print('STATUS: ${res.statusCode}');
-      print('RAW BODY: ${res.body}');
-      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
@@ -171,15 +159,11 @@ class ApiTicket {
             }
           }
         }
-
-        print('FLATTENED: $flat');
         return flat.isEmpty ? null : flat;
       }
-
-      print('getTicketByID FAILED: ${res.body}');
       return null;
     } catch (e) {
-      print('getTicketByID ERROR: $e');
+      //
       return null;
     }
   }

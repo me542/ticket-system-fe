@@ -40,10 +40,7 @@ class _ReportsState extends State<Reports> {
       final data = await TicketService.getAll();
       _monthly = {};
 
-      debugPrint("PARSED TICKETS COUNT: ${data.length}");
-
       for (final t in data) {
-        debugPrint("RESOLUTION RAW: $t");
 
         final created = _parseDate(
           t['created_at'] ?? t['createdAt'] ?? t['date_created'],
@@ -82,18 +79,12 @@ class _ReportsState extends State<Reports> {
             t['resolved_at'] ?? t['resolvedAt'],
           );
 
-          debugPrint("CREATED: $created");
-          debugPrint("RESOLVED: $resolved");
-
           if (created != null && resolved != null) {
             final diff = resolved.difference(created).inMinutes.toDouble();
             if (diff > 0) parsedMinutes = diff;
           } else {
-            debugPrint("⚠️ Missing dates → cannot compute time");
           }
         }
-
-        debugPrint("PARSED MINUTES for ${t['ticket_id']}: $parsedMinutes");
 
         if (status.contains('resolved')) {
           m['resolved']++;
@@ -111,7 +102,6 @@ class _ReportsState extends State<Reports> {
         }
       }
     } catch (e) {
-      debugPrint("LOAD ERROR: $e");
     }
 
     setState(() => _loading = false);

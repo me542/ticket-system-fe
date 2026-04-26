@@ -46,9 +46,6 @@ class _UserScreenState extends State<UserScreen> {
     final fetchedUsers = results[0] as List<Map<String, String>>;
     final role = results[1] as String;
 
-    print('✅ Loaded role: $role');
-    print('✅ Loaded ${fetchedUsers.length} users');
-
     setState(() {
       users.clear();
       users.addAll(fetchedUsers);
