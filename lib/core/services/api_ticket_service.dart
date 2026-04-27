@@ -101,25 +101,19 @@ class TicketService {
       print("PARSED TICKETS COUNT: ${list.length}");
 
       return list.map<Map<String, dynamic>>((e) {
-        // FIX: API wraps all ticket fields inside e['ticket']
-        // Previous code read from e directly — so all fields were empty
-        final Map<String, dynamic> t =
-        (e['ticket'] is Map)
-            ? Map<String, dynamic>.from(e['ticket'] as Map)
-            : Map<String, dynamic>.from(e as Map);
-
+        final Map<String, dynamic> t = Map<String, dynamic>.from(e as Map);
         return {
-          'ticket_id':          t['ticket_id']    ?? '',
-          'subject':            t['subject']      ?? '',
-          'priority':           t['priority']     ?? 0,
-          'status':             t['status']       ?? '',
-          'description':        t['description']  ?? '',
-          'username':           t['username']     ?? 'Unknown',
-          'category':           t['category']     ?? '',
-          'created_at':         t['created_at']   ?? '',
-          'resolved_at':        t['resolved_at']  ?? '',
-          // FIX: cast directly to double — no string conversion
-          'resolution_time': (t['resolution_time'] as num?)?.toDouble() ?? 0.0,
+          'ticket_id':          t['ticket_id']          ?? '',
+          'subject':            t['subject']             ?? '',
+          'priority':           t['priority']            ?? 0,
+          'status':             t['status']              ?? '',
+          'description':        t['description']         ?? '',
+          'username':           t['username']            ?? 'Unknown',
+          'category':           t['category']            ?? '',
+          'created_at':         t['created_at']          ?? '',
+          'resolved_at':        t['resolved_at']         ?? '',
+          'resolution_minutes': (t['resolution_minutes'] as num?)?.toDouble() ?? 0.0,
+          'resolution_time':    t['resolution_time']?.toString() ?? '',
         };
       }).toList();
     } catch (e) {
