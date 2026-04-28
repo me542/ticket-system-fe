@@ -119,6 +119,25 @@ class AppSidebar extends StatelessWidget {
             },
           ),
 
+          // ✅ Template (ADMIN ONLY)
+          FutureBuilder<String>(
+            future: roleFuture,
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) return const SizedBox();
+
+              if (snapshot.data == 'admin') {
+                return _navItem(
+                  icon: Icons.report,
+                  label: 'Template',
+                  route: 'template',
+                );
+              }
+
+              return const SizedBox.shrink();
+            },
+          ),
+
+
           _navItem(
             icon: Icons.settings_outlined,
             label: 'Settings',

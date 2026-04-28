@@ -10,7 +10,6 @@ import '../data/light_theme.dart';
 final TextEditingController subjectController = TextEditingController();
 final TextEditingController descriptionController = TextEditingController();
 
-const String _kAddNew = '__ADD_NEW__';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Sidebar widget — drop it into the same AnimatedPositioned stack you use
@@ -48,6 +47,99 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
   // ── form state ────────────────────────────────────────────────────────────
   final _subjectCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
+
+  Future<bool> showSubmitConfirmation(BuildContext context) async {
+    final result = await showDialog<bool>(
+      context: context,
+      useRootNavigator: true,
+      barrierDismissible: false,
+      builder: (context) {
+        return Center(
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
+              width: 400,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppTheme.surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppTheme.border),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.4),
+                    blurRadius: 20,
+                  )
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ── Header ──
+                  Row(
+                    children: [
+                      const Icon(Icons.warning_amber_rounded,
+                          color: Colors.orange, size: 18),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: Text(
+                          'Confirm Submission',
+                          style: TextStyle(
+                            color: AppTheme.textPrimary,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        icon: const Icon(Icons.close,
+                            size: 18, color: AppTheme.textSecondary),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  // ── Content ──
+                  const Text(
+                    'Are you sure you want to submit this ticket?',
+                    style: TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontSize: 13,
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // ── Actions ──
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _outlineBtn(
+                          'Cancel',
+                              () => Navigator.pop(context, false),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _primaryBtn(
+                          'Submit',
+                              () => Navigator.pop(context, true),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    return result ?? false;
+  }
 
   int _priority = 1;
   String _ticketType = 'Service Request';
@@ -127,7 +219,7 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
   }
 
   void _onCategoryChanged(String? val) {
-    if (val == null || val == _kAddNew) return;
+    if (val == null) return;
     final subs = _categoryMap[val] ?? [];
     setState(() {
       _category = val;
@@ -215,278 +307,6 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
       duration: const Duration(seconds: 3),
     ));
   }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // ADD CATEGORY SHEET
-  // ─────────────────────────────────────────────────────────────────────────
-  void _openAddCategorySheet() {
-    final nameCtrl = TextEditingController();
-    final List<TextEditingController> subCtrls = [TextEditingController()];
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppTheme.sidebarBg,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheet) => Padding(
-          padding: EdgeInsets.only(
-              bottom: MediaQuery.of(ctx).viewInsets.bottom,
-              left: 20,
-              right: 20,
-              top: 20),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // ── drag handle ──
-                Center(
-                  child: Container(
-                    width: 36,
-                    height: 4,
-                    margin: const EdgeInsets.only(bottom: 16),
-                    decoration: BoxDecoration(
-                      color: AppTheme.border,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text('Add New Category',
-                        style: TextStyle(
-                            color: AppTheme.textPrimary,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600)),
-                    IconButton(
-                        icon: const Icon(Icons.close,
-                            color: AppTheme.textSecondary),
-                        onPressed: () => Navigator.pop(ctx)),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                _sheetLabel('CATEGORY NAME *'),
-                _sheetInput(nameCtrl, 'e.g. STORAGE'),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text('SUBCATEGORIES',
-                        style: TextStyle(
-                            color: AppTheme.textMuted, fontSize: 11,
-                            letterSpacing: 0.6, fontWeight: FontWeight.w600)),
-                    _miniButton(
-                      icon: Icons.add,
-                      label: 'Add Row',
-                      onTap: () =>
-                          setSheet(() => subCtrls.add(TextEditingController())),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                ...List.generate(
-                  subCtrls.length,
-                      (i) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Row(children: [
-                      Expanded(
-                          child: _sheetInput(
-                              subCtrls[i], 'Subcategory ${i + 1}')),
-                      if (subCtrls.length > 1)
-                        IconButton(
-                          icon: const Icon(Icons.remove_circle_outline,
-                              color: Colors.redAccent, size: 18),
-                          onPressed: () =>
-                              setSheet(() => subCtrls.removeAt(i)),
-                        ),
-                    ]),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Row(mainAxisAlignment: MainAxisAlignment.end, children: [
-                  _outlineBtn('Cancel', () => Navigator.pop(ctx)),
-                  const SizedBox(width: 8),
-                  _primaryBtn('Save', () async {
-                    final catName = nameCtrl.text.trim();
-                    if (catName.isEmpty) {
-                      _snack('Category name is required',
-                          color: Colors.redAccent);
-                      return;
-                    }
-                    final subs = subCtrls
-                        .map((c) => c.text.trim())
-                        .where((s) => s.isNotEmpty)
-                        .toList();
-                    final token = await ApiLogin.getToken() ?? '';
-                    final ok =
-                    await ApiCategory.addCategoryWithSubcategories(
-                      name: catName,
-                      subcategories: subs,
-                      token: token,
-                    );
-                    if (ok) {
-                      Navigator.pop(ctx);
-                      await _loadCategories();
-                      setState(() {
-                        _category = catName;
-                        _subCategory = subs.isNotEmpty ? subs.first : null;
-                      });
-                      _snack('Category added', color: AppTheme.statusResolved);
-                    } else {
-                      _snack('Failed to add category', color: Colors.redAccent);
-                    }
-                  }),
-                ]),
-                const SizedBox(height: 24),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // ADD SUBCATEGORY SHEET
-  // ─────────────────────────────────────────────────────────────────────────
-  void _openAddSubCategorySheet() {
-    if (_category == null) {
-      _snack('Please select a category first', color: Colors.orange);
-      return;
-    }
-    final List<TextEditingController> subCtrls = [TextEditingController()];
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppTheme.sidebarBg,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheet) => Padding(
-          padding: EdgeInsets.only(
-              bottom: MediaQuery.of(ctx).viewInsets.bottom,
-              left: 20,
-              right: 20,
-              top: 20),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 36,
-                    height: 4,
-                    margin: const EdgeInsets.only(bottom: 16),
-                    decoration: BoxDecoration(
-                        color: AppTheme.border,
-                        borderRadius: BorderRadius.circular(2)),
-                  ),
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Add Subcategory',
-                            style: TextStyle(
-                                color: AppTheme.textPrimary,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600)),
-                        Text('under  $_category',
-                            style: const TextStyle(
-                                color: AppTheme.textMuted, fontSize: 12)),
-                      ],
-                    ),
-                    IconButton(
-                        icon: const Icon(Icons.close,
-                            color: AppTheme.textSecondary),
-                        onPressed: () => Navigator.pop(ctx)),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text('SUBCATEGORIES',
-                        style: TextStyle(
-                            color: AppTheme.textMuted,
-                            fontSize: 11,
-                            letterSpacing: 0.6,
-                            fontWeight: FontWeight.w600)),
-                    _miniButton(
-                      icon: Icons.add,
-                      label: 'Add Row',
-                      onTap: () =>
-                          setSheet(() => subCtrls.add(TextEditingController())),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                ...List.generate(
-                  subCtrls.length,
-                      (i) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Row(children: [
-                      Expanded(
-                          child: _sheetInput(
-                              subCtrls[i], 'Subcategory ${i + 1}')),
-                      if (subCtrls.length > 1)
-                        IconButton(
-                          icon: const Icon(Icons.remove_circle_outline,
-                              color: Colors.redAccent, size: 18),
-                          onPressed: () =>
-                              setSheet(() => subCtrls.removeAt(i)),
-                        ),
-                    ]),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Row(mainAxisAlignment: MainAxisAlignment.end, children: [
-                  _outlineBtn('Cancel', () => Navigator.pop(ctx)),
-                  const SizedBox(width: 8),
-                  _primaryBtn('Save', () async {
-                    final newSubs = subCtrls
-                        .map((c) => c.text.trim())
-                        .where((s) => s.isNotEmpty)
-                        .toList();
-                    if (newSubs.isEmpty) {
-                      _snack('Enter at least one subcategory',
-                          color: Colors.orange);
-                      return;
-                    }
-                    final token = await ApiLogin.getToken() ?? '';
-                    final ok =
-                    await ApiCategory.addCategoryWithSubcategories(
-                      name: _category!,
-                      subcategories: newSubs,
-                      token: token,
-                    );
-                    if (ok) {
-                      Navigator.pop(ctx);
-                      await _loadCategories();
-                      _snack('Subcategory added',
-                          color: AppTheme.statusResolved);
-                    } else {
-                      _snack('Failed to add subcategory',
-                          color: Colors.redAccent);
-                    }
-                  }),
-                ]),
-                const SizedBox(height: 24),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   // ─────────────────────────────────────────────────────────────────────────
   // BUILD
   // ─────────────────────────────────────────────────────────────────────────
@@ -495,7 +315,7 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
     return Material(
       elevation: 20,
       child: Container(
-        width: 940,
+        width: 1250,
         color: AppTheme.sidebarBg,
         child: Column(
           children: [
@@ -586,7 +406,8 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
                                 'Change Request',
                                 'Incident'
                               ],
-                              onChanged: (v) => setState(() => _ticketType = v!),
+                              onChanged: (v) =>
+                                  setState(() => _ticketType = v!),
                             ),
                           ),
                         ),
@@ -596,30 +417,23 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
                     const SizedBox(height: 10),
 
                     // ── CATEGORY ──
+                    // NOTE: + Add chip removed; "Add New Category" option
+                    // remains available inside the dropdown itself.
                     Row(
                       children: [
                         Expanded(
                           child: _fieldCard(
                             label: 'CATEGORY',
                             required: true,
-                            trailing: _addChip('Add', _openAddCategorySheet),
                             child: _loadingCats
                                 ? _loadingRow()
-                                : _styledDropdownWithAddNew(
-                              value: _categoryMap.keys.contains(_category)
-                                  ? _category
-                                  : null,
+                                : _styledDropdown(
+                              value: _categoryMap.keys.contains(_category) ? _category : null,
                               items: _categoryMap.keys.toList(),
-                              addLabel: 'Add New Category',
                               hint: 'Select category',
-                              onChanged: (v) {
-                                if (v == _kAddNew) {
-                                  _openAddCategorySheet();
-                                } else {
-                                  _onCategoryChanged(v);
-                                }
-                              },
+                              onChanged: (v) => _onCategoryChanged(v),
                             ),
+
                           ),
                         ),
                       ],
@@ -628,31 +442,25 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
                     const SizedBox(height: 10),
 
                     // ── SUBCATEGORY ──
+                    // NOTE: + Add chip removed; "Add New Subcategory" option
+                    // remains available inside the dropdown itself.
                     Row(
                       children: [
                         Expanded(
                           child: _fieldCard(
                             label: 'SUBCATEGORY',
                             required: true,
-                            trailing: _addChip('Add', _openAddSubCategorySheet),
                             child: _loadingCats
                                 ? _loadingRow()
-                                : _styledDropdownWithAddNew(
-                              value: (_categoryMap[_category] ?? [])
-                                  .contains(_subCategory)
+                                : _styledDropdown(
+                              value: (_categoryMap[_category] ?? []).contains(_subCategory)
                                   ? _subCategory
                                   : null,
                               items: _categoryMap[_category] ?? [],
-                              addLabel: 'Add New Subcategory',
                               hint: 'Select subcategory',
-                              onChanged: (v) {
-                                if (v == _kAddNew) {
-                                  _openAddSubCategorySheet();
-                                } else {
-                                  setState(() => _subCategory = v);
-                                }
-                              },
+                              onChanged: (v) => setState(() => _subCategory = v),
                             ),
+
                           ),
                         ),
                       ],
@@ -690,9 +498,7 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
                   label: 'ORGANIZATION',
                   child: _styledDropdown(
                     value: _organization,
-                    items: const [
-                      'Bakawan Data Analytics'
-                    ],
+                    items: const ['Bakawan Data Analytics'],
                     onChanged: (v) => setState(() => _organization = v!),
                   ),
                 ),
@@ -704,7 +510,7 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
 
           // ───────────────── RIGHT COLUMN ────────────────
           SizedBox(
-            width: 460,
+            width: 625,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -727,11 +533,10 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
                           final selected = _priority == val;
                           return Expanded(
                             child: GestureDetector(
-                              onTap: () =>
-                                  setState(() => _priority = val),
+                              onTap: () => setState(() => _priority = val),
                               child: Container(
-                                margin: EdgeInsets.only(
-                                    right: i < 3 ? 6 : 0),
+                                margin:
+                                EdgeInsets.only(right: i < 3 ? 6 : 0),
                                 padding: const EdgeInsets.symmetric(
                                     vertical: 9),
                                 decoration: BoxDecoration(
@@ -825,7 +630,6 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
 
                       const SizedBox(height: 10),
 
-                      // ✅ SHOW FILE PREVIEW IF EXISTS
                       if (_file != null && _fileBytes != null)
                         Padding(
                           padding: const EdgeInsets.only(bottom: 12),
@@ -838,16 +642,14 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Text(
+                              const Text(
                                 'Max file size: 25MB',
                                 style: TextStyle(
                                   color: AppTheme.textMuted,
                                   fontSize: 12,
                                 ),
                               ),
-
                               const SizedBox(height: 12),
-
                               ElevatedButton(
                                 onPressed: _pickFile,
                                 child: const Text('Upload File'),
@@ -867,7 +669,14 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
                     Expanded(child: _outlineBtn('Clear', _reset)),
                     const SizedBox(width: 8),
                     Expanded(
-                        child: _primaryBtn('Submit', _submit)),
+                      child: _primaryBtn('Submit', () async {
+                        final confirm =
+                        await showSubmitConfirmation(context);
+                        if (confirm) {
+                          _submit();
+                        }
+                      }),
+                    ),
                   ],
                 ),
               ],
@@ -877,7 +686,6 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
       ),
     );
   }
-
 
   // ── file preview ──────────────────────────────────────────────────────────
   Widget _buildFilePreview() {
@@ -898,10 +706,13 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
                   width: double.infinity, height: 140, fit: BoxFit.cover),
             ),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Row(children: [
               Icon(
-                isImage ? Icons.image_outlined : Icons.insert_drive_file_outlined,
+                isImage
+                    ? Icons.image_outlined
+                    : Icons.insert_drive_file_outlined,
                 color: isImage ? Colors.blue : Colors.orange,
                 size: 18,
               ),
@@ -920,13 +731,13 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
                   _fileBytes = null;
                 }),
                 child: Container(
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
                     color: Colors.redAccent.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(6),
-                    border:
-                    Border.all(color: Colors.redAccent.withOpacity(0.5)),
+                    border: Border.all(
+                        color: Colors.redAccent.withOpacity(0.5)),
                   ),
                   child: const Row(
                     mainAxisSize: MainAxisSize.min,
@@ -949,10 +760,9 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Widget helpers — all match status_sidebar visual language
+  // Widget helpers
   // ─────────────────────────────────────────────────────────────────────────
 
-  /// Card wrapper identical to sidebar's _card()
   Widget _card({required Widget child}) => Container(
     width: double.infinity,
     padding: const EdgeInsets.all(12),
@@ -964,11 +774,9 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
     child: child,
   );
 
-  /// Card with icon header — wraps _card
   Widget _fieldCard({
     required String label,
     bool required = false,
-    Widget? trailing,
     required Widget child,
   }) =>
       _card(
@@ -983,10 +791,6 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
                 const Text('*',
                     style:
                     TextStyle(color: Colors.redAccent, fontSize: 11)),
-              ],
-              if (trailing != null) ...[
-                const Spacer(),
-                trailing,
               ],
             ]),
             const SizedBox(height: 8),
@@ -1005,7 +809,6 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
     ),
   );
 
-  /// Plain text input matching sidebar's dark surface
   Widget _fieldInput({
     required TextEditingController controller,
     String hint = '',
@@ -1023,7 +826,6 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
         ),
       );
 
-  /// Dropdown that matches the dark sidebar surface — no extra container
   Widget _styledDropdown({
     required String? value,
     required List<String> items,
@@ -1035,9 +837,7 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
         decoration: BoxDecoration(
           color: AppTheme.surface,
           borderRadius: BorderRadius.circular(6),
-          border: Border.all(
-            color: AppTheme.border, // 👈 outline color
-          ),
+          border: Border.all(color: AppTheme.border),
         ),
         child: DropdownButton<String>(
           value: items.contains(value) ? value : null,
@@ -1063,88 +863,6 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
         ),
       );
 
-
-  /// Dropdown with "+ Add New" sentinel as last item
-  Widget _styledDropdownWithAddNew({
-    required String? value,
-    required List<String> items,
-    required String addLabel,
-    required String hint,
-    required ValueChanged<String?> onChanged,
-  }) =>
-      Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-        decoration: BoxDecoration(
-          color: AppTheme.surface,
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(
-            color: AppTheme.border,
-          ),
-        ),
-        child: DropdownButton<String>(
-          value: items.contains(value) ? value : null,
-          dropdownColor: AppTheme.surface,
-          isExpanded: true,
-          underline: const SizedBox(),
-          iconEnabledColor: AppTheme.textSecondary,
-          style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
-          hint: Text(hint,
-              style: const TextStyle(
-                  color: AppTheme.textMuted, fontSize: 13)),
-          items: [
-            ...items.map((e) => DropdownMenuItem(
-              value: e,
-              child: Text(e,
-                  style: const TextStyle(
-                      color: AppTheme.textPrimary, fontSize: 13)),
-            )),
-            DropdownMenuItem(
-              value: _kAddNew,
-              child: Row(children: [
-                Icon(Icons.add_circle_outline,
-                    size: 14, color: AppTheme.accent),
-                const SizedBox(width: 6),
-                Text(addLabel,
-                    style: TextStyle(
-                        color: AppTheme.accent,
-                        fontStyle: FontStyle.italic,
-                        fontSize: 12)),
-              ]),
-            ),
-          ],
-          onChanged: onChanged,
-        ),
-      );
-
-
-  /// Small green "+ Add" chip used next to field labels
-  Widget _addChip(String label, VoidCallback onTap) => GestureDetector(
-    onTap: onTap,
-    child: Container(
-      padding:
-      const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-      decoration: BoxDecoration(
-        color: AppTheme.accent.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(5),
-        border:
-        Border.all(color: AppTheme.accent.withOpacity(0.5)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.add, size: 11, color: AppTheme.accent),
-          const SizedBox(width: 3),
-          Text(label,
-              style: TextStyle(
-                  fontSize: 10,
-                  color: AppTheme.accent,
-                  fontWeight: FontWeight.w600)),
-        ],
-      ),
-    ),
-  );
-
-  /// Loading shimmer row
   Widget _loadingRow() => const Row(
     children: [
       SizedBox(
@@ -1155,15 +873,12 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
       ),
       SizedBox(width: 8),
       Text('Loading…',
-          style: TextStyle(
-              color: AppTheme.textMuted, fontSize: 12)),
+          style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
     ],
   );
 
-  /// Sheet-specific input (slightly taller, uses AppTheme surface)
   Widget _sheetInput(TextEditingController ctrl, String hint) => Container(
-    padding:
-    const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
     decoration: BoxDecoration(
       color: AppTheme.surface,
       borderRadius: BorderRadius.circular(8),
@@ -1175,8 +890,8 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
       const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: const TextStyle(
-            color: AppTheme.textMuted, fontSize: 13),
+        hintStyle:
+        const TextStyle(color: AppTheme.textMuted, fontSize: 13),
         border: InputBorder.none,
         isDense: true,
       ),
@@ -1202,8 +917,7 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
         onPressed: onTap,
         icon: Icon(icon, size: 13, color: AppTheme.accent),
         label: Text(label,
-            style:
-            TextStyle(fontSize: 11, color: AppTheme.accent)),
+            style: TextStyle(fontSize: 11, color: AppTheme.accent)),
         style: TextButton.styleFrom(
             padding:
             const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -1211,44 +925,47 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
             tapTargetSize: MaterialTapTargetSize.shrinkWrap),
       );
 
-  Widget _primaryBtn(String text, VoidCallback onPressed) =>
-      ElevatedButton(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppTheme.accent,
-          foregroundColor: Colors.white,
-          padding:
-          const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8)),
-          textStyle: const TextStyle(
-              fontSize: 13, fontWeight: FontWeight.w600),
-        ),
-        onPressed: onPressed,
-        child: Text(text),
-      );
+  Widget _primaryBtn(String text, VoidCallback onPressed) => ElevatedButton(
+    style: ElevatedButton.styleFrom(
+      backgroundColor: AppTheme.accent,
+      foregroundColor: Colors.white,
+      padding:
+      const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8)),
+      textStyle: const TextStyle(
+          fontSize: 13, fontWeight: FontWeight.w600),
+    ),
+    onPressed: onPressed,
+    child: Text(text),
+  );
 
-  Widget _outlineBtn(String text, VoidCallback onPressed) =>
-      OutlinedButton(
-        style: OutlinedButton.styleFrom(
-          side: const BorderSide(color: AppTheme.border),
-          padding:
-          const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8)),
-          textStyle: const TextStyle(fontSize: 13),
-        ),
-        onPressed: onPressed,
-        child: Text(text,
-            style: const TextStyle(color: AppTheme.textSecondary)),
-      );
+  Widget _outlineBtn(String text, VoidCallback onPressed) => OutlinedButton(
+    style: OutlinedButton.styleFrom(
+      side: const BorderSide(color: AppTheme.border),
+      padding:
+      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8)),
+      textStyle: const TextStyle(fontSize: 13),
+    ),
+    onPressed: onPressed,
+    child: Text(text,
+        style: const TextStyle(color: AppTheme.textSecondary)),
+  );
 
   Color _priorityColor(int v) {
     switch (v) {
-      case 1: return Colors.red;
-      case 2: return Colors.orange;
-      case 3: return Colors.yellow.shade700;
-      case 4: return Colors.green;
-      default: return Colors.grey;
+      case 1:
+        return Colors.red;
+      case 2:
+        return Colors.orange;
+      case 3:
+        return Colors.yellow.shade700;
+      case 4:
+        return Colors.green;
+      default:
+        return Colors.grey;
     }
   }
 }

@@ -259,6 +259,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         role = users.first['role'] ?? '';
       }
 
+
       if (mounted) {
         setState(() {
           _currentUsername = username.toLowerCase().trim();
@@ -449,7 +450,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeInOut,
           top: 0, bottom: 0,
-          right: _isSidebarOpen ? 0 : -1040,
+          right: _isSidebarOpen ? 0 : -1250,
           child: TicketSidebar(
             ticket: _selectedTicket,
             onClose: _closeSidebar,
@@ -461,7 +462,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeInOut,
           top: 0, bottom: 0,
-          right: _isCreateOpen ? 0 : -940,
+          right: _isCreateOpen ? 0 : -1250,
           child: CreateTicketSidebar(
             onClose: () => setState(() => _isCreateOpen = false),
             onCreated: () {

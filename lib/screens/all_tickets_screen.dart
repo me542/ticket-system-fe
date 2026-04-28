@@ -226,6 +226,7 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
         role = users.first['role'] ?? '';
       }
 
+
       if (mounted) {
         setState(() {
           _currentUsername = username.toLowerCase().trim();
@@ -778,7 +779,7 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
       _ColDef('Subject',            'subject',            200, false),
       _ColDef('Institution',        'institution',        140, true),
       _ColDef('Type',               'tickettype',         120, true),
-      _ColDef('Description',        'description',        220, false),
+      //_ColDef('Description',        'description',        220, false),
       _ColDef('Priority',           'priority',           90,  true),
       _ColDef('Assignee',           'assignee',           120, true),
       _ColDef('Endorser',           'endorser',           120, true),

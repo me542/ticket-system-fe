@@ -6,7 +6,6 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:excel/excel.dart' hide Border, TextSpan;
 import 'package:universal_html/html.dart' as html;
 
-
 class Reports extends StatefulWidget {
   const Reports({super.key});
 

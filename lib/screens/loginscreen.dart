@@ -5,13 +5,17 @@ import 'package:flutter/services.dart';
 import 'package:ticket_system/core/services/api_login.dart';
 import 'package:ticket_system/core/services/api_forgot_password.dart';
 import 'package:ticket_system/main.dart';
+import 'package:ticket_system/screens/registration.dart';
+
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
 
+
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
+
 
 class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
@@ -20,6 +24,7 @@ class _LoginScreenState extends State<LoginScreen> {
   String? emailError;
   String? passwordError;
 
+
   @override
   void dispose() {
     _emailController.dispose();
@@ -27,14 +32,17 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+
   Future<void> _handleLogin() async {
     setState(() {
       emailError = null;
       passwordError = null;
     });
 
+
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
+
 
     if (email.isEmpty) {
       setState(() => emailError = 'Please enter your email');
@@ -44,10 +52,9 @@ class _LoginScreenState extends State<LoginScreen> {
     }
     if (email.isEmpty || password.isEmpty) return;
 
-    final response = await ApiLogin.login(
-      username: email,
-      password: password,
-    );
+
+    final response = await ApiLogin.login(username: email, password: password);
+
 
     if (response['success'] == true) {
       // ← Replace entire navigator stack, go back to AuthGate to re-check token
@@ -63,18 +70,22 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+
   // =========================
   // FORGOT PASSWORD DIALOG (ENTER EMAIL)
   // =========================
+
 
   void _showForgotPasswordDialog() {
     final emailController = TextEditingController();
     String? errorText; // Holds error message
 
+
     bool isValidEmail(String email) {
       final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
       return emailRegex.hasMatch(email);
     }
+
 
     showGeneralDialog(
       context: context,
@@ -181,6 +192,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             onPressed: () async {
                               final email = emailController.text.trim();
 
+
                               // Email format validation
                               if (email.isEmpty || !isValidEmail(email)) {
                                 setState(() {
@@ -189,8 +201,10 @@ class _LoginScreenState extends State<LoginScreen> {
                                 return;
                               }
 
+
                               final res =
-                                  await ApiForgotPassword.forgotPassword(email);
+                              await ApiForgotPassword.forgotPassword(email);
+
 
                               if (res['success'] && res['token'] != null) {
                                 Navigator.pop(context); // Close only on success
@@ -231,15 +245,17 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+
   // =========================
   // VERIFY CODE DIALOG
   // =========================
   void _showVerifyCodeDialog(String email, String token) {
     final List<TextEditingController> otpControllers = List.generate(
       6,
-      (_) => TextEditingController(),
+          (_) => TextEditingController(),
     );
     String? errorText;
+
 
     showDialog(
       context: context,
@@ -276,7 +292,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: List.generate(
                     6,
-                    (index) => SizedBox(
+                        (index) => SizedBox(
                       width: 50, // Wider box for digit
                       child: TextField(
                         controller: otpControllers[index],
@@ -331,6 +347,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             FocusScope.of(context).previousFocus();
                           }
 
+
                           // Reset error when user types again
                           setStateDialog(() {
                             errorText = null;
@@ -360,6 +377,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           .map((e) => e.text.trim())
                           .join();
 
+
                       if (enteredCode.length < 6) {
                         setStateDialog(() {
                           errorText = 'Please enter the complete 6-digit code';
@@ -367,12 +385,14 @@ class _LoginScreenState extends State<LoginScreen> {
                         return;
                       }
 
+
                       if (enteredCode != token) {
                         setStateDialog(() {
                           errorText = 'Code does not match';
                         });
                         return;
                       }
+
 
                       Navigator.pop(context);
                       _showNewPasswordDialog(token);
@@ -398,6 +418,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+
   // =========================
   // NEW PASSWORD DIALOG
   // =========================
@@ -409,6 +430,7 @@ class _LoginScreenState extends State<LoginScreen> {
     String? passwordError;
     String? confirmError;
 
+
     void showNotification(String message, {Color color = Colors.green}) {
       Flushbar(
         message: message,
@@ -417,6 +439,7 @@ class _LoginScreenState extends State<LoginScreen> {
         flushbarPosition: FlushbarPosition.TOP,
       ).show(context);
     }
+
 
     showDialog(
       context: context,
@@ -449,6 +472,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   style: TextStyle(color: Color(0xFF8A92A3), fontSize: 14),
                 ),
                 const SizedBox(height: 16),
+
 
                 // New Password Field
                 TextField(
@@ -521,7 +545,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ],
 
+
                 const SizedBox(height: 16),
+
 
                 // Confirm Password Field
                 TextField(
@@ -594,6 +620,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ],
 
+
                 const SizedBox(height: 24),
                 SizedBox(
                   width: double.infinity,
@@ -602,6 +629,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     onPressed: () async {
                       final newPassword = passwordController.text.trim();
                       final confirmPassword = confirmController.text.trim();
+
 
                       // Validate passwords
                       if (newPassword.isEmpty) {
@@ -623,10 +651,12 @@ class _LoginScreenState extends State<LoginScreen> {
                         return;
                       }
 
+
                       final res = await ApiForgotPassword.resetPassword(
                         token: token,
                         newPassword: newPassword,
                       );
+
 
                       if (res['success']) {
                         Navigator.pop(context);
@@ -659,13 +689,14 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+
   // =========================
   // MAIN LOGIN UI
   // =========================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F1419),
+      backgroundColor: const Color(0xFFF4F6F9),
       body: Center(
         child: SingleChildScrollView(
           child: Column(
@@ -683,12 +714,10 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
 
+
               ShaderMask(
                 shaderCallback: (bounds) => const LinearGradient(
-                  colors: [
-                    Color(0xFFDAB76B),
-                    Color(0xFFA0813D),
-                  ],
+                  colors: [Color(0xFFDAB76B), Color(0xFFA0813D)],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                 ).createShader(bounds),
@@ -702,6 +731,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
 
+
               const Text(
                 'Bakawan Ticketing System',
                 style: TextStyle(
@@ -712,17 +742,22 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 20),
 
+
               // Login Form
               Center(
                 child: Container(
                   width: 400,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1A1F2E),
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: const Color(0xFF2A3142),
-                      width: 1,
-                    ),
+                    border: Border.all(color: const Color(0xFFE5E7EB)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
                   padding: const EdgeInsets.all(24),
                   child: Column(
@@ -737,13 +772,16 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const SizedBox(height: 5),
 
+
                       // ✅ Email Field
                       TextField(
                         controller: _emailController,
-                        style: const TextStyle(color: Colors.white),
+                        style: const TextStyle(color: Colors.black),
                         textInputAction: TextInputAction.next, // 👈 Next button
                         onSubmitted: (_) {
-                          FocusScope.of(context).nextFocus(); // 👈 go to password
+                          FocusScope.of(
+                            context,
+                          ).nextFocus(); // 👈 go to password
                         },
                         decoration: InputDecoration(
                           hintText: 'admin@example.com',
@@ -753,13 +791,13 @@ class _LoginScreenState extends State<LoginScreen> {
                             color: Color(0xFF268A15),
                           ),
                           filled: true,
-                          fillColor: const Color(0xFF0F1419),
+                          fillColor: const Color(0xFFF4F6F9),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
                             borderSide: BorderSide(
                               color: emailError != null
                                   ? Colors.red
-                                  : const Color(0xFF2A3142),
+                                  : const Color(0xFFE5E7EB),
                               width: 2,
                             ),
                           ),
@@ -768,7 +806,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             borderSide: BorderSide(
                               color: emailError != null
                                   ? Colors.red
-                                  : const Color(0xFF2A3142),
+                                  : const Color(0xFFE5E7EB),
                               width: 2,
                             ),
                           ),
@@ -789,15 +827,21 @@ class _LoginScreenState extends State<LoginScreen> {
                         },
                       ),
 
+
                       if (emailError != null) ...[
                         const SizedBox(height: 4),
                         Text(
                           emailError!,
-                          style: const TextStyle(color: Colors.red, fontSize: 13),
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontSize: 13,
+                          ),
                         ),
                       ],
 
+
                       const SizedBox(height: 15),
+
 
                       const Text(
                         'Password',
@@ -808,13 +852,15 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const SizedBox(height: 5),
 
+
                       // ✅ Password Field
                       TextField(
                         controller: _passwordController,
                         obscureText: _obscurePassword,
-                        style: const TextStyle(color: Colors.white),
+                        style: const TextStyle(color: Colors.black),
                         textInputAction: TextInputAction.done, // 👈 Done button
-                        onSubmitted: (_) => _handleLogin(), // 👈 ENTER triggers login
+                        onSubmitted: (_) =>
+                            _handleLogin(), // 👈 ENTER triggers login
                         decoration: InputDecoration(
                           hintText: 'Password',
                           hintStyle: const TextStyle(color: Color(0xFF4A5268)),
@@ -834,13 +880,13 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
                           filled: true,
-                          fillColor: const Color(0xFF0F1419),
+                          fillColor: const Color(0xFFF4F6F9),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
                             borderSide: BorderSide(
                               color: passwordError != null
                                   ? Colors.red
-                                  : const Color(0xFF2A3142),
+                                  : Color(0xFFE5E7EB),
                               width: 2,
                             ),
                           ),
@@ -870,13 +916,18 @@ class _LoginScreenState extends State<LoginScreen> {
                         },
                       ),
 
+
                       if (passwordError != null) ...[
                         const SizedBox(height: 4),
                         Text(
                           passwordError!,
-                          style: const TextStyle(color: Colors.red, fontSize: 13),
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontSize: 13,
+                          ),
                         ),
                       ],
+
 
                       Align(
                         alignment: Alignment.centerRight,
@@ -889,7 +940,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
 
-                      const SizedBox(height: 16),
+
+                      const SizedBox(height: 10),
+
 
                       // ✅ Login Button
                       SizedBox(
@@ -909,8 +962,36 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                       ),
+
+
+                      const SizedBox(height: 12),
+
+
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Text(
+                            "Don't have an account?",
+                            style: TextStyle(color: Color(0xFF8A92A3)),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => RegisterScreen(),
+                                ),
+                              );
+                            },
+                            child: const Text(
+                              'Register Now',
+                              style: TextStyle(color: Color(0xFF268A15)),
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
-                  )
+                  ),
                 ),
               ),
             ],
@@ -920,4 +1001,6 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 }
+
+
 

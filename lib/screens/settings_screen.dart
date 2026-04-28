@@ -3,7 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../core/services/api_login.dart';
 import '../core/services/api_user_data.dart';
 import '../data/light_theme.dart';
-import '../main.dart'; // for themeModeNotifier
+import '../main.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -13,8 +13,8 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  bool _emailNotifications = true;
-  bool _darkMode = false;
+  //bool _emailNotifications = true;
+  //bool _darkMode = false;
 
   String _username = '';
   String _fullName = '';
@@ -26,7 +26,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void initState() {
     super.initState();
     _loadUserInfo();
-    _darkMode = themeModeNotifier.value == ThemeMode.dark;
+    //_darkMode = themeModeNotifier.value == ThemeMode.dark;
   }
 
   Future<void> _loadUserInfo() async {
@@ -98,41 +98,41 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const SizedBox(height: 20),
 
                 // Notifications
-                _section('Notifications', [
-                  _settingRow(
-                    'Email Notifications',
-                    trailing: Switch(
-                      value: _emailNotifications,
-                      onChanged: (v) =>
-                          setState(() => _emailNotifications = v),
-                      activeColor: AppTheme.accent,
-                    ),
-                  ),
-                ]),
-                const SizedBox(height: 20),
+                // _section('Notifications', [
+                //   _settingRow(
+                //     'Email Notifications',
+                //     trailing: Switch(
+                //       value: _emailNotifications,
+                //       onChanged: (v) =>
+                //           setState(() => _emailNotifications = v),
+                //       activeColor: AppTheme.accent,
+                //     ),
+                //   ),
+                // ]),
+                // const SizedBox(height: 20),
 
                 // Appearance
-                _section('Appearance', [
-                  _settingRow(
-                    'Dark Mode',
-                    trailing: Switch(
-                      value: _darkMode,
-                      onChanged: (v) async {
-                        setState(() => _darkMode = v);
-
-                        // update global theme
-                        themeModeNotifier.value = v ? ThemeMode.dark : ThemeMode.light;
-
-                        // save preference
-                        final prefs = await SharedPreferences.getInstance();
-                        await prefs.setBool('darkMode', v);
-                      },
-
-                      activeColor: AppTheme.accent,
-                    ),
-                  ),
-                ]),
-                const SizedBox(height: 20),
+                // _section('Appearance', [
+                //   _settingRow(
+                //     'Dark Mode',
+                //     trailing: Switch(
+                //       value: _darkMode,
+                //       onChanged: (v) async {
+                //         setState(() => _darkMode = v);
+                //
+                //         // update global theme
+                //         themeModeNotifier.value = v ? ThemeMode.dark : ThemeMode.light;
+                //
+                //         // save preference
+                //         final prefs = await SharedPreferences.getInstance();
+                //         await prefs.setBool('darkMode', v);
+                //       },
+                //
+                //       activeColor: AppTheme.accent,
+                //     ),
+                //   ),
+                // ]),
+                // const SizedBox(height: 20),
 
                 ElevatedButton(
                   onPressed: () {

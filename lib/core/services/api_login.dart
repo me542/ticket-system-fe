@@ -94,8 +94,12 @@ class ApiLogin {
           _username = userData['username'];
           _role     = userData['role'];
 
-          // Save to sessionStorage (web) or SharedPreferences (mobile)
-          await _saveToStorage(_token ?? '', _username ?? '', _role ?? '');
+          if (_token == null || _token!.isEmpty) {
+            return {'success': false, 'error': 'Invalid token from server'};
+          }
+
+          await _saveToStorage(_token!, _username ?? '', _role ?? '');
+
 
           if (_role == null || _role!.isEmpty) {
             await _fetchAndCacheRole();

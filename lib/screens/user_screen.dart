@@ -16,8 +16,6 @@ class _UserScreenState extends State<UserScreen> {
   bool isLoading = false;
   String _currentUserRole = '';
 
-
-
   @override
   void initState() {
     super.initState();
@@ -746,9 +744,11 @@ class _UserScreenState extends State<UserScreen> {
 
               final success = await ApiUser.disableUser(id: id);
 
+
+
               if (success) {
-                setState(() => user['status'] = 'inactive');
                 Navigator.pop(context);
+                await _loadUsers(); // 👈 reload from backend
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                       content: Text(
@@ -775,18 +775,17 @@ class _UserScreenState extends State<UserScreen> {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Enable User'),
-        content:
-        Text('Are you sure you want to enable ${user['name']}?'),
+        content: Text('Are you sure you want to enable ${user['name']}?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            style:
-            ElevatedButton.styleFrom(backgroundColor: Colors.green),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
             onPressed: () async {
               final id = int.tryParse(user['id'] ?? '');
+
               if (id == null) {
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -795,21 +794,25 @@ class _UserScreenState extends State<UserScreen> {
                 return;
               }
 
+              // Call API
               final success = await ApiUser.enableUser(id: id);
 
+              // Close dialog FIRST
+              Navigator.pop(context);
+
               if (success) {
-                setState(() => user['status'] = 'active');
-                Navigator.pop(context);
+                await _loadUsers(); // reload list
+
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                      content:
-                      Text('${user['name']} enabled successfully')),
+                    content: Text('${user['name']} enabled successfully'),
+                  ),
                 );
               } else {
-                Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                      content: Text('Failed to enable user')),
+                    content: Text('Failed to enable user'),
+                  ),
                 );
               }
             },

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:ticket_system/screens/template.dart';
 import 'data/light_theme.dart';
 import 'widgets/app_sidebar.dart';
 import 'screens/dashboard_screen.dart';
@@ -135,12 +136,15 @@ class _MainShellState extends State<MainShell> {
         return const Reports();
       case 'users':
         return const UserScreen();
+      case 'template':
+        return const TemplateScreen();
       case 'settings':
         return const SettingsScreen();
       default:
         return const DashboardScreen();
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
