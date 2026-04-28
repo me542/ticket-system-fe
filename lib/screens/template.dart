@@ -1,37 +1,22 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../core/services/api_login.dart';
 import '../core/services/api_category.dart';
 import '../data/light_theme.dart';
 
-// ── Data model ────────────────────────────────────────────────────────────────
+// ── Data model ───────────────────────────────────────────────────────────────
 class TicketTemplate {
   final String id;
-  final String name;
   final String category;
   final String subcategory;
-  final String description; // pre-filled but editable when filing
+  final String description;
 
   TicketTemplate({
     required this.id,
-    required this.name,
     required this.category,
     required this.subcategory,
     required this.description,
   });
-
-  TicketTemplate copyWith({
-    String? name,
-    String? category,
-    String? subcategory,
-    String? description,
-  }) =>
-      TicketTemplate(
-        id: id,
-        name: name ?? this.name,
-        category: category ?? this.category,
-        subcategory: subcategory ?? this.subcategory,
-        description: description ?? this.description,
-      );
 }
 
 // ── Screen ────────────────────────────────────────────────────────────────────
@@ -43,42 +28,21 @@ class TemplateScreen extends StatefulWidget {
 }
 
 class _TemplateScreenState extends State<TemplateScreen> {
-  // ── template list state ───────────────────────────────────────────────────
-  final List<TicketTemplate> _templates = [
-    // Seed with sample data — replace with your API fetch
-    TicketTemplate(
-      id: '1',
-      name: 'Password Reset',
-      category: 'Account',
-      subcategory: 'Access',
-      description:
-      'Issue type: Password Reset\nSteps:\n1. Cannot log in\n2. Forgot password\n\nExpected: Reset link sent to email\nActual: N/A',
-    ),
-    TicketTemplate(
-      id: '2',
-      name: 'Software Installation',
-      category: 'Software',
-      subcategory: 'Installation',
-      description:
-      'Issue type: Software Installation\nSoftware name:\nVersion:\n\nSteps to reproduce:\n1.\n\nExpected result:\nActual result:',
-    ),
-  ];
-
-  String _search = '';
-  TicketTemplate? _selected; // null = "Add New" mode
-
-  // ── category state ────────────────────────────────────────────────────────
-  Map<String, List<String>> _categoryMap = {};
+  Map<String, List<Map<String, String>>> _categoryMap = {};
   bool _loadingCats = true;
 
-  // ── form controllers ──────────────────────────────────────────────────────
-  final _nameCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
+
   String? _formCategory;
   String? _formSubcategory;
   bool _saving = false;
 
-  // ─────────────────────────────────────────────────────────────────────────
+  bool _isEditing = false;
+  TicketTemplate? _savedTemplate;
+
+  static const String addCategoryKey = '__add_category__';
+  static const String addSubcategoryKey = '__add_subcategory__';
+
   @override
   void initState() {
     super.initState();
@@ -87,220 +51,372 @@ class _TemplateScreenState extends State<TemplateScreen> {
 
   @override
   void dispose() {
-    _nameCtrl.dispose();
     _descCtrl.dispose();
     super.dispose();
   }
 
-  // ── loaders ───────────────────────────────────────────────────────────────
+  // ── LOAD CATEGORIES ────────────────────────────────────────────────────────
   Future<void> _loadCategories() async {
     setState(() => _loadingCats = true);
+
+    final prevCategory = _formCategory;
+    final prevSubcategory = _formSubcategory;
+
     final token = await ApiLogin.getToken() ?? '';
     final raw = await ApiCategory.fetchCategories(token: token);
-    if (!mounted) return;
 
-    final Map<String, List<String>> built = {};
-    for (final cat in raw) {
-      final name = (cat['name'] as String? ?? '').trim();
-      if (name.isEmpty) continue;
-      final subs = (cat['subcategories'] as List<dynamic>? ?? [])
-          .map((s) => (s['name'] as String? ?? '').trim())
-          .where((s) => s.isNotEmpty)
-          .toList();
-      built[name] = subs;
+    final Map<String, List<Map<String, String>>> built = {};
+
+    for (final item in raw) {
+      final categoryName = item['name']?.toString() ?? '';
+
+      List<Map<String, String>> subs = [];
+
+      if (item['subcategories'] is List) {
+        subs = (item['subcategories'] as List)
+            .map((sub) {
+          if (sub is Map) {
+            return {
+              'name': sub['name']?.toString() ?? '',
+              'description': sub['description']?.toString() ?? '',
+              'subcategory_id': sub['subcategory_id']?.toString() ?? '',
+            };
+          }
+          return {
+            'name': sub.toString(),
+            'description': '',
+            'subcategory_id': '',
+          };
+        })
+            .where((e) => e['name']!.isNotEmpty)
+            .toList();
+      }
+
+      if (categoryName.isNotEmpty) {
+        built[categoryName] = subs;
+      }
     }
+
     final cats = built.keys.toList();
+
+    String? newCategory =
+    (prevCategory != null && built.containsKey(prevCategory))
+        ? prevCategory
+        : (cats.isNotEmpty ? cats.first : null);
+
+    List<Map<String, String>> subs =
+    newCategory != null ? built[newCategory] ?? [] : [];
+
+    String? newSubcategory =
+    (prevSubcategory != null &&
+        subs.any((s) => s['name'] == prevSubcategory))
+        ? prevSubcategory
+        : (subs.isNotEmpty ? subs.first['name'] : null);
+
     setState(() {
       _categoryMap = built;
-      _formCategory = cats.isNotEmpty ? cats.first : null;
-      final subs =
-      _formCategory != null ? (built[_formCategory] ?? []) : <String>[];
-      _formSubcategory = subs.isNotEmpty ? subs.first : null;
+      _formCategory = newCategory;
+      _formSubcategory = newSubcategory;
       _loadingCats = false;
     });
+
+    if (newCategory != null && newSubcategory != null && !_isEditing) {
+      _descCtrl.text = _subDescription(newCategory, newSubcategory);
+    }
   }
 
-  // ── select a template to edit ─────────────────────────────────────────────
-  void _selectTemplate(TicketTemplate t) {
-    setState(() {
-      _selected = t;
-      _nameCtrl.text = t.name;
-      _descCtrl.text = t.description;
-      _formCategory = _categoryMap.keys.contains(t.category)
-          ? t.category
-          : (_categoryMap.keys.isNotEmpty ? _categoryMap.keys.first : null);
-      final subs = _categoryMap[_formCategory] ?? [];
-      _formSubcategory = subs.contains(t.subcategory)
-          ? t.subcategory
-          : (subs.isNotEmpty ? subs.first : null);
-    });
+  // ── helpers ────────────────────────────────────────────────────────────────
+  List<String> _subNames(String? category) {
+    if (category == null) return [];
+    return (_categoryMap[category] ?? []).map((s) => s['name']!).toList();
   }
 
-  // ── clear form (add-new mode) ─────────────────────────────────────────────
-  void _clearForm() {
-    final cats = _categoryMap.keys.toList();
-    setState(() {
-      _selected = null;
-      _nameCtrl.clear();
-      _descCtrl.clear();
-      _formCategory = cats.isNotEmpty ? cats.first : null;
-      final subs = _formCategory != null
-          ? (_categoryMap[_formCategory] ?? [])
-          : <String>[];
-      _formSubcategory = subs.isNotEmpty ? subs.first : null;
-    });
+  String _subDescription(String category, String subName) {
+    final subs = _categoryMap[category] ?? [];
+    final match = subs.firstWhere(
+          (s) => s['name'] == subName,
+      orElse: () => {'name': '', 'description': '', 'subcategory_id': ''},
+    );
+    return match['description'] ?? '';
   }
 
-  // ── save / update ─────────────────────────────────────────────────────────
+  String _subId(String category, String subName) {
+    final subs = _categoryMap[category] ?? [];
+    final match = subs.firstWhere(
+          (s) => s['name'] == subName,
+      orElse: () => {'name': '', 'description': '', 'subcategory_id': ''},
+    );
+    return match['subcategory_id'] ?? '';
+  }
+
+  // ── ADD CATEGORY ───────────────────────────────────────────────────────────
+  Future<void> _addCategoryDialog() async {
+    final ctrl = TextEditingController();
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Add Category'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'Category name'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final name = ctrl.text.trim();
+              debugPrint('>>> addCategory name: "$name"');
+              if (name.isEmpty) return;
+
+              final token = await ApiLogin.getToken() ?? '';
+              debugPrint('>>> addCategory token empty: ${token.isEmpty}');
+
+              final success = await ApiCategory.addCategory(
+                name: name,
+                token: token,
+              );
+
+
+              if (success) {
+                Navigator.pop(ctx);
+                setState(() {
+                  _formCategory = name;
+                  _formSubcategory = null;
+                });
+                _snack('Category added');
+                await _loadCategories();
+              } else {
+                _snack('Failed to add category', color: Colors.red);
+              }
+            },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+
+    ctrl.dispose();
+  }
+
+  // ── ADD SUBCATEGORY ────────────────────────────────────────────────────────
+  Future<void> _addSubcategoryDialog() async {
+    // ✅ Capture category at dialog open time — not inside builder
+    final currentCategory = _formCategory;
+
+    if (currentCategory == null) {
+      _snack('Please select a category first', color: Colors.orange);
+      return;
+    }
+
+    final nameCtrl = TextEditingController();
+    final descCtrl = TextEditingController();
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Add Subcategory to "$currentCategory"'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameCtrl,
+              autofocus: true,
+              decoration:
+              const InputDecoration(hintText: 'Subcategory name'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: descCtrl,
+              decoration: const InputDecoration(
+                  hintText: 'Description (optional)'),
+              minLines: 2,
+              maxLines: 4,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              debugPrint('>>> ADD SUBCATEGORY BUTTON PRESSED');
+              debugPrint('>>> currentCategory: "$currentCategory"');
+
+              final subName = nameCtrl.text.trim();
+              final subDesc = descCtrl.text.trim();
+
+              debugPrint('>>> subName: "$subName"');
+              debugPrint('>>> subDesc: "$subDesc"');
+
+              if (subName.isEmpty) {
+                debugPrint('>>> EARLY RETURN — subName is empty');
+                return;
+              }
+
+              final token = await ApiLogin.getToken() ?? '';
+              debugPrint('>>> token empty: ${token.isEmpty}');
+
+              // ✅ Only send the NEW subcategory
+              final categoryId = int.tryParse(
+                _categoryMap[currentCategory]?[0]['subcategory_id'] ?? '',
+              );
+
+              if (categoryId == null) {
+                _snack('Invalid category id', color: Colors.red);
+                return;
+              }
+
+              final success = await ApiCategory.addSubcategory(
+                categoryId: categoryId,
+                name: subName,
+                token: token,
+              );
+
+
+              if (success) {
+                Navigator.pop(ctx);
+                setState(() => _formSubcategory = subName);
+                _snack('Subcategory added');
+                await _loadCategories();
+                if (!_isEditing) {
+                  _descCtrl.text = subDesc;
+                }
+              } else {
+                _snack('Failed to add subcategory', color: Colors.red);
+              }
+            },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+
+    // ✅ Dispose after dialog closes
+    nameCtrl.dispose();
+    descCtrl.dispose();
+  }
+
+  // ── ENTER EDIT MODE ────────────────────────────────────────────────────────
+  void _startEditing() {
+    if (_savedTemplate != null) {
+      _descCtrl.text = _savedTemplate!.description;
+      setState(() {
+        _formCategory = _savedTemplate!.category;
+        _formSubcategory = _savedTemplate!.subcategory;
+        _isEditing = true;
+      });
+    } else {
+      setState(() => _isEditing = true);
+    }
+  }
+
+  // ── SAVE ───────────────────────────────────────────────────────────────────
   Future<void> _save() async {
     if (_formCategory == null) {
       _snack('Please select a category', color: Colors.redAccent);
       return;
     }
+
+    if (_descCtrl.text.trim().isEmpty) {
+      _snack('Please enter a description', color: Colors.redAccent);
+      return;
+    }
+
     setState(() => _saving = true);
 
-    // TODO: replace with your actual API call
-    // e.g. await ApiTemplate.saveTemplate(...)
-    await Future.delayed(const Duration(milliseconds: 500));
+    try {
+      final token = await ApiLogin.getToken() ?? '';
 
-    final isEdit = _selected != null;
-    final newTemplate = TicketTemplate(
-      id: _selected?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
-      name: _nameCtrl.text.trim(),
-      category: _formCategory ?? '',
-      subcategory: _formSubcategory ?? '',
-      description: _descCtrl.text.trim(),
-    );
+      final success = await ApiCategory.saveTemplate(
+        category: _formCategory!,
+        subcategory: _formSubcategory ?? '',
+        description: _descCtrl.text.trim(), // ✅ THIS is what was NOT going to DB
+        token: token,
+      );
 
-    setState(() {
-      if (isEdit) {
-        final idx = _templates.indexWhere((t) => t.id == _selected!.id);
-        if (idx >= 0) _templates[idx] = newTemplate;
+      if (success) {
+        final template = TicketTemplate(
+          id: _savedTemplate?.id ??
+              DateTime.now().millisecondsSinceEpoch.toString(),
+          category: _formCategory!,
+          subcategory: _formSubcategory ?? '',
+          description: _descCtrl.text.trim(),
+        );
+
+        setState(() {
+          _savedTemplate = template;
+          _saving = false;
+          _isEditing = false;
+        });
+
+        _snack('Template saved to database');
       } else {
-        _templates.add(newTemplate);
+        _snack('Failed to save template', color: Colors.red);
+        setState(() => _saving = false);
       }
-      _selected = newTemplate;
-      _saving = false;
-    });
-
-    _snack(
-      isEdit ? 'Template updated' : 'Template saved',
-      color: AppTheme.statusResolved,
-    );
+    } catch (e) {
+      setState(() => _saving = false);
+      _snack('Error: $e', color: Colors.red);
+    }
   }
 
-  // ── delete ────────────────────────────────────────────────────────────────
-  Future<void> _delete(TicketTemplate t) async {
-    final confirm = await _showDeleteConfirm(t.name);
-    if (!confirm) return;
 
-    // TODO: replace with your actual API call
-    // e.g. await ApiTemplate.deleteTemplate(t.id)
+  // ── CANCEL EDIT ────────────────────────────────────────────────────────────
+  void _cancelEdit() {
+    if (_savedTemplate != null) {
+      _descCtrl.text = _savedTemplate!.description;
+      setState(() {
+        _formCategory = _savedTemplate!.category;
+        _formSubcategory = _savedTemplate!.subcategory;
+        _isEditing = false;
+      });
+    } else {
+      _clearForm();
+      setState(() => _isEditing = false);
+    }
+  }
+
+  void _clearForm() {
+    final cats = _categoryMap.keys.toList();
+    final firstCat = cats.isNotEmpty ? cats.first : null;
+    final firstSub =
+    firstCat != null ? _subNames(firstCat).firstOrNull : null;
 
     setState(() {
-      _templates.removeWhere((x) => x.id == t.id);
-      if (_selected?.id == t.id) _clearForm();
+      _savedTemplate = null;
+      _formCategory = firstCat;
+      _formSubcategory = firstSub;
+      _isEditing = false;
     });
-    _snack('Template deleted', color: Colors.redAccent);
-  }
 
-  Future<bool> _showDeleteConfirm(String name) async {
-    final result = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => Center(
-        child: Material(
-          color: Colors.transparent,
-          child: Container(
-            width: 380,
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: AppTheme.surface,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppTheme.border),
-              boxShadow: [
-                BoxShadow(
-                    color: Colors.black.withOpacity(0.3), blurRadius: 20)
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(children: [
-                  const Icon(Icons.delete_outline,
-                      color: Colors.redAccent, size: 18),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Text('Delete Template',
-                        style: TextStyle(
-                            color: AppTheme.textPrimary,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600)),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close,
-                        size: 16, color: AppTheme.textSecondary),
-                    onPressed: () => Navigator.pop(ctx, false),
-                  ),
-                ]),
-                const SizedBox(height: 10),
-                Text(
-                  'Delete "$name"? This cannot be undone.',
-                  style: const TextStyle(
-                      color: AppTheme.textSecondary, fontSize: 13),
-                ),
-                const SizedBox(height: 20),
-                Row(children: [
-                  Expanded(
-                      child: _outlineBtn(
-                          'Cancel', () => Navigator.pop(ctx, false))),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.redAccent,
-                        foregroundColor: Colors.white,
-                        padding:
-                        const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8)),
-                      ),
-                      onPressed: () => Navigator.pop(ctx, true),
-                      child: const Text('Delete',
-                          style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600)),
-                    ),
-                  ),
-                ]),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-    return result ?? false;
+    _descCtrl.text =
+    (firstCat != null && firstSub != null)
+        ? _subDescription(firstCat, firstSub)
+        : '';
   }
 
   void _snack(String msg, {Color color = Colors.black87}) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg),
-      backgroundColor: color,
-      behavior: SnackBarBehavior.floating,
-      duration: const Duration(seconds: 3),
-    ));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: color,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // BUILD
-  // ─────────────────────────────────────────────────────────────────────────
+  // ── BUILD ──────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // ── Page Header — matches SettingsScreen ──────────────────────────
         Container(
           height: 56,
           padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -313,24 +429,20 @@ class _TemplateScreenState extends State<TemplateScreen> {
               Text(
                 'Templates',
                 style: TextStyle(
-                    color: AppTheme.textPrimary,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700),
+                  color: AppTheme.textPrimary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ],
           ),
         ),
-
-        // ── Body ──────────────────────────────────────────────────────────
         Expanded(
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // LEFT: Template Details
               SizedBox(width: 420, child: _buildDetailsPanel()),
-              // Divider
               const VerticalDivider(width: 1, color: AppTheme.border),
-              // RIGHT: Description
               Expanded(child: _buildDescriptionPanel()),
             ],
           ),
@@ -339,220 +451,210 @@ class _TemplateScreenState extends State<TemplateScreen> {
     );
   }
 
-  // ── LEFT PANEL: Template Details ──────────────────────────────────────────
+  // ── LEFT PANEL ─────────────────────────────────────────────────────────────
   Widget _buildDetailsPanel() {
+    final subDesc = (_formCategory != null && _formSubcategory != null)
+        ? _subDescription(_formCategory!, _formSubcategory!)
+        : '';
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 20),
-
-          // Template Details section — Settings-style card
           _section('Template Details', [
+
+            // ── Category — always interactive ──────────────────────────
             _formRow(
               label: 'Category *',
               child: _loadingCats
-                  ? _loadingRow()
+                  ? const CircularProgressIndicator()
                   : _inlineDropdown(
-                value: _categoryMap.keys.contains(_formCategory)
-                    ? _formCategory
-                    : null,
-                items: _categoryMap.keys.toList(),
+                value: _formCategory,
+                items: [..._categoryMap.keys, addCategoryKey],
                 hint: 'Select category',
                 onChanged: (v) {
-                  if (v == null) return;
-                  final subs = _categoryMap[v] ?? [];
+                  if (v == addCategoryKey) {
+                    _addCategoryDialog();
+                    return;
+                  }
+                  final subs = _subNames(v);
+                  final firstSub =
+                  subs.isNotEmpty ? subs.first : null;
                   setState(() {
                     _formCategory = v;
-                    _formSubcategory =
-                    subs.isNotEmpty ? subs.first : null;
+                    _formSubcategory = firstSub;
                   });
+                  if (firstSub != null &&
+                      v != null &&
+                      !_isEditing) {
+                    _descCtrl.text =
+                        _subDescription(v, firstSub);
+                  }
                 },
               ),
             ),
+
+            // ── Subcategory — always interactive ───────────────────────
             _formRow(
               label: 'Subcategory',
               child: _loadingCats
-                  ? _loadingRow()
+                  ? const CircularProgressIndicator()
                   : _inlineDropdown(
-                value: (_categoryMap[_formCategory] ?? [])
-                    .contains(_formSubcategory)
-                    ? _formSubcategory
-                    : null,
-                items: _categoryMap[_formCategory] ?? [],
+                value: _formSubcategory,
+                items: [
+                  ..._subNames(_formCategory),
+                  addSubcategoryKey,
+                ],
                 hint: 'Select subcategory',
-                onChanged: (v) =>
-                    setState(() => _formSubcategory = v),
+                onChanged: (v) {
+                  if (v == addSubcategoryKey) {
+                    _addSubcategoryDialog();
+                    return;
+                  }
+                  setState(() => _formSubcategory = v);
+                  if (v != null &&
+                      _formCategory != null &&
+                      !_isEditing) {
+                    _descCtrl.text =
+                        _subDescription(_formCategory!, v);
+                  }
+                },
               ),
             ),
-          ]),
 
+            // ── Subcategory description info chip ──────────────────────
+            if (subDesc.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppTheme.border.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.info_outline,
+                          size: 14, color: Colors.grey),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          subDesc,
+                          style: const TextStyle(
+                              fontSize: 12, color: Colors.grey),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ]),
         ],
       ),
     );
   }
 
-  // ── RIGHT PANEL: Description ───────────────────────────────────────────────
+  // ── RIGHT PANEL ────────────────────────────────────────────────────────────
   Widget _buildDescriptionPanel() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(height: 20),
-
           _section('Description', [
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Pre-filled when filing — the person creating the ticket can still edit it.',
-                    style: TextStyle(
-                        color: AppTheme.textMuted,
-                        fontSize: 11,
-                        fontStyle: FontStyle.italic),
+              child: _isEditing
+                  ? TextField(
+                controller: _descCtrl,
+                minLines: 10,
+                maxLines: null,
+                decoration: const InputDecoration(
+                  hintText: 'Template description...',
+                  border: InputBorder.none,
+                ),
+              )
+                  : Container(
+                width: double.infinity,
+                constraints: const BoxConstraints(minHeight: 120),
+                child: Text(
+                  _descCtrl.text.isNotEmpty
+                      ? _descCtrl.text
+                      : 'Select a subcategory to see its description.',
+                  style: TextStyle(
+                    color: _descCtrl.text.isNotEmpty
+                        ? AppTheme.textPrimary
+                        : Colors.grey,
+                    height: 1.5,
                   ),
-                  const SizedBox(height: 10),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: AppTheme.sidebarBg,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppTheme.border),
-                    ),
-                    child: TextField(
-                      controller: _descCtrl,
-                      minLines: 10,
-                      maxLines: null,
-                      style: const TextStyle(
-                          color: AppTheme.textPrimary, fontSize: 13),
-                      decoration: const InputDecoration(
-                        hintText:
-                        'Write the default description here...\n\nExample:\nIssue type:\nSteps to reproduce:\n1.\n\nExpected result:\nActual result:',
-                        hintStyle: TextStyle(
-                            color: AppTheme.textMuted, fontSize: 13),
-                        border: InputBorder.none,
-                        isDense: true,
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
           ]),
 
           const SizedBox(height: 24),
 
-          // Buttons
-          Row(children: [
-            _outlineBtn('Clear', _clearForm),
-            const SizedBox(width: 8),
-            _saving
-                ? const SizedBox(
-              width: 140,
-              child: Center(
-                child: SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2, color: AppTheme.accent),
+          Row(
+            children: [
+              if (_isEditing) ...[
+                OutlinedButton(
+                  onPressed: _cancelEdit,
+                  child: const Text('Cancel'),
                 ),
-              ),
-            )
-                : ElevatedButton(
-              onPressed: _save,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.accent,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 24, vertical: 12),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8)),
-              ),
-              child: Text(
-                _selected == null
-                    ? 'Save Template'
-                    : 'Update Template',
-                style: const TextStyle(
-                    fontWeight: FontWeight.w600, fontSize: 13),
-              ),
-            ),
-          ]),
-        ],
-      ),
-    );
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // Widget helpers — match Settings screen visual language
-  // ─────────────────────────────────────────────────────────────────────────
-
-  Widget _section(String title, List<Widget> children) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-            child: Text(
-              title,
-              style: const TextStyle(
-                  color: AppTheme.textPrimary,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700),
-            ),
+                const SizedBox(width: 8),
+                _saving
+                    ? const CircularProgressIndicator()
+                    : ElevatedButton.icon(
+                  onPressed: _save,
+                  icon: const Icon(Icons.save, size: 16),
+                  label: const Text('Save'),
+                ),
+              ] else ...[
+                ElevatedButton.icon(
+                  onPressed: _startEditing,
+                  icon: const Icon(Icons.edit, size: 16),
+                  label: const Text('Edit Template'),
+                ),
+              ],
+            ],
           ),
-          ...children,
         ],
       ),
     );
   }
 
-  Widget _formRow({required String label, required Widget child}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: const BoxDecoration(
-        border:
-        Border(top: BorderSide(color: AppTheme.border, width: 0.5)),
-      ),
-      child: Row(children: [
-        SizedBox(
-          width: 140,
-          child: Text(label,
-              style: const TextStyle(
-                  color: AppTheme.textSecondary, fontSize: 13)),
+  // ── HELPERS ────────────────────────────────────────────────────────────────
+  Widget _section(String title, List<Widget> children) => Container(
+    decoration: BoxDecoration(
+      color: AppTheme.surface,
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: AppTheme.border),
+    ),
+    child: Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(12),
+          child: Text(title,
+              style: const TextStyle(fontWeight: FontWeight.bold)),
         ),
-        Expanded(child: child),
-      ]),
-    );
-  }
+        ...children,
+      ],
+    ),
+  );
 
-  Widget _inlineInput({
-    required TextEditingController controller,
-    String hint = '',
-  }) =>
-      TextField(
-        controller: controller,
-        style:
-        const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: const TextStyle(
-              color: AppTheme.textMuted, fontSize: 13),
-          border: InputBorder.none,
-          isDense: true,
-          contentPadding: EdgeInsets.zero,
-        ),
-      );
+  Widget _formRow({required String label, required Widget child}) => Padding(
+    padding: const EdgeInsets.all(12),
+    child: Row(
+      children: [
+        SizedBox(width: 140, child: Text(label)),
+        Expanded(child: child),
+      ],
+    ),
+  );
 
   Widget _inlineDropdown({
     required String? value,
@@ -562,54 +664,20 @@ class _TemplateScreenState extends State<TemplateScreen> {
   }) =>
       DropdownButton<String>(
         value: items.contains(value) ? value : null,
-        dropdownColor: AppTheme.surface,
         isExpanded: true,
-        underline: const SizedBox(),
-        iconEnabledColor: AppTheme.textSecondary,
-        style: const TextStyle(
-            color: AppTheme.textPrimary, fontSize: 13),
-        hint: Text(hint,
-            style: const TextStyle(
-                color: AppTheme.textMuted, fontSize: 13)),
-        items: items
-            .map((e) => DropdownMenuItem(
-          value: e,
-          child: Text(e,
-              style: const TextStyle(
-                  color: AppTheme.textPrimary, fontSize: 13)),
-        ))
-            .toList(),
+        hint: Text(hint),
+        items: items.map((e) {
+          final isAdd = e == addCategoryKey || e == addSubcategoryKey;
+          return DropdownMenuItem(
+            value: e,
+            child: Text(
+              isAdd ? '+ Add New' : e,
+              style: TextStyle(
+                color: isAdd ? Colors.green : AppTheme.textPrimary,
+              ),
+            ),
+          );
+        }).toList(),
         onChanged: onChanged,
-      );
-
-  Widget _loadingRow() => const Row(
-    children: [
-      SizedBox(
-        width: 14,
-        height: 14,
-        child: CircularProgressIndicator(
-            strokeWidth: 2, color: AppTheme.textMuted),
-      ),
-      SizedBox(width: 8),
-      Text('Loading…',
-          style:
-          TextStyle(color: AppTheme.textMuted, fontSize: 12)),
-    ],
-  );
-
-  Widget _outlineBtn(String text, VoidCallback onPressed) =>
-      OutlinedButton(
-        style: OutlinedButton.styleFrom(
-          side: const BorderSide(color: AppTheme.border),
-          padding:
-          const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8)),
-          textStyle: const TextStyle(fontSize: 13),
-        ),
-        onPressed: onPressed,
-        child: Text(text,
-            style: const TextStyle(
-                color: AppTheme.textSecondary)),
       );
 }

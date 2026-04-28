@@ -5,16 +5,20 @@ import '../core/services/api_user_data.dart';
 import '../data/light_theme.dart';
 import '../main.dart';
 
+
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
+
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
+
 class _SettingsScreenState extends State<SettingsScreen> {
   //bool _emailNotifications = true;
   //bool _darkMode = false;
+
 
   String _username = '';
   String _fullName = '';
@@ -22,12 +26,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _role = '';
   String _position = '';
 
+
   @override
   void initState() {
     super.initState();
     _loadUserInfo();
     //_darkMode = themeModeNotifier.value == ThemeMode.dark;
   }
+
 
   Future<void> _loadUserInfo() async {
     try {
@@ -39,7 +45,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       );
       setState(() {
         _username = username;
-        _fullName = currentUser['name'] ?? '';
+        _fullName = currentUser['full_name'] ?? '';
         _email = currentUser['email'] ?? username + '@example.com';
         _role = currentUser['role'] ?? 'User';
         _position = currentUser['position'] ?? '';
@@ -54,6 +60,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       });
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -80,6 +87,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
 
+
         // Body
         Expanded(
           child: SingleChildScrollView(
@@ -97,6 +105,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ]),
                 const SizedBox(height: 20),
 
+
                 // Notifications
                 // _section('Notifications', [
                 //   _settingRow(
@@ -110,6 +119,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 //   ),
                 // ]),
                 // const SizedBox(height: 20),
+
 
                 // Appearance
                 // _section('Appearance', [
@@ -134,6 +144,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 // ]),
                 // const SizedBox(height: 20),
 
+
                 ElevatedButton(
                   onPressed: () {
                   },
@@ -157,6 +168,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ],
     );
   }
+
 
   // Section container
   Widget _section(String title, List<Widget> children) {
@@ -185,6 +197,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+
   // Individual setting row
   Widget _settingRow(String label, {required Widget trailing}) {
     return Container(
@@ -203,6 +216,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     );
   }
+
 
   // Display text for read-only fields
   Widget _displayText(String text) {

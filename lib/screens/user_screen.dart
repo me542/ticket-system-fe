@@ -3,18 +3,25 @@ import '../core/services/api_login.dart';
 import '../core/services/api_user_data.dart';
 import '../core/services/api_user.dart';
 import '../data/light_theme.dart';
+import 'package:intl/intl.dart';
+
 
 class UserScreen extends StatefulWidget {
   const UserScreen({super.key});
+
 
   @override
   State<UserScreen> createState() => _UserScreenState();
 }
 
+
 class _UserScreenState extends State<UserScreen> {
   final List<Map<String, String>> users = [];
   bool isLoading = false;
   String _currentUserRole = '';
+  String _sortColumn = '';
+  bool _isAscending = true;
+
 
   @override
   void initState() {
@@ -22,9 +29,44 @@ class _UserScreenState extends State<UserScreen> {
     _loadUsersAndRole();
   }
 
+
+  Widget _buildSortableHeader(String key, String title, int flex) {
+    return Expanded(
+      flex: flex,
+      child: InkWell(
+        onTap: () => _sortUsers(key),
+        child: Row(
+          children: [
+            Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+            if (_sortColumn == key)
+              Icon(
+                _isAscending ? Icons.arrow_upward : Icons.arrow_downward,
+                size: 14,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+
+  String formatDate(String rawDate) {
+    if (rawDate.isEmpty) return '';
+
+
+    try {
+      final date = DateTime.parse(rawDate);
+      return DateFormat('MMM dd, yyyy • hh:mm a').format(date);
+    } catch (e) {
+      return rawDate; // fallback if parsing fails
+    }
+  }
+
+
   // ================= LOAD USERS + ROLE =================
   Future<void> _loadUsersAndRole() async {
     setState(() => isLoading = true);
+
 
     final token = await ApiLogin.getToken();
     if (token == null || token.isEmpty) {
@@ -35,14 +77,17 @@ class _UserScreenState extends State<UserScreen> {
       return;
     }
 
+
     // Fetch users and role in parallel
     final results = await Future.wait([
       ApiGetUser.fetchUsers(),
       ApiLogin.getRole(),
     ]);
 
+
     final fetchedUsers = results[0] as List<Map<String, String>>;
     final role = results[1] as String;
+
 
     setState(() {
       users.clear();
@@ -51,13 +96,16 @@ class _UserScreenState extends State<UserScreen> {
       isLoading = false;
     });
 
+
     if (fetchedUsers.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('No users found or failed to fetch users')),
+          content: Text('No users found or failed to fetch users'),
+        ),
       );
     }
   }
+
 
   // ================= RELOAD USERS ONLY (after add/edit) =================
   Future<void> _loadUsers() async {
@@ -70,7 +118,73 @@ class _UserScreenState extends State<UserScreen> {
     });
   }
 
+
+  Future<void> _confirmToggleUser(Map<String, String> u, int id) async {
+    final isActive = u['status'] == 'active';
+
+
+    final action = isActive ? 'Disable' : 'Enable';
+
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('$action User'),
+          content: Text(
+            'Are you sure you want to $action this user?\n\n'
+                'User: ${u['full_name'] ?? ''}\n'
+                'Email: ${u['email'] ?? ''}',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: isActive ? Colors.red : Colors.green,
+              ),
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(action),
+            ),
+          ],
+        );
+      },
+    );
+
+
+    if (result == true) {
+      bool success;
+
+
+      if (isActive) {
+        success = await ApiUser.disableUser(id: id);
+      } else {
+        success = await ApiUser.enableUser(id: id);
+      }
+
+
+      if (success) {
+        _loadUsers();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'User ${isActive ? 'disabled' : 'enabled'} successfully',
+            ),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Action failed')));
+      }
+    }
+  }
+
+
   bool get _isAdmin => _currentUserRole.toLowerCase() == 'admin';
+
 
   void _showAdminOnlyWarning() {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -80,6 +194,30 @@ class _UserScreenState extends State<UserScreen> {
       ),
     );
   }
+
+
+  void _sortUsers(String column) {
+    setState(() {
+      if (_sortColumn == column) {
+        _isAscending = !_isAscending;
+      } else {
+        _sortColumn = column;
+        _isAscending = true;
+      }
+
+
+      users.sort((a, b) {
+        final aValue = (a[column] ?? '').toLowerCase();
+        final bValue = (b[column] ?? '').toLowerCase();
+
+
+        return _isAscending
+            ? aValue.compareTo(bValue)
+            : bValue.compareTo(aValue);
+      });
+    });
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -107,25 +245,30 @@ class _UserScreenState extends State<UserScreen> {
           ),
         ),
 
+
         // Main Content
         Expanded(
           child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Container(
-              decoration: BoxDecoration(
-                color: AppTheme.surface,
+            padding: const EdgeInsets.all(12),
+            child: Card(
+              color: AppTheme.surface,
+              elevation: 3,
+              shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppTheme.border),
+                side: const BorderSide(color: AppTheme.border),
               ),
               child: Column(
                 children: [
                   // Header Row
                   Padding(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16, // 👈 left & right spacing
+                      vertical: 12, // 👈 top & bottom spacing
+                    ),
                     child: Row(
                       children: [
                         const Text(
-                          'Users',
+                          'List of Users',
                           style: TextStyle(
                             color: AppTheme.textPrimary,
                             fontSize: 15,
@@ -140,36 +283,204 @@ class _UserScreenState extends State<UserScreen> {
                             fontSize: 12,
                           ),
                         ),
-                        const Spacer(),
-                        if (_isAdmin)
-                          ElevatedButton.icon(
-                            onPressed: _showAddUserDialog,
-                            icon: const Icon(Icons.add, size: 16),
-                            label: const Text('Add User'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppTheme.accent,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 10),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                          ),
                       ],
                     ),
                   ),
 
-                  // Users List
+
+                  // TABLE SECTION
                   Expanded(
                     child: isLoading
                         ? const Center(child: CircularProgressIndicator())
                         : users.isEmpty
                         ? const Center(child: Text('No users found'))
-                        : ListView(
-                      children: users
-                          .map((u) => _buildUserRow(u))
-                          .toList(),
+                        : Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: SizedBox(
+                          width: MediaQuery.of(context)
+                              .size
+                              .width, // 👈 important: forces "table width"
+                          child: Column(
+                            children: [
+                              // HEADER
+                              Container(
+                                color: const Color(0xFFF1F3F5),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 12,
+                                ),
+                                child: Row(
+                                  children: [
+                                    _buildSortableHeader(
+                                      'created_at',
+                                      'Created',
+                                      2,
+                                    ),
+                                    _buildSortableHeader(
+                                      'username',
+                                      'Username',
+                                      1,
+                                    ),
+                                    _buildSortableHeader(
+                                      'full_name',
+                                      'Full Name',
+                                      1,
+                                    ),
+                                    _buildSortableHeader(
+                                      'email',
+                                      'Email',
+                                      2,
+                                    ),
+                                    _buildSortableHeader(
+                                      'role',
+                                      'Role',
+                                      1,
+                                    ),
+                                    _buildSortableHeader(
+                                      'position',
+                                      'Position',
+                                      1,
+                                    ),
+                                    _buildSortableHeader(
+                                      'status',
+                                      'Status',
+                                      1,
+                                    ),
+                                    const Expanded(
+                                      flex: 1,
+                                      child: Text('Actions'),
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+
+                              const Divider(height: 1),
+
+
+                              // BODY
+                              Column(
+                                children: users.map((u) {
+                                  final id =
+                                      int.tryParse(u['id'] ?? '0') ?? 0;
+
+
+                                  return Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 12,
+                                    ),
+                                    decoration: const BoxDecoration(
+                                      border: Border(
+                                        top: BorderSide(
+                                          color: AppTheme.border,
+                                        ),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          flex: 2,
+                                          child: Text(
+                                            formatDate(
+                                              u['created_at'] ?? '',
+                                            ),
+                                          ),
+                                        ),
+                                        Expanded(
+                                          flex: 1,
+                                          child: Text(
+                                            u['username'] ?? '',
+                                          ),
+                                        ),
+                                        Expanded(
+                                          flex: 1,
+                                          child: Text(
+                                            u['full_name'] ?? '',
+                                          ),
+                                        ),
+                                        Expanded(
+                                          flex: 2,
+                                          child: Text(u['email'] ?? ''),
+                                        ),
+                                        Expanded(
+                                          flex: 1,
+                                          child: Text(u['role'] ?? ''),
+                                        ),
+                                        Expanded(
+                                          flex: 1,
+                                          child: Text(
+                                            u['position'] ?? '',
+                                          ),
+                                        ),
+                                        Expanded(
+                                          flex: 1,
+                                          child: Text(
+                                            u['status'] ?? '',
+                                            style: TextStyle(
+                                              color:
+                                              (u['status'] ==
+                                                  'active')
+                                                  ? Colors.green
+                                                  : Colors.red,
+                                            ),
+                                          ),
+                                        ),
+                                        Expanded(
+                                          flex: 1,
+                                          child: Row(
+                                            children: [
+                                              if (u['role'] !=
+                                                  'admin') ...[
+                                                IconButton(
+                                                  icon: const Icon(
+                                                    Icons.edit,
+                                                    color: Colors.blue,
+                                                    size: 18,
+                                                  ),
+                                                  onPressed: _isAdmin
+                                                      ? () =>
+                                                      _showEditUserDialog(
+                                                        u,
+                                                      )
+                                                      : _showAdminOnlyWarning,
+                                                ),
+                                                IconButton(
+                                                  icon: Icon(
+                                                    color: Colors.red,
+                                                    u['status'] ==
+                                                        'active'
+                                                        ? Icons.block
+                                                        : Icons
+                                                        .check_circle,
+                                                    size: 18,
+                                                  ),
+                                                  onPressed: _isAdmin
+                                                      ? () =>
+                                                      _confirmToggleUser(
+                                                        u,
+                                                        id,
+                                                      )
+                                                      : _showAdminOnlyWarning,
+                                                ),
+                                              ],
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -181,381 +492,30 @@ class _UserScreenState extends State<UserScreen> {
     );
   }
 
-  // ================= USER ROW =================
-  Widget _buildUserRow(Map<String, String> u) {
-    final bool isDisabled = u['status'] == 'inactive';
-    return InkWell(
-      onTap: () {
-        if (!_isAdmin) {
-          _showAdminOnlyWarning();
-          return;
-        }
-        _showUserActions(u);
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: const BoxDecoration(
-          border:
-          Border(top: BorderSide(color: AppTheme.border, width: 0.5)),
-        ),
-        child: Row(
-          children: [
-            CircleAvatar(
-              radius: 18,
-              backgroundColor: isDisabled ? Colors.grey : AppTheme.accent,
-              child: Text(
-                u['initials'] ?? '',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    u['name'] ?? '',
-                    style: TextStyle(
-                      color: isDisabled
-                          ? Colors.grey
-                          : AppTheme.textPrimary,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  Text(
-                    u['email'] ?? '',
-                    style: TextStyle(
-                      color: isDisabled
-                          ? Colors.grey
-                          : AppTheme.textSecondary,
-                      fontSize: 11,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            Container(
-              margin: const EdgeInsets.only(right: 8),
-              padding:
-              const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: AppTheme.border,
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Text(
-                u['position'] ?? '',
-                style: TextStyle(
-                  color: isDisabled
-                      ? Colors.grey
-                      : AppTheme.textSecondary,
-                  fontSize: 11,
-                ),
-              ),
-            ),
-
-            Container(
-              padding:
-              const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: AppTheme.border,
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Text(
-                u['role'] ?? '',
-                style: TextStyle(
-                  color: isDisabled
-                      ? Colors.grey
-                      : AppTheme.textSecondary,
-                  fontSize: 11,
-                ),
-              ),
-            ),
-
-            if (!_isAdmin) ...[
-              const SizedBox(width: 8),
-              const Icon(Icons.lock_outline, size: 14, color: Colors.grey),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ================= ACTION MENU =================
-  void _showUserActions(Map<String, String> user) {
-    final bool isDisabled = user['status'] == 'inactive';
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text(user['name'] ?? ''),
-        content: const Text('Select an action'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _showEditUserDialog(user);
-            },
-            child: const Text('Edit'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              if (isDisabled) {
-                _confirmEnableUser(user);
-              } else {
-                _confirmDisableUser(user);
-              }
-            },
-            child: Text(
-              isDisabled ? 'Enable' : 'Disable',
-              style: TextStyle(
-                  color: isDisabled ? Colors.green : Colors.orange),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ================= ADD USER =================
-  void _showAddUserDialog() {
-    final fullNameController = TextEditingController();
-    final userNameController = TextEditingController();
-    final emailController = TextEditingController();
-    final passwordController = TextEditingController();
-
-    String selectedPosition = 'Cloud Ops';
-    String selectedRole = 'user';
-
-    bool fullNameValid = true;
-    bool userNameValid = true;
-    bool emailValid = true;
-    bool passwordValid = true;
-
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setStateDialog) => AlertDialog(
-          title: const Text('Add User'),
-          content: SizedBox(
-            width: 400,
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  TextField(
-                    controller: fullNameController,
-                    decoration: InputDecoration(
-                      labelText: 'Full Name',
-                      errorText:
-                      fullNameValid ? null : 'Full Name is required',
-                    ),
-                    onChanged: (value) {
-                      setStateDialog(
-                              () => fullNameValid = value.trim().isNotEmpty);
-                    },
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: userNameController,
-                    decoration: InputDecoration(
-                      labelText: 'User Name',
-                      errorText: userNameValid
-                          ? null
-                          : 'Invalid or duplicate username',
-                    ),
-                    onChanged: (value) {
-                      bool valid = value.trim().isNotEmpty &&
-                          !RegExp(r'^[0-9]+$').hasMatch(value);
-                      bool duplicate = users.any((u) =>
-                      u['username']?.toLowerCase() ==
-                          value.toLowerCase());
-                      setStateDialog(
-                              () => userNameValid = valid && !duplicate);
-                    },
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: emailController,
-                    decoration: InputDecoration(
-                      labelText: 'Email',
-                      errorText:
-                      emailValid ? null : 'Invalid or duplicate email',
-                    ),
-                    onChanged: (value) {
-                      bool duplicate = users.any((u) =>
-                      u['email']?.toLowerCase() ==
-                          value.toLowerCase());
-                      setStateDialog(() =>
-                      emailValid =
-                          value.trim().isNotEmpty && !duplicate);
-                    },
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: passwordController,
-                    obscureText: true,
-                    decoration: InputDecoration(
-                      labelText: 'Password',
-                      errorText:
-                      passwordValid ? null : 'Password invalid',
-                    ),
-                    onChanged: (value) {
-                      bool valid = value.length >= 8 &&
-                          RegExp(r'[A-Z]').hasMatch(value) &&
-                          RegExp(r'[a-z]').hasMatch(value) &&
-                          RegExp(r'[0-9]').hasMatch(value) &&
-                          RegExp(r'[!@#$%^&*(),.?":{}|<>]')
-                              .hasMatch(value);
-                      setStateDialog(() => passwordValid = valid);
-                    },
-                  ),
-                  const SizedBox(height: 5),
-                  const Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Password must:\n'
-                          '• Minimum 8 characters\n'
-                          '• Uppercase letter\n'
-                          '• Lowercase letter\n'
-                          '• Number\n'
-                          '• Special character',
-                      style:
-                      TextStyle(fontSize: 11, color: Colors.grey),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  DropdownButtonFormField<String>(
-                    value: selectedPosition,
-                    items: const [
-                      DropdownMenuItem(
-                          value: 'Cloud Ops',
-                          child: Text('Cloud Operation Support')),
-                      DropdownMenuItem(
-                          value: 'PS',
-                          child: Text('Product Specialist')),
-                      DropdownMenuItem(
-                          value: 'QA',
-                          child: Text('Quality Assurance')),
-                      DropdownMenuItem(
-                          value: 'N/A', child: Text('N/A')),
-                    ],
-                    onChanged: (value) {
-                      if (value != null) {
-                        setStateDialog(() => selectedPosition = value);
-                      }
-                    },
-                    decoration:
-                    const InputDecoration(labelText: 'Position'),
-                  ),
-                  const SizedBox(height: 10),
-                  DropdownButtonFormField<String>(
-                    value: selectedRole,
-                    items: const [
-                      DropdownMenuItem(
-                          value: 'user', child: Text('User')),
-                      DropdownMenuItem(
-                          value: 'endorser', child: Text('Endorser')),
-                      DropdownMenuItem(
-                          value: 'approver', child: Text('Approver')),
-                      DropdownMenuItem(
-                          value: 'resolver', child: Text('Resolver')),
-                    ],
-                    onChanged: (value) {
-                      if (value != null) {
-                        setStateDialog(() => selectedRole = value);
-                      }
-                    },
-                    decoration:
-                    const InputDecoration(labelText: 'Role'),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel')),
-            ElevatedButton(
-              onPressed: () async {
-                if (fullNameController.text.trim().isEmpty ||
-                    userNameController.text.trim().isEmpty ||
-                    emailController.text.trim().isEmpty ||
-                    passwordController.text.trim().isEmpty ||
-                    !fullNameValid ||
-                    !userNameValid ||
-                    !emailValid ||
-                    !passwordValid) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text(
-                            'Please fix the errors before submitting')),
-                  );
-                  return;
-                }
-
-                final success = await ApiUser.createUser(
-                  username: userNameController.text.trim(),
-                  fullname: fullNameController.text.trim(),
-                  email: emailController.text.trim(),
-                  password: passwordController.text.trim(),
-                  role: selectedRole,
-                  position: selectedPosition,
-                );
-
-                if (success) {
-                  Navigator.pop(context);
-                  await _loadUsers();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text('User created successfully')),
-                  );
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text('Failed to create user')),
-                  );
-                }
-              },
-              child: const Text('Add'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   // ================= EDIT USER =================
   void _showEditUserDialog(Map<String, String> user) {
-    final fullNameController =
-    TextEditingController(text: user['name']);
-    final emailController =
-    TextEditingController(text: user['email']);
+    final fullNameController = TextEditingController(text: user['full_name']);
+    final emailController = TextEditingController(text: user['email']);
     final passwordController = TextEditingController();
 
-    String selectedPosition =
-    ['Cloud Ops', 'PS', 'QA', 'N/A'].contains(user['position'])
-        ? user['position']!
-        : 'N/A';
 
-    String selectedRole = [
-      'user',
-      'endorser',
-      'approver',
-      'resolver'
-    ].contains(user['role'])
+    String? selectedPosition =
+    ['Cloud Ops', 'PS', 'QA'].contains(user['position'])
+        ? user['position']!
+        : null;
+
+
+    String selectedRole =
+    ['user', 'endorser', 'approver', 'resolver'].contains(user['role'])
         ? user['role']!
         : 'user';
 
-    String selectedStatus =
-    user['status'] == 'inactive' ? 'inactive' : 'active';
+
+    String selectedStatus = user['status'] == 'inactive'
+        ? 'inactive'
+        : 'active';
+
 
     showDialog(
       context: context,
@@ -569,14 +529,12 @@ class _UserScreenState extends State<UserScreen> {
                 children: [
                   TextField(
                     controller: fullNameController,
-                    decoration:
-                    const InputDecoration(labelText: 'Full Name'),
+                    decoration: const InputDecoration(labelText: 'Full Name'),
                   ),
                   const SizedBox(height: 10),
                   TextField(
                     controller: emailController,
-                    decoration:
-                    const InputDecoration(labelText: 'Email'),
+                    decoration: const InputDecoration(labelText: 'Email'),
                   ),
                   const SizedBox(height: 10),
                   TextField(
@@ -592,62 +550,66 @@ class _UserScreenState extends State<UserScreen> {
                     value: selectedPosition,
                     items: const [
                       DropdownMenuItem(
-                          value: 'Cloud Ops',
-                          child: Text('Cloud Operation Support')),
+                        value: 'Cloud Ops',
+                        child: Text('Cloud Operation Support'),
+                      ),
                       DropdownMenuItem(
-                          value: 'PS',
-                          child: Text('Product Specialist')),
+                        value: 'PS',
+                        child: Text('Product Specialist'),
+                      ),
                       DropdownMenuItem(
-                          value: 'QA',
-                          child: Text('Quality Assurance')),
-                      DropdownMenuItem(
-                          value: 'N/A', child: Text('N/A')),
+                        value: 'QA',
+                        child: Text('Quality Assurance'),
+                      ),
                     ],
                     onChanged: (value) {
                       if (value != null) {
                         setStateDialog(() => selectedPosition = value);
                       }
                     },
-                    decoration:
-                    const InputDecoration(labelText: 'Position'),
+                    decoration: const InputDecoration(labelText: 'Position'),
                   ),
                   const SizedBox(height: 10),
                   DropdownButtonFormField<String>(
                     value: selectedRole,
                     items: const [
+                      DropdownMenuItem(value: 'user', child: Text('User')),
                       DropdownMenuItem(
-                          value: 'user', child: Text('User')),
+                        value: 'endorser',
+                        child: Text('Endorser'),
+                      ),
                       DropdownMenuItem(
-                          value: 'endorser', child: Text('Endorser')),
+                        value: 'approver',
+                        child: Text('Approver'),
+                      ),
                       DropdownMenuItem(
-                          value: 'approver', child: Text('Approver')),
-                      DropdownMenuItem(
-                          value: 'resolver', child: Text('Resolver')),
+                        value: 'resolver',
+                        child: Text('Resolver'),
+                      ),
                     ],
                     onChanged: (value) {
                       if (value != null) {
                         setStateDialog(() => selectedRole = value);
                       }
                     },
-                    decoration:
-                    const InputDecoration(labelText: 'Role'),
+                    decoration: const InputDecoration(labelText: 'Role'),
                   ),
                   const SizedBox(height: 10),
                   DropdownButtonFormField<String>(
                     value: selectedStatus,
                     items: const [
+                      DropdownMenuItem(value: 'active', child: Text('Active')),
                       DropdownMenuItem(
-                          value: 'active', child: Text('Active')),
-                      DropdownMenuItem(
-                          value: 'inactive', child: Text('Inactive')),
+                        value: 'inactive',
+                        child: Text('Inactive'),
+                      ),
                     ],
                     onChanged: (value) {
                       if (value != null) {
                         setStateDialog(() => selectedStatus = value);
                       }
                     },
-                    decoration:
-                    const InputDecoration(labelText: 'Status'),
+                    decoration: const InputDecoration(labelText: 'Status'),
                   ),
                 ],
               ),
@@ -655,8 +617,9 @@ class _UserScreenState extends State<UserScreen> {
           ),
           actions: [
             TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel')),
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
             ElevatedButton(
               onPressed: () async {
                 final id = int.tryParse(user['id'] ?? '');
@@ -667,6 +630,7 @@ class _UserScreenState extends State<UserScreen> {
                   return;
                 }
 
+
                 final success = await ApiUser.updateUser(
                   id: id,
                   fullname: fullNameController.text.trim(),
@@ -675,19 +639,19 @@ class _UserScreenState extends State<UserScreen> {
                       ? passwordController.text.trim()
                       : null,
                   role: selectedRole,
-                  position: selectedPosition,
+                  position: selectedPosition ?? '',
                   status: selectedStatus,
                 );
+
 
                 if (success) {
                   setState(() {
                     user['name'] = fullNameController.text.trim();
                     user['email'] = emailController.text.trim();
                     user['role'] = selectedRole;
-                    user['position'] = selectedPosition;
+                    user['position'] = selectedPosition ?? '';
                     user['status'] = selectedStatus;
-                    user['initials'] =
-                    fullNameController.text.trim().isNotEmpty
+                    user['initials'] = fullNameController.text.trim().isNotEmpty
                         ? fullNameController.text
                         .trim()
                         .split(' ')
@@ -698,13 +662,11 @@ class _UserScreenState extends State<UserScreen> {
                   });
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text('User updated successfully')),
+                    const SnackBar(content: Text('User updated successfully')),
                   );
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text('Failed to update user')),
+                    const SnackBar(content: Text('Failed to update user')),
                   );
                 }
               },
@@ -715,111 +677,7 @@ class _UserScreenState extends State<UserScreen> {
       ),
     );
   }
-
-  // ================= DISABLE USER =================
-  void _confirmDisableUser(Map<String, String> user) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Disable User'),
-        content:
-        Text('Are you sure you want to disable ${user['name']}?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            style:
-            ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-            onPressed: () async {
-              final id = int.tryParse(user['id'] ?? '');
-              if (id == null) {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Invalid user ID')),
-                );
-                return;
-              }
-
-              final success = await ApiUser.disableUser(id: id);
-
-
-
-              if (success) {
-                Navigator.pop(context);
-                await _loadUsers(); // 👈 reload from backend
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                      content: Text(
-                          '${user['name']} disabled successfully')),
-                );
-              } else {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                      content: Text('Failed to disable user')),
-                );
-              }
-            },
-            child: const Text('Disable'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ================= ENABLE USER =================
-  void _confirmEnableUser(Map<String, String> user) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Enable User'),
-        content: Text('Are you sure you want to enable ${user['name']}?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-            onPressed: () async {
-              final id = int.tryParse(user['id'] ?? '');
-
-              if (id == null) {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Invalid user ID')),
-                );
-                return;
-              }
-
-              // Call API
-              final success = await ApiUser.enableUser(id: id);
-
-              // Close dialog FIRST
-              Navigator.pop(context);
-
-              if (success) {
-                await _loadUsers(); // reload list
-
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('${user['name']} enabled successfully'),
-                  ),
-                );
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Failed to enable user'),
-                  ),
-                );
-              }
-            },
-            child: const Text('Enable'),
-          ),
-        ],
-      ),
-    );
-  }
 }
+
+
+

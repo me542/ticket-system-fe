@@ -59,8 +59,15 @@ class _LoginScreenState extends State<LoginScreen> {
     if (response['success'] == true) {
       // ← Replace entire navigator stack, go back to AuthGate to re-check token
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const AuthGate()),
-            (route) => false, // remove ALL previous routes
+        PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) => const AuthGate(),
+          transitionDuration: Duration.zero,
+          reverseTransitionDuration: Duration.zero,
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return child; // no animation at all
+          },
+        ),
+            (route) => false,
       );
     } else {
       setState(() {

@@ -471,7 +471,7 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeInOut,
           top: 0, bottom: 0,
-          right: _isSidebarOpen ? 0 : -1040,
+          right: _isSidebarOpen ? 0 : -1250,
           child: TicketSidebar(
             ticket: _selectedTicket,
             onClose: _closeSidebar,

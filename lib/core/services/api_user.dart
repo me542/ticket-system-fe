@@ -2,21 +2,27 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'api_login.dart'; // ✅ IMPORTANT
 
+
 class ApiUser {
   static const String baseUrl = 'http://localhost:8080/api/user';
+
 
   // ================= TOKEN =================
   static Future<String?> getToken() async {
     final token = await ApiLogin.getToken();
 
+
     print("TOKEN FROM ApiLogin: $token"); // 🔥 DEBUG
+
 
     return token;
   }
 
+
   // ================= HEADERS =================
   static Future<Map<String, String>> _headers() async {
     final token = await getToken();
+
 
     final headers = {
       'Content-Type': 'application/json',
@@ -24,10 +30,13 @@ class ApiUser {
         'Authorization': 'Bearer $token',
     };
 
+
     print("HEADERS: $headers"); // 🔥 DEBUG
+
 
     return headers;
   }
+
 
   // ================= CREATE =================
   static Future<bool> createUser({
@@ -40,6 +49,7 @@ class ApiUser {
   }) async {
     final url = Uri.parse('$baseUrl/register');
 
+
     final body = jsonEncode({
       'username': username,
       'full_name': fullname,
@@ -49,6 +59,7 @@ class ApiUser {
       'role': role,
     });
 
+
     try {
       final response = await http.post(
         url,
@@ -56,8 +67,10 @@ class ApiUser {
         body: body,
       );
 
+
       print("CREATE STATUS: ${response.statusCode}");
       print("CREATE BODY: ${response.body}");
+
 
       return response.statusCode == 200 || response.statusCode == 201;
     } catch (e) {
@@ -65,6 +78,7 @@ class ApiUser {
       return false;
     }
   }
+
 
   // ================= UPDATE =================
   static Future<bool> updateUser({
@@ -78,6 +92,7 @@ class ApiUser {
   }) async {
     final url = Uri.parse('$baseUrl/update/profile/$id');
 
+
     final body = jsonEncode({
       'full_name': fullname,
       'email': email,
@@ -87,6 +102,7 @@ class ApiUser {
       'status': status,
     });
 
+
     try {
       final response = await http.put(
         url,
@@ -94,8 +110,10 @@ class ApiUser {
         body: body,
       );
 
+
       print("UPDATE STATUS: ${response.statusCode}");
       print("UPDATE BODY: ${response.body}");
+
 
       return response.statusCode == 200;
     } catch (e) {
@@ -104,13 +122,16 @@ class ApiUser {
     }
   }
 
+
   // ================= DISABLE =================
   static Future<bool> disableUser({required int id}) async {
     final url = Uri.parse('$baseUrl/update/profile/$id');
 
+
     final body = jsonEncode({
       'status': 'inactive',
     });
+
 
     try {
       final response = await http.put(
@@ -119,8 +140,10 @@ class ApiUser {
         body: body,
       );
 
+
       print("DISABLE STATUS: ${response.statusCode}");
       print("DISABLE BODY: ${response.body}");
+
 
       return response.statusCode == 200;
     } catch (e) {
@@ -129,13 +152,16 @@ class ApiUser {
     }
   }
 
+
   // ================= ENABLE =================
   static Future<bool> enableUser({required int id}) async {
     final url = Uri.parse('$baseUrl/update/profile/$id');
 
+
     final body = jsonEncode({
       'status': 'active',
     });
+
 
     try {
       final response = await http.put(
@@ -144,8 +170,10 @@ class ApiUser {
         body: body,
       );
 
+
       print("ENABLE STATUS: ${response.statusCode}");
       print("ENABLE BODY: ${response.body}");
+
 
       return response.statusCode == 200;
     } catch (e) {
@@ -154,3 +182,4 @@ class ApiUser {
     }
   }
 }
+
