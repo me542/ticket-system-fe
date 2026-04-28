@@ -15,17 +15,17 @@ class ApiCategory {
   }) async {
     try {
       final res = await http.get(
-        Uri.parse('$_baseUrl/categories'),
-        headers: {
-          'Authorization': 'Bearer $token',
-        },
+        Uri.parse('$_baseUrl/get/categories'),
+        headers: {'Authorization': 'Bearer $token'},
       );
 
       debugPrint('>>> fetchCategories ${res.statusCode}: ${res.body}');
 
       if (res.statusCode == 200) {
         final body = jsonDecode(res.body);
-        return List<Map<String, dynamic>>.from(body['Data'] ?? []);
+        return List<Map<String, dynamic>>.from(
+          body['data'] ?? body['Data'] ?? [],
+        );
       }
     } catch (e) {
       debugPrint('>>> fetchCategories ERROR: $e');
@@ -105,28 +105,28 @@ class ApiCategory {
     required String token,
   }) async {
     try {
-      final payload = jsonEncode({
-        'category_id': categoryId,
-        'name': name,
-      });
+      final uri = Uri.parse('$_baseUrl/categories/$categoryId/sub-categories');
+
+      final payload = {'category_id': categoryId, 'name': name};
 
       debugPrint('>>> addSubcategory PAYLOAD: $payload');
 
       final res = await http.post(
-        Uri.parse('$_baseUrl/add-sub-category'),
+        uri,
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
-        body: payload,
+        body: jsonEncode(payload),
       );
 
       debugPrint('>>> addSubcategory ${res.statusCode}: ${res.body}');
+
       return res.statusCode == 201;
     } catch (e) {
       debugPrint('>>> addSubcategory ERROR: $e');
+      return false;
     }
-    return false;
   }
 
   // ─────────────────────────────────────────────────────────────

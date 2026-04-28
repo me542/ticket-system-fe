@@ -230,13 +230,6 @@ class _TemplateScreenState extends State<TemplateScreen> {
               const InputDecoration(hintText: 'Subcategory name'),
             ),
             const SizedBox(height: 12),
-            TextField(
-              controller: descCtrl,
-              decoration: const InputDecoration(
-                  hintText: 'Description (optional)'),
-              minLines: 2,
-              maxLines: 4,
-            ),
           ],
         ),
         actions: [
