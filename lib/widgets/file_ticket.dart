@@ -7,28 +7,6 @@ import '../core/services/api_user_data.dart';
 import '../core/services/api_category.dart';
 import '../data/light_theme.dart';
 
-final TextEditingController subjectController = TextEditingController();
-final TextEditingController descriptionController = TextEditingController();
-
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Sidebar widget — drop it into the same AnimatedPositioned stack you use
-// for TicketSidebar in dashboard_screen.dart
-//
-// Usage in DashboardScreen:
-//   bool _isCreateOpen = false;
-//
-//   AnimatedPositioned(
-//     duration: const Duration(milliseconds: 300),
-//     curve: Curves.easeInOut,
-//     top: 0, bottom: 0,
-//     right: _isCreateOpen ? 0 : -540,
-//     child: CreateTicketSidebar(
-//       onClose: () => setState(() => _isCreateOpen = false),
-//       onCreated: () { _loadTickets(); setState(() => _isCreateOpen = false); },
-//     ),
-//   ),
-// ─────────────────────────────────────────────────────────────────────────────
 class CreateTicketSidebar extends StatefulWidget {
   final VoidCallback onClose;
   final VoidCallback? onCreated;
@@ -48,6 +26,221 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
   final _subjectCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
 
+  int _priority = 1;
+  String _ticketType = 'Service Request';
+  String _organization = 'Bakawan Data Analytics';
+
+  // ── category ──────────────────────────────────────────────────────────────
+  // Now stores subcategory name → description, not just name list
+  // Structure: { categoryName: { 'subs': [{ 'name': '', 'description': '' }] } }
+  Map<String, List<Map<String, String>>> _categoryMap = {};
+  String? _category;
+  String? _subCategory;
+  bool _loadingCats = true;
+
+  // ── endorser ──────────────────────────────────────────────────────────────
+  String? _endorser;
+  List<String> _endorsers = [];
+
+  // ── file ──────────────────────────────────────────────────────────────────
+  PlatformFile? _file;
+  Uint8List? _fileBytes;
+
+  // ── submit state ──────────────────────────────────────────────────────────
+  bool _submitting = false;
+
+  // ── tracks whether user has manually edited the description ───────────────
+  // If true, switching subcategory won't overwrite their typed content.
+  bool _descManuallyEdited = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUsers();
+    _loadCategories();
+    _descCtrl.addListener(_onDescChanged);
+  }
+
+  @override
+  void dispose() {
+    _subjectCtrl.dispose();
+    _descCtrl.removeListener(_onDescChanged);
+    _descCtrl.dispose();
+    super.dispose();
+  }
+
+  // Called whenever user types in the description field.
+  // Once they type something themselves, stop auto-filling from templates.
+  void _onDescChanged() {
+    // We only flag as manually edited during active user input,
+    // not when we programmatically set the text.
+    // We use _isProgrammaticallySettingDesc to distinguish the two.
+  }
+
+  bool _isProgrammaticallySettingDesc = false;
+
+  /// Set description text from a template without flagging it as manual edit.
+  void _setDescFromTemplate(String text) {
+    _isProgrammaticallySettingDesc = true;
+    _descCtrl.text = text;
+    // Move cursor to end
+    _descCtrl.selection = TextSelection.collapsed(offset: text.length);
+    _isProgrammaticallySettingDesc = false;
+    _descManuallyEdited = false;
+  }
+
+  // ── loaders ───────────────────────────────────────────────────────────────
+  Future<void> _loadUsers() async {
+    final users = await ApiGetUser.fetchUsers();
+    if (!mounted) return;
+
+    debugPrint('>>> _loadUsers total users: ${users.length}');
+    for (final u in users) {
+      debugPrint('>>>   user: ${u['username']} | role: "${u['role']}"');
+    }
+
+    // Filter endorsers — role field is now always a non-null String
+    final endorserUsers = users
+        .where((u) => (u['role'] ?? '').toLowerCase() == 'endorser')
+        .toList();
+
+    debugPrint('>>> endorsers found: ${endorserUsers.length}');
+
+    // Show full_name in dropdown; fall back to username
+    final endorserNames = endorserUsers
+        .map((u) {
+      final display = u['username'] ?? '';
+      return display;
+    })
+        .where((s) => s.isNotEmpty)
+        .toList();
+
+    setState(() {
+      _endorsers = endorserNames;
+      if (endorserNames.isNotEmpty) _endorser = endorserNames.first;
+    });
+  }
+
+  Future<void> _loadCategories() async {
+    setState(() => _loadingCats = true);
+    final token = await ApiLogin.getToken() ?? '';
+    final raw = await ApiCategory.fetchCategories(token: token);
+    if (!mounted) return;
+
+    // ── Build map: categoryName → list of { name, description } ──────────
+    final Map<String, List<Map<String, String>>> built = {};
+
+    for (final cat in raw) {
+      final name =
+      ((cat['name'] ?? cat['Name']) as String? ?? '').trim();
+      if (name.isEmpty) continue;
+
+      // Handle all common key casings from the backend
+      final subsRaw =
+          cat['SubCategories'] ??
+              cat['sub_categories'] ??
+              cat['subcategories'] ??
+              cat['Subcategories'] ??
+              <dynamic>[];
+
+      final subs = (subsRaw as List<dynamic>).map((s) {
+        final subName =
+        ((s['name'] ?? s['Name']) as String? ?? '').trim();
+        final subDesc =
+        ((s['description'] ?? s['Description']) as String? ?? '')
+            .trim();
+        return {'name': subName, 'description': subDesc};
+      }).where((s) => s['name']!.isNotEmpty).toList();
+
+      built[name] = subs;
+    }
+
+    final cats = built.keys.toList();
+    final firstCat = cats.isNotEmpty ? cats.first : null;
+    final firstSub =
+    firstCat != null && built[firstCat]!.isNotEmpty
+        ? built[firstCat]!.first
+        : null;
+
+    setState(() {
+      _categoryMap = built;
+      _category = firstCat;
+      _subCategory = firstSub?['name'];
+      _loadingCats = false;
+    });
+
+    // Pre-fill description with first subcategory's template
+    if (firstSub != null && (firstSub['description'] ?? '').isNotEmpty) {
+      _setDescFromTemplate(firstSub['description']!);
+    }
+  }
+
+  // ── subcategory names for a given category ────────────────────────────────
+  List<String> _subNames(String? category) {
+    if (category == null) return [];
+    return (_categoryMap[category] ?? [])
+        .map((s) => s['name']!)
+        .toList();
+  }
+
+  // ── get template description for a subcategory ────────────────────────────
+  String _subDescription(String category, String subName) {
+    final subs = _categoryMap[category] ?? [];
+    final match = subs.firstWhere(
+          (s) => s['name'] == subName,
+      orElse: () => {'name': '', 'description': ''},
+    );
+    return match['description'] ?? '';
+  }
+
+  void _onCategoryChanged(String? val) {
+    if (val == null) return;
+    final subs = _categoryMap[val] ?? [];
+    final firstSub = subs.isNotEmpty ? subs.first : null;
+    setState(() {
+      _category = val;
+      _subCategory = firstSub?['name'];
+      _descManuallyEdited = false;
+    });
+    // Pre-fill description from template
+    final desc = firstSub?['description'] ?? '';
+    _setDescFromTemplate(desc);
+  }
+
+  void _onSubcategoryChanged(String? val) {
+    if (val == null) return;
+    setState(() {
+      _subCategory = val;
+      _descManuallyEdited = false;
+    });
+    // Pre-fill description from this subcategory's template
+    if (_category != null) {
+      final desc = _subDescription(_category!, val);
+      _setDescFromTemplate(desc);
+    }
+  }
+
+  // ── file picker ───────────────────────────────────────────────────────────
+  Future<void> _pickFile() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['jpg', 'jpeg', 'png', 'pdf', 'doc', 'docx'],
+      withData: true,
+    );
+    if (result != null && result.files.isNotEmpty) {
+      final f = result.files.first;
+      if (f.size > 25 * 1024 * 1024) {
+        _snack('File too large. Max 25 MB', color: Colors.redAccent);
+        return;
+      }
+      setState(() {
+        _file = f;
+        _fileBytes = f.bytes;
+      });
+    }
+  }
+
+  // ── submit confirmation ────────────────────────────────────────────────────
   Future<bool> showSubmitConfirmation(BuildContext context) async {
     final result = await showDialog<bool>(
       context: context,
@@ -75,7 +268,6 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ── Header ──
                   Row(
                     children: [
                       const Icon(Icons.warning_amber_rounded,
@@ -98,21 +290,13 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
                       ),
                     ],
                   ),
-
                   const SizedBox(height: 10),
-
-                  // ── Content ──
                   const Text(
                     'Are you sure you want to submit this ticket?',
                     style: TextStyle(
-                      color: AppTheme.textSecondary,
-                      fontSize: 13,
-                    ),
+                        color: AppTheme.textSecondary, fontSize: 13),
                   ),
-
                   const SizedBox(height: 20),
-
-                  // ── Actions ──
                   Row(
                     children: [
                       Expanded(
@@ -137,114 +321,7 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
         );
       },
     );
-
     return result ?? false;
-  }
-
-  int _priority = 1;
-  String _ticketType = 'Service Request';
-  String _organization = 'Bakawan Data Analytics';
-
-  // ── category ──────────────────────────────────────────────────────────────
-  Map<String, List<String>> _categoryMap = {};
-  String? _category;
-  String? _subCategory;
-  bool _loadingCats = true;
-
-  // ── endorser ──────────────────────────────────────────────────────────────
-  String? _endorser;
-  List<String> _endorsers = [];
-
-  // ── file ──────────────────────────────────────────────────────────────────
-  PlatformFile? _file;
-  Uint8List? _fileBytes;
-
-  // ── submit state ──────────────────────────────────────────────────────────
-  bool _submitting = false;
-
-  // ─────────────────────────────────────────────────────────────────────────
-  @override
-  void initState() {
-    super.initState();
-    _loadUsers();
-    _loadCategories();
-  }
-
-  @override
-  void dispose() {
-    _subjectCtrl.dispose();
-    _descCtrl.dispose();
-    super.dispose();
-  }
-
-  // ── loaders ───────────────────────────────────────────────────────────────
-  Future<void> _loadUsers() async {
-    final users = await ApiGetUser.fetchUsers();
-    if (!mounted) return;
-    final endorsers = users
-        .where((u) => (u['role'] ?? '').toLowerCase() == 'endorser')
-        .map((u) => u['username'] as String? ?? '')
-        .where((s) => s.isNotEmpty)
-        .toList();
-    setState(() {
-      _endorsers = endorsers;
-      if (endorsers.isNotEmpty) _endorser = endorsers.first;
-    });
-  }
-
-  Future<void> _loadCategories() async {
-    setState(() => _loadingCats = true);
-    final token = await ApiLogin.getToken() ?? '';
-    final raw = await ApiCategory.fetchCategories(token: token);
-    if (!mounted) return;
-
-    final Map<String, List<String>> built = {};
-    for (final cat in raw) {
-      final name = (cat['name'] as String? ?? '').trim();
-      if (name.isEmpty) continue;
-      final subs = (cat['subcategories'] as List<dynamic>? ?? [])
-          .map((s) => (s['name'] as String? ?? '').trim())
-          .where((s) => s.isNotEmpty)
-          .toList();
-      built[name] = subs;
-    }
-    final cats = built.keys.toList();
-    setState(() {
-      _categoryMap = built;
-      _category = cats.isNotEmpty ? cats.first : null;
-      final subs = _category != null ? (built[_category] ?? []) : <String>[];
-      _subCategory = subs.isNotEmpty ? subs.first : null;
-      _loadingCats = false;
-    });
-  }
-
-  void _onCategoryChanged(String? val) {
-    if (val == null) return;
-    final subs = _categoryMap[val] ?? [];
-    setState(() {
-      _category = val;
-      _subCategory = subs.isNotEmpty ? subs.first : null;
-    });
-  }
-
-  // ── file picker ───────────────────────────────────────────────────────────
-  Future<void> _pickFile() async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['jpg', 'jpeg', 'png', 'pdf', 'doc', 'docx'],
-      withData: true,
-    );
-    if (result != null && result.files.isNotEmpty) {
-      final f = result.files.first;
-      if (f.size > 25 * 1024 * 1024) {
-        _snack('File too large. Max 25 MB', color: Colors.redAccent);
-        return;
-      }
-      setState(() {
-        _file = f;
-        _fileBytes = f.bytes;
-      });
-    }
   }
 
   // ── submit ────────────────────────────────────────────────────────────────
@@ -282,20 +359,27 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
 
   void _reset() {
     _subjectCtrl.clear();
-    _descCtrl.clear();
     final cats = _categoryMap.keys.toList();
+    final firstCat = cats.isNotEmpty ? cats.first : null;
+    final firstSub =
+    firstCat != null && (_categoryMap[firstCat] ?? []).isNotEmpty
+        ? _categoryMap[firstCat]!.first
+        : null;
+
     setState(() {
       _priority = 1;
       _ticketType = 'Service Request';
       _organization = 'Bakawan Data Analytics';
-      _category = cats.isNotEmpty ? cats.first : null;
-      final subs =
-      _category != null ? (_categoryMap[_category] ?? []) : <String>[];
-      _subCategory = subs.isNotEmpty ? subs.first : null;
+      _category = firstCat;
+      _subCategory = firstSub?['name'];
       _file = null;
       _fileBytes = null;
+      _descManuallyEdited = false;
       if (_endorsers.isNotEmpty) _endorser = _endorsers.first;
     });
+
+    // Restore template description
+    _setDescFromTemplate(firstSub?['description'] ?? '');
   }
 
   void _snack(String msg, {Color color = Colors.black87}) {
@@ -307,6 +391,7 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
       duration: const Duration(seconds: 3),
     ));
   }
+
   // ─────────────────────────────────────────────────────────────────────────
   // BUILD
   // ─────────────────────────────────────────────────────────────────────────
@@ -374,7 +459,6 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ── subject ───────────────────────────────
                 _fieldCard(
                   label: 'SUBJECT',
                   required: true,
@@ -388,112 +472,73 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
                 ),
                 const SizedBox(height: 20),
 
-                // ── ticket type + category ────────────────
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // ── TICKET TYPE ──
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _fieldCard(
-                            label: 'TICKET TYPE',
-                            required: true,
-                            child: _styledDropdown(
-                              value: _ticketType,
-                              items: const [
-                                'Service Request',
-                                'Change Request',
-                                'Incident'
-                              ],
-                              onChanged: (v) =>
-                                  setState(() => _ticketType = v!),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 10),
-
-                    // ── CATEGORY ──
-                    // NOTE: + Add chip removed; "Add New Category" option
-                    // remains available inside the dropdown itself.
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _fieldCard(
-                            label: 'CATEGORY',
-                            required: true,
-                            child: _loadingCats
-                                ? _loadingRow()
-                                : _styledDropdown(
-                              value: _categoryMap.keys.contains(_category) ? _category : null,
-                              items: _categoryMap.keys.toList(),
-                              hint: 'Select category',
-                              onChanged: (v) => _onCategoryChanged(v),
-                            ),
-
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 10),
-
-                    // ── SUBCATEGORY ──
-                    // NOTE: + Add chip removed; "Add New Subcategory" option
-                    // remains available inside the dropdown itself.
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _fieldCard(
-                            label: 'SUBCATEGORY',
-                            required: true,
-                            child: _loadingCats
-                                ? _loadingRow()
-                                : _styledDropdown(
-                              value: (_categoryMap[_category] ?? []).contains(_subCategory)
-                                  ? _subCategory
-                                  : null,
-                              items: _categoryMap[_category] ?? [],
-                              hint: 'Select subcategory',
-                              onChanged: (v) => setState(() => _subCategory = v),
-                            ),
-
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 10),
-
-                    // ── ENDORSER ──
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _fieldCard(
-                            label: 'ENDORSER',
-                            child: _endorsers.isEmpty
-                                ? _loadingRow()
-                                : _styledDropdown(
-                              value: _endorsers.contains(_endorser)
-                                  ? _endorser
-                                  : null,
-                              items: _endorsers,
-                              hint: 'Select endorser',
-                              onChanged: (v) =>
-                                  setState(() => _endorser = v),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                // ── TICKET TYPE ──
+                _fieldCard(
+                  label: 'TICKET TYPE',
+                  required: true,
+                  child: _styledDropdown(
+                    value: _ticketType,
+                    items: const [
+                      'Service Request',
+                      'Change Request',
+                      'Incident'
+                    ],
+                    onChanged: (v) => setState(() => _ticketType = v!),
+                  ),
                 ),
                 const SizedBox(height: 10),
 
-                // ── organization ──────────────────────────
+                // ── CATEGORY ──
+                _fieldCard(
+                  label: 'CATEGORY',
+                  required: true,
+                  child: _loadingCats
+                      ? _loadingRow()
+                      : _styledDropdown(
+                    value: _categoryMap.keys.contains(_category)
+                        ? _category
+                        : null,
+                    items: _categoryMap.keys.toList(),
+                    hint: 'Select category',
+                    onChanged: _onCategoryChanged,
+                  ),
+                ),
+                const SizedBox(height: 10),
+
+                // ── SUBCATEGORY ──
+                _fieldCard(
+                  label: 'SUBCATEGORY',
+                  required: true,
+                  child: _loadingCats
+                      ? _loadingRow()
+                      : _styledDropdown(
+                    value: _subNames(_category).contains(_subCategory)
+                        ? _subCategory
+                        : null,
+                    items: _subNames(_category),
+                    hint: 'Select subcategory',
+                    onChanged: _onSubcategoryChanged,
+                  ),
+                ),
+                const SizedBox(height: 10),
+
+                // ── ENDORSER ──
+                _fieldCard(
+                  label: 'ENDORSER',
+                  child: _endorsers.isEmpty
+                      ? _loadingRow()
+                      : _styledDropdown(
+                    value: _endorsers.contains(_endorser)
+                        ? _endorser
+                        : null,
+                    items: _endorsers,
+                    hint: 'Select endorser',
+                    onChanged: (v) => setState(() => _endorser = v),
+                  ),
+                ),
+                const SizedBox(height: 10),
+
+                // ── ORGANIZATION ──
                 _fieldCard(
                   label: 'ORGANIZATION',
                   child: _styledDropdown(
@@ -514,7 +559,7 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ── priority ─────────────────────────────
+                // ── PRIORITY ──
                 _card(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -537,8 +582,8 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
                               child: Container(
                                 margin:
                                 EdgeInsets.only(right: i < 3 ? 6 : 0),
-                                padding: const EdgeInsets.symmetric(
-                                    vertical: 9),
+                                padding:
+                                const EdgeInsets.symmetric(vertical: 9),
                                 decoration: BoxDecoration(
                                   color: selected
                                       ? color.withOpacity(0.15)
@@ -573,7 +618,7 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
 
                 const SizedBox(height: 10),
 
-                // ── description ──────────────────────────
+                // ── DESCRIPTION ──────────────────────────────────────────
                 _card(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -593,21 +638,74 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
                               fontWeight: FontWeight.bold,
                             ),
                           ),
+                          const Spacer(),
+                          // ── Template hint chip ───────────────────────
+                          if (_subCategory != null &&
+                              _category != null &&
+                              _subDescription(_category!, _subCategory!)
+                                  .isNotEmpty)
+                            GestureDetector(
+                              onTap: () {
+                                // Let user restore template if they want
+                                final tmpl = _subDescription(
+                                    _category!, _subCategory!);
+                                _setDescFromTemplate(tmpl);
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.accent.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(5),
+                                  border: Border.all(
+                                      color:
+                                      AppTheme.accent.withOpacity(0.3)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.refresh,
+                                        size: 11,
+                                        color: AppTheme.accent
+                                            .withOpacity(0.8)),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Restore template',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: AppTheme.accent
+                                            .withOpacity(0.8),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
                         ],
                       ),
 
                       const SizedBox(height: 8),
 
+                      // ── Editable description field ───────────────────
+                      // Pre-filled with template, fully editable by user
                       TextField(
                         controller: _descCtrl,
                         minLines: 12,
                         maxLines: null,
+                        onChanged: (_) {
+                          // Mark as manually edited so switching sub
+                          // doesn't silently wipe their work
+                          if (!_isProgrammaticallySettingDesc) {
+                            _descManuallyEdited = true;
+                          }
+                        },
                         style: const TextStyle(
                           color: AppTheme.textPrimary,
                           fontSize: 13,
+                          height: 1.6,
                         ),
                         decoration: const InputDecoration(
-                          hintText: 'Describe the issue...',
+                          hintText: 'Describe the issue in detail...',
                           hintStyle: TextStyle(
                             color: AppTheme.textMuted,
                             fontSize: 13,
@@ -621,21 +719,18 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
 
                 const SizedBox(height: 10),
 
-                // ── attachment ───────────────────────────
+                // ── ATTACHMENT ───────────────────────────────────────────
                 _card(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _sectionLabel('ATTACHMENT'),
-
                       const SizedBox(height: 10),
-
                       if (_file != null && _fileBytes != null)
                         Padding(
                           padding: const EdgeInsets.only(bottom: 12),
                           child: _buildFilePreview(),
                         ),
-
                       SizedBox(
                         height: _file == null ? 200 : 120,
                         child: Center(
@@ -645,9 +740,7 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
                               const Text(
                                 'Max file size: 25MB',
                                 style: TextStyle(
-                                  color: AppTheme.textMuted,
-                                  fontSize: 12,
-                                ),
+                                    color: AppTheme.textMuted, fontSize: 12),
                               ),
                               const SizedBox(height: 12),
                               ElevatedButton(
@@ -663,7 +756,7 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
                 ),
                 const SizedBox(height: 20),
 
-                // ── buttons ──────────────────────────────
+                // ── BUTTONS ──────────────────────────────────────────────
                 Row(
                   children: [
                     Expanded(child: _outlineBtn('Clear', _reset)),
@@ -672,9 +765,7 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
                       child: _primaryBtn('Submit', () async {
                         final confirm =
                         await showSubmitConfirmation(context);
-                        if (confirm) {
-                          _submit();
-                        }
+                        if (confirm) _submit();
                       }),
                     ),
                   ],
@@ -689,7 +780,8 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
 
   // ── file preview ──────────────────────────────────────────────────────────
   Widget _buildFilePreview() {
-    final isImage = ['jpg', 'jpeg', 'png'].contains(_file!.extension);
+    final isImage =
+    ['jpg', 'jpeg', 'png'].contains(_file!.extension);
     return Container(
       decoration: BoxDecoration(
         color: AppTheme.sidebarBg,
@@ -789,8 +881,7 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
               if (required) ...[
                 const SizedBox(width: 3),
                 const Text('*',
-                    style:
-                    TextStyle(color: Colors.redAccent, fontSize: 11)),
+                    style: TextStyle(color: Colors.redAccent, fontSize: 11)),
               ],
             ]),
             const SizedBox(height: 8),
@@ -845,7 +936,8 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
           isExpanded: true,
           underline: const SizedBox(),
           iconEnabledColor: AppTheme.textSecondary,
-          style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
+          style:
+          const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
           hint: hint != null
               ? Text(hint,
               style: const TextStyle(
@@ -877,64 +969,16 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
     ],
   );
 
-  Widget _sheetInput(TextEditingController ctrl, String hint) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-    decoration: BoxDecoration(
-      color: AppTheme.surface,
-      borderRadius: BorderRadius.circular(8),
-      border: Border.all(color: AppTheme.border),
-    ),
-    child: TextField(
-      controller: ctrl,
-      style:
-      const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle:
-        const TextStyle(color: AppTheme.textMuted, fontSize: 13),
-        border: InputBorder.none,
-        isDense: true,
-      ),
-    ),
-  );
-
-  Widget _sheetLabel(String text) => Padding(
-    padding: const EdgeInsets.only(bottom: 6),
-    child: Text(text,
-        style: const TextStyle(
-            color: AppTheme.textMuted,
-            fontSize: 10,
-            letterSpacing: 0.6,
-            fontWeight: FontWeight.w700)),
-  );
-
-  Widget _miniButton({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) =>
-      TextButton.icon(
-        onPressed: onTap,
-        icon: Icon(icon, size: 13, color: AppTheme.accent),
-        label: Text(label,
-            style: TextStyle(fontSize: 11, color: AppTheme.accent)),
-        style: TextButton.styleFrom(
-            padding:
-            const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            minimumSize: Size.zero,
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap),
-      );
-
   Widget _primaryBtn(String text, VoidCallback onPressed) => ElevatedButton(
     style: ElevatedButton.styleFrom(
       backgroundColor: AppTheme.accent,
       foregroundColor: Colors.white,
       padding:
       const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8)),
-      textStyle: const TextStyle(
-          fontSize: 13, fontWeight: FontWeight.w600),
+      shape:
+      RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      textStyle:
+      const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
     ),
     onPressed: onPressed,
     child: Text(text),
@@ -945,8 +989,8 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
       side: const BorderSide(color: AppTheme.border),
       padding:
       const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8)),
+      shape:
+      RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       textStyle: const TextStyle(fontSize: 13),
     ),
     onPressed: onPressed,

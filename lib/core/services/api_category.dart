@@ -3,29 +3,36 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 class ApiCategory {
-  // ✅ FIXED: removed /get (this caused your 404 error)
   static const String _baseUrl = 'http://localhost:8080/api/user';
 
-  // ─────────────────────────────────────────────────────────────
-  // ✅ GET ALL CATEGORIES (with subcategories)
-  // FIX: /get/categories → /categories
-  // ─────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────
+  // ✅ GET ALL CATEGORIES
+  // ─────────────────────────────────────────────
   static Future<List<Map<String, dynamic>>> fetchCategories({
     required String token,
   }) async {
     try {
       final res = await http.get(
-        Uri.parse('$_baseUrl/get/categories'),
+        Uri.parse('$_baseUrl/categories'),
         headers: {'Authorization': 'Bearer $token'},
       );
 
-      debugPrint('>>> fetchCategories ${res.statusCode}: ${res.body}');
+      debugPrint('>>> fetchCategories status: ${res.statusCode}');
+      debugPrint('>>> fetchCategories body: ${res.body}');
 
       if (res.statusCode == 200) {
         final body = jsonDecode(res.body);
-        return List<Map<String, dynamic>>.from(
-          body['data'] ?? body['Data'] ?? [],
-        );
+
+        // Debug: print all top-level keys to confirm casing
+        debugPrint('>>> body keys: ${(body as Map).keys.toList()}');
+
+        // Go's ResponseModel uses capital 'Data'
+        final dataRaw = body['Data'] ?? body['data'] ?? [];
+        debugPrint('>>> Data value: $dataRaw');
+
+        if (dataRaw is! List) return [];
+
+        return List<Map<String, dynamic>>.from(dataRaw);
       }
     } catch (e) {
       debugPrint('>>> fetchCategories ERROR: $e');
@@ -33,26 +40,21 @@ class ApiCategory {
     return [];
   }
 
-  // ─────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────
   // ✅ ADD CATEGORY
-  // POST /add-category
-  // ─────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────
   static Future<bool> addCategory({
     required String name,
     required String token,
   }) async {
     try {
-      final payload = jsonEncode({'name': name});
-
-      debugPrint('>>> addCategory PAYLOAD: $payload');
-
       final res = await http.post(
         Uri.parse('$_baseUrl/add-category'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
-        body: payload,
+        body: jsonEncode({'name': name}),
       );
 
       debugPrint('>>> addCategory ${res.statusCode}: ${res.body}');
@@ -63,76 +65,38 @@ class ApiCategory {
     return false;
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // ✅ SAVE TEMPLATE
-  // POST /template/save
-  // ─────────────────────────────────────────────────────────────
-  static Future<bool> saveTemplate({
-    required String category,
-    required String subcategory,
-    required String description,
-    required String token,
-  }) async {
-    try {
-      final res = await http.post(
-        Uri.parse('$_baseUrl/template/save'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode({
-          'category': category,
-          'subcategory': subcategory,
-          'description': description,
-        }),
-      );
-
-      debugPrint('>>> saveTemplate ${res.statusCode}: ${res.body}');
-      return res.statusCode == 200 || res.statusCode == 201;
-    } catch (e) {
-      debugPrint('>>> saveTemplate ERROR: $e');
-    }
-    return false;
-  }
-
-  // ─────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────
   // ✅ ADD SUBCATEGORY
-  // POST /add-sub-category
-  // ─────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────
   static Future<bool> addSubcategory({
     required int categoryId,
     required String name,
     required String token,
   }) async {
     try {
-      final uri = Uri.parse('$_baseUrl/categories/$categoryId/sub-categories');
-
-      final payload = {'category_id': categoryId, 'name': name};
-
-      debugPrint('>>> addSubcategory PAYLOAD: $payload');
-
       final res = await http.post(
-        uri,
+        Uri.parse('$_baseUrl/add-sub-category'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
-        body: jsonEncode(payload),
+        body: jsonEncode({
+          'category_id': categoryId,
+          'name': name,
+        }),
       );
 
       debugPrint('>>> addSubcategory ${res.statusCode}: ${res.body}');
-
       return res.statusCode == 201;
     } catch (e) {
       debugPrint('>>> addSubcategory ERROR: $e');
-      return false;
     }
+    return false;
   }
 
-  // ─────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────
   // ✅ UPDATE CATEGORY
-  // PUT /update-categories/:id
-  // ─────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────
   static Future<bool> updateCategory({
     required int categoryId,
     required String newName,
@@ -156,10 +120,9 @@ class ApiCategory {
     return false;
   }
 
-  // ─────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────
   // ✅ UPDATE SUBCATEGORY NAME
-  // PUT /update-sub-categories/:id
-  // ─────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────
   static Future<bool> updateSubcategoryName({
     required int subcategoryId,
     required String name,
@@ -183,10 +146,9 @@ class ApiCategory {
     return false;
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // ✅ UPDATE SUBCATEGORY DESCRIPTION
-  // PATCH /subcategories/:id/description
-  // ─────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────
+  // ✅ UPDATE DESCRIPTION
+  // ─────────────────────────────────────────────
   static Future<bool> updateSubcategoryDescription({
     required int subcategoryId,
     required String description,
@@ -210,10 +172,9 @@ class ApiCategory {
     return false;
   }
 
-  // ─────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────
   // ✅ DELETE CATEGORY
-  // DELETE /delete-category/:id
-  // ─────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────
   static Future<bool> deleteCategory({
     required int categoryId,
     required String token,
@@ -232,10 +193,9 @@ class ApiCategory {
     return false;
   }
 
-  // ─────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────
   // ✅ DELETE SUBCATEGORY
-  // DELETE /delete-subcategory/:id
-  // ─────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────
   static Future<bool> deleteSubcategory({
     required int subcategoryId,
     required String token,

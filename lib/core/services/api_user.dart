@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'api_login.dart'; // ✅ IMPORTANT
+import 'api_login.dart';
 
 
 class ApiUser {
@@ -36,7 +36,6 @@ class ApiUser {
 
     return headers;
   }
-
 
   // ================= CREATE =================
   static Future<bool> createUser({
@@ -157,11 +156,9 @@ class ApiUser {
   static Future<bool> enableUser({required int id}) async {
     final url = Uri.parse('$baseUrl/update/profile/$id');
 
-
     final body = jsonEncode({
       'status': 'active',
     });
-
 
     try {
       final response = await http.put(
@@ -170,10 +167,8 @@ class ApiUser {
         body: body,
       );
 
-
       print("ENABLE STATUS: ${response.statusCode}");
       print("ENABLE BODY: ${response.body}");
-
 
       return response.statusCode == 200;
     } catch (e) {

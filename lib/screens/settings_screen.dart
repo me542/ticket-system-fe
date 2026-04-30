@@ -1,24 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../core/services/api_login.dart';
 import '../core/services/api_user_data.dart';
 import '../data/light_theme.dart';
-import '../main.dart';
-
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
-
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-
 class _SettingsScreenState extends State<SettingsScreen> {
-  //bool _emailNotifications = true;
-  //bool _darkMode = false;
-
 
   String _username = '';
   String _fullName = '';
@@ -33,7 +25,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _loadUserInfo();
     //_darkMode = themeModeNotifier.value == ThemeMode.dark;
   }
-
 
   Future<void> _loadUserInfo() async {
     try {
@@ -105,62 +96,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ]),
                 const SizedBox(height: 20),
 
-
-                // Notifications
-                // _section('Notifications', [
-                //   _settingRow(
-                //     'Email Notifications',
-                //     trailing: Switch(
-                //       value: _emailNotifications,
-                //       onChanged: (v) =>
-                //           setState(() => _emailNotifications = v),
-                //       activeColor: AppTheme.accent,
-                //     ),
+                // ElevatedButton(
+                //   onPressed: () {
+                //   },
+                //   style: ElevatedButton.styleFrom(
+                //     backgroundColor: AppTheme.accent,
+                //     foregroundColor: Colors.white,
+                //     padding:
+                //     const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                //     shape: RoundedRectangleBorder(
+                //         borderRadius: BorderRadius.circular(8)),
                 //   ),
-                // ]),
-                // const SizedBox(height: 20),
-
-
-                // Appearance
-                // _section('Appearance', [
-                //   _settingRow(
-                //     'Dark Mode',
-                //     trailing: Switch(
-                //       value: _darkMode,
-                //       onChanged: (v) async {
-                //         setState(() => _darkMode = v);
-                //
-                //         // update global theme
-                //         themeModeNotifier.value = v ? ThemeMode.dark : ThemeMode.light;
-                //
-                //         // save preference
-                //         final prefs = await SharedPreferences.getInstance();
-                //         await prefs.setBool('darkMode', v);
-                //       },
-                //
-                //       activeColor: AppTheme.accent,
-                //     ),
+                //   child: const Text(
+                //     'Save Changes',
+                //     style: TextStyle(fontWeight: FontWeight.w600),
                 //   ),
-                // ]),
-                // const SizedBox(height: 20),
-
-
-                ElevatedButton(
-                  onPressed: () {
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.accent,
-                    foregroundColor: Colors.white,
-                    padding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8)),
-                  ),
-                  child: const Text(
-                    'Save Changes',
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                ),
+                // ),
               ],
             ),
           ),
@@ -197,35 +148,58 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-
   // Individual setting row
   Widget _settingRow(String label, {required Widget trailing}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: const BoxDecoration(
-        border: Border(top: BorderSide(color: AppTheme.border, width: 0.5)),
-      ),
-      child: Row(
-        children: [
-          Text(label,
-              style: const TextStyle(
-                  color: AppTheme.textSecondary, fontSize: 13)),
-          const Spacer(),
-          trailing,
-        ],
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isSmall = constraints.maxWidth < 500;
+
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: const BoxDecoration(
+            border: Border(top: BorderSide(color: AppTheme.border, width: 0.5)),
+          ),
+          child: isSmall
+          // 📱 SMALL SCREEN (stacked)
+              ? Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label,
+                  style: const TextStyle(
+                      color: AppTheme.textSecondary, fontSize: 13)),
+              const SizedBox(height: 6),
+              Align(alignment: Alignment.centerLeft, child: trailing),
+            ],
+          )
+          // 💻 LARGE SCREEN (row)
+              : Row(
+            children: [
+              Expanded(
+                child: Text(label,
+                    style: const TextStyle(
+                        color: AppTheme.textSecondary, fontSize: 13)),
+              ),
+              trailing,
+            ],
+          ),
+        );
+      },
     );
   }
 
-
   // Display text for read-only fields
   Widget _displayText(String text) {
-    return Text(
-      text,
-      style: const TextStyle(
-        color: AppTheme.textPrimary,
-        fontSize: 13,
-        fontWeight: FontWeight.w500,
+    return SizedBox(
+      width: 200, // limit width
+      child: Text(
+        text,
+        overflow: TextOverflow.ellipsis,
+        maxLines: 1,
+        style: const TextStyle(
+          color: AppTheme.textPrimary,
+          fontSize: 13,
+          fontWeight: FontWeight.w500,
+        ),
       ),
     );
   }

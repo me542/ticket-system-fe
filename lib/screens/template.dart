@@ -28,7 +28,7 @@ class TemplateScreen extends StatefulWidget {
 }
 
 class _TemplateScreenState extends State<TemplateScreen> {
-  Map<String, List<Map<String, String>>> _categoryMap = {};
+  Map<String, Map<String, dynamic>> _categoryMap = {};
   bool _loadingCats = true;
 
   final _descCtrl = TextEditingController();
@@ -36,9 +36,13 @@ class _TemplateScreenState extends State<TemplateScreen> {
   String? _formCategory;
   String? _formSubcategory;
   bool _saving = false;
-
   bool _isEditing = false;
-  TicketTemplate? _savedTemplate;
+
+  // ── Snapshot of which sub is being edited ─────────────────────────────────
+  // Prevents the dropdowns or _loadCategories from silently changing the
+  // save target mid-edit.
+  String? _editingCategory;
+  String? _editingSubcategory;
 
   static const String addCategoryKey = '__add_category__';
   static const String addSubcategoryKey = '__add_subcategory__';
@@ -56,44 +60,69 @@ class _TemplateScreenState extends State<TemplateScreen> {
   }
 
   // ── LOAD CATEGORIES ────────────────────────────────────────────────────────
-  Future<void> _loadCategories() async {
+  Future<void> _loadCategories({bool preserveSelection = true}) async {
     setState(() => _loadingCats = true);
 
-    final prevCategory = _formCategory;
-    final prevSubcategory = _formSubcategory;
+    final prevCategory = preserveSelection ? _formCategory : null;
+    final prevSubcategory = preserveSelection ? _formSubcategory : null;
 
     final token = await ApiLogin.getToken() ?? '';
     final raw = await ApiCategory.fetchCategories(token: token);
 
-    final Map<String, List<Map<String, String>>> built = {};
+    debugPrint('>>> raw categories count: ${raw.length}');
+    if (raw.isNotEmpty) {
+      debugPrint('>>> first item keys: ${raw.first.keys.toList()}');
+    }
+
+    final Map<String, Map<String, dynamic>> built = {};
 
     for (final item in raw) {
-      final categoryName = item['name']?.toString() ?? '';
+      final categoryName =
+          item['name']?.toString() ??
+              item['Name']?.toString() ??
+              '';
+
+      final categoryId =
+          item['category_id']?.toString() ??
+              item['CategoryID']?.toString() ??
+              item['ID']?.toString() ??
+              '';
+
+      final subsRaw =
+          item['SubCategories'] ??
+              item['sub_categories'] ??
+              item['subcategories'] ??
+              item['Subcategories'] ??
+              [];
 
       List<Map<String, String>> subs = [];
 
-      if (item['subcategories'] is List) {
-        subs = (item['subcategories'] as List)
-            .map((sub) {
-          if (sub is Map) {
-            return {
-              'name': sub['name']?.toString() ?? '',
-              'description': sub['description']?.toString() ?? '',
-              'subcategory_id': sub['subcategory_id']?.toString() ?? '',
-            };
-          }
+      if (subsRaw is List) {
+        subs = subsRaw.map((sub) {
+          final s = Map<String, dynamic>.from(sub as Map);
+          final subId =
+              s['sub_category_id']?.toString() ??
+                  s['SubCategoryID']?.toString() ??
+                  s['subcategory_id']?.toString() ??
+                  s['ID']?.toString() ??
+                  '';
+          final subName =
+              s['name']?.toString() ?? s['Name']?.toString() ?? '';
+          final subDesc =
+              s['description']?.toString() ??
+                  s['Description']?.toString() ??
+                  '';
+          debugPrint('>>>   sub id=$subId name=$subName desc=$subDesc');
           return {
-            'name': sub.toString(),
-            'description': '',
-            'subcategory_id': '',
+            'name': subName,
+            'description': subDesc,
+            'subcategory_id': subId,
           };
-        })
-            .where((e) => e['name']!.isNotEmpty)
-            .toList();
+        }).toList();
       }
 
       if (categoryName.isNotEmpty) {
-        built[categoryName] = subs;
+        built[categoryName] = {'category_id': categoryId, 'subs': subs};
       }
     }
 
@@ -105,7 +134,11 @@ class _TemplateScreenState extends State<TemplateScreen> {
         : (cats.isNotEmpty ? cats.first : null);
 
     List<Map<String, String>> subs =
-    newCategory != null ? built[newCategory] ?? [] : [];
+    newCategory != null
+        ? List<Map<String, String>>.from(
+      built[newCategory]?['subs'] ?? [],
+    )
+        : [];
 
     String? newSubcategory =
     (prevSubcategory != null &&
@@ -120,7 +153,8 @@ class _TemplateScreenState extends State<TemplateScreen> {
       _loadingCats = false;
     });
 
-    if (newCategory != null && newSubcategory != null && !_isEditing) {
+    // ── KEY FIX: never overwrite _descCtrl while the user is editing ──────
+    if (!_isEditing && newCategory != null && newSubcategory != null) {
       _descCtrl.text = _subDescription(newCategory, newSubcategory);
     }
   }
@@ -128,11 +162,15 @@ class _TemplateScreenState extends State<TemplateScreen> {
   // ── helpers ────────────────────────────────────────────────────────────────
   List<String> _subNames(String? category) {
     if (category == null) return [];
-    return (_categoryMap[category] ?? []).map((s) => s['name']!).toList();
+    return (_categoryMap[category]?['subs'] as List? ?? [])
+        .map((s) => (s as Map<String, String>)['name']!)
+        .toList();
   }
 
   String _subDescription(String category, String subName) {
-    final subs = _categoryMap[category] ?? [];
+    final subs = List<Map<String, String>>.from(
+      _categoryMap[category]?['subs'] ?? [],
+    );
     final match = subs.firstWhere(
           (s) => s['name'] == subName,
       orElse: () => {'name': '', 'description': '', 'subcategory_id': ''},
@@ -141,7 +179,9 @@ class _TemplateScreenState extends State<TemplateScreen> {
   }
 
   String _subId(String category, String subName) {
-    final subs = _categoryMap[category] ?? [];
+    final subs = List<Map<String, String>>.from(
+      _categoryMap[category]?['subs'] ?? [],
+    );
     final match = subs.firstWhere(
           (s) => s['name'] == subName,
       orElse: () => {'name': '', 'description': '', 'subcategory_id': ''},
@@ -152,7 +192,6 @@ class _TemplateScreenState extends State<TemplateScreen> {
   // ── ADD CATEGORY ───────────────────────────────────────────────────────────
   Future<void> _addCategoryDialog() async {
     final ctrl = TextEditingController();
-
     await showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -170,18 +209,10 @@ class _TemplateScreenState extends State<TemplateScreen> {
           ElevatedButton(
             onPressed: () async {
               final name = ctrl.text.trim();
-              debugPrint('>>> addCategory name: "$name"');
               if (name.isEmpty) return;
-
               final token = await ApiLogin.getToken() ?? '';
-              debugPrint('>>> addCategory token empty: ${token.isEmpty}');
-
-              final success = await ApiCategory.addCategory(
-                name: name,
-                token: token,
-              );
-
-
+              final success =
+              await ApiCategory.addCategory(name: name, token: token);
               if (success) {
                 Navigator.pop(ctx);
                 setState(() {
@@ -199,38 +230,26 @@ class _TemplateScreenState extends State<TemplateScreen> {
         ],
       ),
     );
-
     ctrl.dispose();
   }
 
   // ── ADD SUBCATEGORY ────────────────────────────────────────────────────────
   Future<void> _addSubcategoryDialog() async {
-    // ✅ Capture category at dialog open time — not inside builder
     final currentCategory = _formCategory;
-
     if (currentCategory == null) {
       _snack('Please select a category first', color: Colors.orange);
       return;
     }
 
     final nameCtrl = TextEditingController();
-    final descCtrl = TextEditingController();
-
     await showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('Add Subcategory to "$currentCategory"'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameCtrl,
-              autofocus: true,
-              decoration:
-              const InputDecoration(hintText: 'Subcategory name'),
-            ),
-            const SizedBox(height: 12),
-          ],
+        content: TextField(
+          controller: nameCtrl,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'Subcategory name'),
         ),
         actions: [
           TextButton(
@@ -239,48 +258,27 @@ class _TemplateScreenState extends State<TemplateScreen> {
           ),
           ElevatedButton(
             onPressed: () async {
-              debugPrint('>>> ADD SUBCATEGORY BUTTON PRESSED');
-              debugPrint('>>> currentCategory: "$currentCategory"');
-
               final subName = nameCtrl.text.trim();
-              final subDesc = descCtrl.text.trim();
-
-              debugPrint('>>> subName: "$subName"');
-              debugPrint('>>> subDesc: "$subDesc"');
-
-              if (subName.isEmpty) {
-                debugPrint('>>> EARLY RETURN — subName is empty');
-                return;
-              }
-
+              if (subName.isEmpty) return;
               final token = await ApiLogin.getToken() ?? '';
-              debugPrint('>>> token empty: ${token.isEmpty}');
-
-              // ✅ Only send the NEW subcategory
               final categoryId = int.tryParse(
-                _categoryMap[currentCategory]?[0]['subcategory_id'] ?? '',
+                _categoryMap[currentCategory]?['category_id'] ?? '',
               );
-
               if (categoryId == null) {
                 _snack('Invalid category id', color: Colors.red);
                 return;
               }
-
               final success = await ApiCategory.addSubcategory(
                 categoryId: categoryId,
                 name: subName,
                 token: token,
               );
-
-
               if (success) {
                 Navigator.pop(ctx);
                 setState(() => _formSubcategory = subName);
                 _snack('Subcategory added');
                 await _loadCategories();
-                if (!_isEditing) {
-                  _descCtrl.text = subDesc;
-                }
+                if (!_isEditing) _descCtrl.text = '';
               } else {
                 _snack('Failed to add subcategory', color: Colors.red);
               }
@@ -290,35 +288,36 @@ class _TemplateScreenState extends State<TemplateScreen> {
         ],
       ),
     );
-
-    // ✅ Dispose after dialog closes
     nameCtrl.dispose();
-    descCtrl.dispose();
   }
 
   // ── ENTER EDIT MODE ────────────────────────────────────────────────────────
   void _startEditing() {
-    if (_savedTemplate != null) {
-      _descCtrl.text = _savedTemplate!.description;
-      setState(() {
-        _formCategory = _savedTemplate!.category;
-        _formSubcategory = _savedTemplate!.subcategory;
-        _isEditing = true;
-      });
-    } else {
-      setState(() => _isEditing = true);
-    }
+    if (_formCategory == null || _formSubcategory == null) return;
+
+    // Snapshot the current target so Save always hits the right row
+    _editingCategory = _formCategory;
+    _editingSubcategory = _formSubcategory;
+
+    // Load the DB description for THIS subcategory into the field
+    _descCtrl.text = _subDescription(_formCategory!, _formSubcategory!);
+
+    setState(() => _isEditing = true);
   }
 
   // ── SAVE ───────────────────────────────────────────────────────────────────
   Future<void> _save() async {
-    if (_formCategory == null) {
-      _snack('Please select a category', color: Colors.redAccent);
+    // Always save to the snapshotted sub, not whatever dropdown says now
+    final targetCategory = _editingCategory;
+    final targetSub = _editingSubcategory;
+
+    if (targetCategory == null || targetSub == null) {
+      _snack('No subcategory selected', color: Colors.redAccent);
       return;
     }
 
     if (_descCtrl.text.trim().isEmpty) {
-      _snack('Please enter a description', color: Colors.redAccent);
+      _snack('Description cannot be empty', color: Colors.redAccent);
       return;
     }
 
@@ -326,32 +325,38 @@ class _TemplateScreenState extends State<TemplateScreen> {
 
     try {
       final token = await ApiLogin.getToken() ?? '';
+      final subId = _subId(targetCategory, targetSub);
 
-      final success = await ApiCategory.saveTemplate(
-        category: _formCategory!,
-        subcategory: _formSubcategory ?? '',
-        description: _descCtrl.text.trim(), // ✅ THIS is what was NOT going to DB
+      debugPrint(
+          '>>> SAVE: category=$targetCategory sub=$targetSub id=$subId');
+
+      if (subId.isEmpty) {
+        _snack('Could not find subcategory ID', color: Colors.red);
+        setState(() => _saving = false);
+        return;
+      }
+
+      final success = await ApiCategory.updateSubcategoryDescription(
+        subcategoryId: int.parse(subId),
+        description: _descCtrl.text.trim(),
         token: token,
       );
 
       if (success) {
-        final template = TicketTemplate(
-          id: _savedTemplate?.id ??
-              DateTime.now().millisecondsSinceEpoch.toString(),
-          category: _formCategory!,
-          subcategory: _formSubcategory ?? '',
-          description: _descCtrl.text.trim(),
-        );
-
+        // Stay on the saved subcategory after reload
         setState(() {
-          _savedTemplate = template;
+          _formCategory = targetCategory;
+          _formSubcategory = targetSub;
           _saving = false;
           _isEditing = false;
+          _editingCategory = null;
+          _editingSubcategory = null;
         });
 
-        _snack('Template saved to database');
+        _snack('Saved description for "$targetSub"');
+        await _loadCategories(preserveSelection: true);
       } else {
-        _snack('Failed to save template', color: Colors.red);
+        _snack('Failed to save description', color: Colors.red);
         setState(() => _saving = false);
       }
     } catch (e) {
@@ -360,39 +365,21 @@ class _TemplateScreenState extends State<TemplateScreen> {
     }
   }
 
-
   // ── CANCEL EDIT ────────────────────────────────────────────────────────────
   void _cancelEdit() {
-    if (_savedTemplate != null) {
-      _descCtrl.text = _savedTemplate!.description;
-      setState(() {
-        _formCategory = _savedTemplate!.category;
-        _formSubcategory = _savedTemplate!.subcategory;
-        _isEditing = false;
-      });
-    } else {
-      _clearForm();
-      setState(() => _isEditing = false);
-    }
-  }
-
-  void _clearForm() {
-    final cats = _categoryMap.keys.toList();
-    final firstCat = cats.isNotEmpty ? cats.first : null;
-    final firstSub =
-    firstCat != null ? _subNames(firstCat).firstOrNull : null;
+    final cat = _editingCategory ?? _formCategory;
+    final sub = _editingSubcategory ?? _formSubcategory;
 
     setState(() {
-      _savedTemplate = null;
-      _formCategory = firstCat;
-      _formSubcategory = firstSub;
+      _formCategory = cat;
+      _formSubcategory = sub;
       _isEditing = false;
+      _editingCategory = null;
+      _editingSubcategory = null;
     });
 
     _descCtrl.text =
-    (firstCat != null && firstSub != null)
-        ? _subDescription(firstCat, firstSub)
-        : '';
+    (cat != null && sub != null) ? _subDescription(cat, sub) : '';
   }
 
   void _snack(String msg, {Color color = Colors.black87}) {
@@ -446,7 +433,9 @@ class _TemplateScreenState extends State<TemplateScreen> {
 
   // ── LEFT PANEL ─────────────────────────────────────────────────────────────
   Widget _buildDetailsPanel() {
-    final subDesc = (_formCategory != null && _formSubcategory != null)
+    final subDesc = (!_isEditing &&
+        _formCategory != null &&
+        _formSubcategory != null)
         ? _subDescription(_formCategory!, _formSubcategory!)
         : '';
 
@@ -458,16 +447,23 @@ class _TemplateScreenState extends State<TemplateScreen> {
           const SizedBox(height: 20),
           _section('Template Details', [
 
-            // ── Category — always interactive ──────────────────────────
+            // ── Category ──────────────────────────────────────────────
             _formRow(
               label: 'Category *',
               child: _loadingCats
-                  ? const CircularProgressIndicator()
+                  ? const SizedBox(
+                height: 20,
+                width: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
                   : _inlineDropdown(
                 value: _formCategory,
                 items: [..._categoryMap.keys, addCategoryKey],
                 hint: 'Select category',
-                onChanged: (v) {
+                // Lock while editing so target can't drift
+                onChanged: _isEditing
+                    ? null
+                    : (v) {
                   if (v == addCategoryKey) {
                     _addCategoryDialog();
                     return;
@@ -479,21 +475,22 @@ class _TemplateScreenState extends State<TemplateScreen> {
                     _formCategory = v;
                     _formSubcategory = firstSub;
                   });
-                  if (firstSub != null &&
-                      v != null &&
-                      !_isEditing) {
-                    _descCtrl.text =
-                        _subDescription(v, firstSub);
-                  }
+                  _descCtrl.text = (firstSub != null && v != null)
+                      ? _subDescription(v, firstSub)
+                      : '';
                 },
               ),
             ),
 
-            // ── Subcategory — always interactive ───────────────────────
+            // ── Subcategory ───────────────────────────────────────────
             _formRow(
               label: 'Subcategory',
               child: _loadingCats
-                  ? const CircularProgressIndicator()
+                  ? const SizedBox(
+                height: 20,
+                width: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
                   : _inlineDropdown(
                 value: _formSubcategory,
                 items: [
@@ -501,15 +498,17 @@ class _TemplateScreenState extends State<TemplateScreen> {
                   addSubcategoryKey,
                 ],
                 hint: 'Select subcategory',
-                onChanged: (v) {
+                // Lock while editing so target can't drift
+                onChanged: _isEditing
+                    ? null
+                    : (v) {
                   if (v == addSubcategoryKey) {
                     _addSubcategoryDialog();
                     return;
                   }
                   setState(() => _formSubcategory = v);
-                  if (v != null &&
-                      _formCategory != null &&
-                      !_isEditing) {
+                  if (v != null && _formCategory != null) {
+                    // Show this sub's DB description
                     _descCtrl.text =
                         _subDescription(_formCategory!, v);
                   }
@@ -517,7 +516,7 @@ class _TemplateScreenState extends State<TemplateScreen> {
               ),
             ),
 
-            // ── Subcategory description info chip ──────────────────────
+            // ── Existing description chip (view mode only) ─────────────
             if (subDesc.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
@@ -545,6 +544,36 @@ class _TemplateScreenState extends State<TemplateScreen> {
                   ),
                 ),
               ),
+
+            // ── Editing indicator ─────────────────────────────────────
+            if (_isEditing && _editingSubcategory != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border:
+                    Border.all(color: Colors.orange.withOpacity(0.4)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.edit,
+                          size: 14, color: Colors.orange),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Editing: "$_editingSubcategory"',
+                          style: const TextStyle(
+                              fontSize: 12, color: Colors.orange),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
           ]),
         ],
       ),
@@ -553,12 +582,16 @@ class _TemplateScreenState extends State<TemplateScreen> {
 
   // ── RIGHT PANEL ────────────────────────────────────────────────────────────
   Widget _buildDescriptionPanel() {
+    final panelTitle = (_isEditing && _editingSubcategory != null)
+        ? 'Description — $_editingSubcategory'
+        : 'Description';
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _section('Description', [
+          _section(panelTitle, [
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
               child: _isEditing
@@ -567,7 +600,7 @@ class _TemplateScreenState extends State<TemplateScreen> {
                 minLines: 10,
                 maxLines: null,
                 decoration: const InputDecoration(
-                  hintText: 'Template description...',
+                  hintText: 'Enter description for this subcategory...',
                   border: InputBorder.none,
                 ),
               )
@@ -577,7 +610,7 @@ class _TemplateScreenState extends State<TemplateScreen> {
                 child: Text(
                   _descCtrl.text.isNotEmpty
                       ? _descCtrl.text
-                      : 'Select a subcategory to see its description.',
+                      : 'Select a subcategory to view its description.',
                   style: TextStyle(
                     color: _descCtrl.text.isNotEmpty
                         ? AppTheme.textPrimary
@@ -600,7 +633,11 @@ class _TemplateScreenState extends State<TemplateScreen> {
                 ),
                 const SizedBox(width: 8),
                 _saving
-                    ? const CircularProgressIndicator()
+                    ? const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
                     : ElevatedButton.icon(
                   onPressed: _save,
                   icon: const Icon(Icons.save, size: 16),
@@ -608,9 +645,10 @@ class _TemplateScreenState extends State<TemplateScreen> {
                 ),
               ] else ...[
                 ElevatedButton.icon(
-                  onPressed: _startEditing,
+                  onPressed:
+                  _formSubcategory != null ? _startEditing : null,
                   icon: const Icon(Icons.edit, size: 16),
-                  label: const Text('Edit Template'),
+                  label: const Text('Edit Description'),
                 ),
               ],
             ],
@@ -653,12 +691,13 @@ class _TemplateScreenState extends State<TemplateScreen> {
     required String? value,
     required List<String> items,
     required String hint,
-    required ValueChanged<String?> onChanged,
+    required ValueChanged<String?>? onChanged,
   }) =>
       DropdownButton<String>(
         value: items.contains(value) ? value : null,
         isExpanded: true,
         hint: Text(hint),
+        disabledHint: value != null ? Text(value) : Text(hint),
         items: items.map((e) {
           final isAdd = e == addCategoryKey || e == addSubcategoryKey;
           return DropdownMenuItem(

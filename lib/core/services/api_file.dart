@@ -12,12 +12,12 @@ class ApiTicket {
     required String subject,
     required String tickettype,
     required String category,
+    required String subcategory,
     required String organization,
     required int priority,
     required String description,
     required String endorser,
     PlatformFile? file,
-    required String subcategory,
   }) async {
     try {
       final token = await ApiLogin.getToken();
@@ -27,18 +27,22 @@ class ApiTicket {
       var request = http.MultipartRequest('POST', uri);
 
       request.headers['Authorization'] = 'Bearer $token';
+
+      // ── REQUIRED FIELDS (MATCH BACKEND EXACTLY)
       request.fields['subject'] = subject;
       request.fields['tickettype'] = tickettype;
       request.fields['category'] = category;
-      request.fields['institution'] = organization;
+      request.fields['subcategory'] = subcategory;
+      request.fields['organization'] = organization; // ✅ FIXED
       request.fields['priority'] = priority.toString();
       request.fields['description'] = description;
       request.fields['endorser'] = endorser;
 
+      // ── FILE UPLOAD (safe check)
       if (file != null && file.bytes != null) {
         request.files.add(
           http.MultipartFile.fromBytes(
-            'attachments',
+            'attachment', // ⚠️ confirm backend expects this
             file.bytes!,
             filename: file.name,
           ),
@@ -47,12 +51,17 @@ class ApiTicket {
 
       final response = await request.send();
       final resBody = await response.stream.bytesToString();
+
+      debugPrint('>>> CREATE TICKET STATUS: ${response.statusCode}');
+      debugPrint('>>> CREATE TICKET BODY: $resBody');
+
       return response.statusCode == 201;
     } catch (e) {
-      //
+      debugPrint('CREATE TICKET ERROR: $e');
       return false;
     }
   }
+
 
   /// GET ALL TICKETS
   static Future<List<Map<String, dynamic>>> getAllTickets() async {
