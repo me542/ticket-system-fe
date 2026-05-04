@@ -4,7 +4,7 @@ import 'api_login.dart';
 
 
 class ApiGetUser {
-  static const String baseUrl = 'http://localhost:8080/api/user/list/all/users';
+  static const String baseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://idiyanale-be.bakawan-ai.com') + '/api/user/list/all/users';
 
 
   /// Fetch all users from backend

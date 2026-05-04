@@ -75,6 +75,13 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
   Ticket? _selectedTicket;
   bool    _isSidebarOpen = false;
 
+  // ── Horizontal scroll controller ─────────────────────────
+  final ScrollController _hScrollController = ScrollController();
+
+  // ── Sort ──────────────────────────────────────────────────
+  String _sortColumn    = 'created_at';
+  bool   _isAscending   = false;
+
   void _openTicket(Ticket ticket) => setState(() {
     _selectedTicket = ticket;
     _isSidebarOpen  = true;
@@ -96,7 +103,6 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
   List<Map<String, dynamic>> get _filteredRaw {
     var list = List<Map<String, dynamic>>.from(_roleFilteredRaw);
 
-    // Date range filters (created_at + updated_at)
     for (final col in ['created_at', 'updated_at']) {
       final from = _dateFrom[col];
       final to   = _dateTo[col];
@@ -111,7 +117,6 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
       }
     }
 
-    // Status tab
     if (_selectedFilter != 'All') {
       const map = {
         'For':       'for',
@@ -126,7 +131,6 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
           .toList();
     }
 
-    // Search
     if (_search.isNotEmpty) {
       final q = _search.toLowerCase();
       list = list
@@ -137,7 +141,6 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
           .toList();
     }
 
-    // Column filters
     _colFilters.forEach((col, val) {
       if (val.isNotEmpty) {
         list = list
@@ -146,6 +149,24 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
             .toList();
       }
     });
+
+    // Sort
+    if (_sortColumn.isNotEmpty) {
+      list.sort((a, b) {
+        final av = (a[_sortColumn] ?? '').toString().toLowerCase();
+        final bv = (b[_sortColumn] ?? '').toString().toLowerCase();
+        // Try numeric compare for priority
+        final an = num.tryParse(av);
+        final bn = num.tryParse(bv);
+        int cmp;
+        if (an != null && bn != null) {
+          cmp = an.compareTo(bn);
+        } else {
+          cmp = av.compareTo(bv);
+        }
+        return _isAscending ? cmp : -cmp;
+      });
+    }
 
     return list;
   }
@@ -202,6 +223,7 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _hScrollController.dispose();
     super.dispose();
   }
 
@@ -226,7 +248,6 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
         role = users.first['role'] ?? '';
       }
 
-
       if (mounted) {
         setState(() {
           _currentUsername = username.toLowerCase().trim();
@@ -248,12 +269,14 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
       final data = await ApiTicket.getAllTickets();
       _rawData = data;
       _tickets = data.map<Ticket>((item) {
-        final username = item['username'] ?? 'Unknown';
+        final username  = item['username'] ?? 'Unknown';
+        final rawStatus = (item['status'] ?? '').toString().trim();
         return Ticket(
           id:                item['ticket_id'] ?? '',
           title:             item['subject'] ?? '',
           categoryName:      item['category'] ?? '',
-          status:            _mapStatus(item['status'] ?? ''),
+          status:            _mapStatus(rawStatus),
+          rawStatus:         rawStatus,
           priority:          _mapPriority(item['priority']),
           submitter:         username,
           submitterInitials: username.isNotEmpty ? username[0].toUpperCase() : '?',
@@ -266,7 +289,6 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
       if (mounted) setState(() => _loading = false);
     }
   }
-
 
   // ── Export filtered data ──────────────────────────────────
   Future<void> _exportExcel() async {
@@ -401,17 +423,6 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
       default: return TicketPriority.priority1;
     }
   }
-
-  // ── Role accent color ─────────────────────────────────────
-  // Color get _roleColor {
-  //   switch (_currentUserRole) {
-  //     case 'admin':    return Colors.white;
-  //     case 'endorser': return Colors.white;
-  //     case 'approver': return Colors.white;
-  //     case 'resolver': return Colors.white;
-  //     default:         return Colors.white;
-  //   }
-  // }
 
   Color get _roleColor {
     switch (_currentUserRole) {
@@ -673,7 +684,6 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                // Column filter chips
                 ..._colFilters.entries
                     .where((e) => e.value.isNotEmpty)
                     .map((e) => _filterChip(
@@ -683,8 +693,6 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
                     _currentPage = 1;
                   }),
                 )),
-
-                // Date range filter chips
                 ..._dateFrom.keys
                     .where((col) => _hasDateFilter(col))
                     .map((col) => _filterChip(
@@ -774,24 +782,23 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
   Widget _buildScrollableTable() {
     final cols = [
       _ColDef('Ticket ID',          'ticket_id',          120, false),
+      _ColDef('Status',             'status',             140, true),
       _ColDef('Creator',            'username',           120, true),
       _ColDef('Category',           'category',           160, true),
       _ColDef('Subject',            'subject',            200, false),
       _ColDef('Institution',        'institution',        140, true),
       _ColDef('Type',               'tickettype',         120, true),
-      //_ColDef('Description',        'description',        220, false),
-      _ColDef('Priority',           'priority',           90,  true),
+      _ColDef('Priority',           'priority',            90, true),
       _ColDef('Assignee',           'assignee',           120, true),
       _ColDef('Endorser',           'endorser',           120, true),
       _ColDef('Approver',           'approver',           120, true),
-      _ColDef('Status',             'status',             140, true),
       _ColDef('Created At',         'created_at',         160, true),
       _ColDef('Updated At',         'updated_at',         160, true),
       _ColDef('Cancelled By',       'cancelled_by',       120, true),
       _ColDef('Cancelled At',       'cancelled_at',       160, false),
       _ColDef('Started At',         'started_at',         160, false),
       _ColDef('Resolved At',        'resolved_at',        160, false),
-      _ColDef('Resolution Times', 'resolution_time', 160, false),
+      _ColDef('Resolution Times',   'resolution_time',    160, false),
     ];
 
     final totalWidth = cols.fold(0.0, (sum, c) => sum + c.width);
@@ -802,167 +809,210 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
 
     final page = _paginatedRaw;
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: SizedBox(
-        width: totalWidth,
-        child: Column(
-          children: [
-            // ── Column headers ──────────────────────────────
-            Container(
-              decoration: const BoxDecoration(
-                border: Border(
-                  top: BorderSide(color: AppTheme.border),
-                  bottom: BorderSide(color: AppTheme.border),
+    // ── Scrollbar wraps the horizontal SingleChildScrollView ──
+    return Scrollbar(
+      controller: _hScrollController,
+      thumbVisibility: true,
+      trackVisibility: true,
+      child: SingleChildScrollView(
+        controller: _hScrollController,
+        scrollDirection: Axis.horizontal,
+        child: SizedBox(
+          width: totalWidth,
+          child: Column(
+            children: [
+              // ── Column headers ──────────────────────────────
+              Container(
+                decoration: const BoxDecoration(
+                  border: Border(
+                    top: BorderSide(color: AppTheme.border),
+                    bottom: BorderSide(color: AppTheme.border),
+                  ),
                 ),
-              ),
-              child: Row(
-                children: cols.map((col) {
-                  final isDateCol =
-                      col.key == 'created_at' || col.key == 'updated_at';
-                  final hasFilter = isDateCol
-                      ? _hasDateFilter(col.key)
-                      : col.filterable &&
-                      (_colFilters[col.key] ?? '').isNotEmpty;
+                child: Row(
+                  children: cols.map((col) {
+                    final isDateCol =
+                        col.key == 'created_at' || col.key == 'updated_at';
+                    final hasFilter = isDateCol
+                        ? _hasDateFilter(col.key)
+                        : col.filterable &&
+                        (_colFilters[col.key] ?? '').isNotEmpty;
+                    final isSorted  = _sortColumn == col.key;
 
-                  return SizedBox(
-                    width: col.width,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 10),
-                      child: Row(children: [
-                        Expanded(
-                          child: Text(
-                            col.label.toUpperCase(),
-                            style: TextStyle(
-                              color: hasFilter
-                                  ? AppTheme.accent
-                                  : AppTheme.textMuted,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.6,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        if (col.filterable)
-                          GestureDetector(
-                            onTap: () => _showColumnFilterMenu(
-                                col.key, col.label),
-                            child: Icon(
-                              hasFilter
-                                  ? Icons.filter_alt
-                                  : Icons.filter_alt_outlined,
-                              size: 14,
-                              color: hasFilter
-                                  ? AppTheme.accent
-                                  : AppTheme.textMuted,
-                            ),
-                          ),
-                      ]),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
-
-            // ── Data rows ───────────────────────────────────
-            Expanded(
-              child: page.isEmpty
-                  ? Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.inbox_outlined,
-                        size: 36, color: AppTheme.textMuted),
-                    const SizedBox(height: 10),
-                    Text(
-                      _isPrivileged
-                          ? 'No tickets found'
-                          : 'You have not submitted any tickets yet.',
-                      style: const TextStyle(
-                          color: AppTheme.textSecondary,
-                          fontSize: 13),
-                    ),
-                  ],
-                ),
-              )
-                  : ListView.builder(
-                itemCount: page.length,
-                itemBuilder: (_, i) {
-                  final r      = page[i];
-                  final isEven = i % 2 == 0;
-                  final ticket = _tickets.firstWhere(
-                        (t) => t.id == r['ticket_id'],
-                    orElse: () => Ticket(
-                      id:                r['ticket_id'] ?? '',
-                      title:             r['subject'] ?? '',
-                      categoryName:      r['category'] ?? '',
-                      status:            _mapStatus(r['status'] ?? ''),
-                      priority:          _mapPriority(r['priority']),
-                      submitter:         r['username'] ?? '',
-                      submitterInitials: (r['username'] ?? 'U')
-                          .toString()
-                          .substring(0, 1)
-                          .toUpperCase(),
-                      createdAt: DateTime.tryParse(
-                          r['created_at'] ?? '') ??
-                          DateTime.now(),
-                      description: r['description'] ?? '',
-                    ),
-                  );
-
-                  return GestureDetector(
-                    onTap: () => _openTicket(ticket),
-                    child: MouseRegion(
-                      cursor: SystemMouseCursors.click,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: isEven
-                              ? Colors.transparent
-                              : AppTheme.border.withOpacity(0.15),
-                          border: const Border(
-                            bottom: BorderSide(
-                                color: AppTheme.border,
-                                width: 0.5),
-                          ),
-                        ),
-                        child: Row(
-                          children: cols.map((col) {
-                            final val =
-                            (r[col.key] ?? '').toString();
-                            return SizedBox(
-                              width: col.width,
-                              child: Padding(
-                                padding: const EdgeInsets
-                                    .symmetric(
-                                    horizontal: 12,
-                                    vertical: 10),
-                                child: col.key == 'status'
-                                    ? _statusChip(val)
-                                    : col.key == 'priority'
-                                    ? _priorityChip(val)
-                                    : Text(
-                                  val.isEmpty ? '—' : val,
-                                  style: const TextStyle(
-                                    color: AppTheme
-                                        .textPrimary,
-                                    fontSize: 12,
-                                  ),
-                                  overflow: TextOverflow
-                                      .ellipsis,
+                    return SizedBox(
+                      width: col.width,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 10),
+                        child: Row(children: [
+                          // Tapping the label toggles sort
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => setState(() {
+                                if (_sortColumn == col.key) {
+                                  _isAscending = !_isAscending;
+                                } else {
+                                  _sortColumn  = col.key;
+                                  _isAscending = true;
+                                }
+                                _currentPage = 1;
+                              }),
+                              child: MouseRegion(
+                                cursor: SystemMouseCursors.click,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        col.label.toUpperCase(),
+                                        style: TextStyle(
+                                          color: (hasFilter || isSorted)
+                                              ? AppTheme.accent
+                                              : AppTheme.textMuted,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w700,
+                                          letterSpacing: 0.6,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 3),
+                                    Icon(
+                                      isSorted
+                                          ? (_isAscending
+                                          ? Icons.arrow_upward
+                                          : Icons.arrow_downward)
+                                          : Icons.unfold_more,
+                                      size: 12,
+                                      color: isSorted
+                                          ? AppTheme.accent
+                                          : AppTheme.textMuted.withOpacity(0.5),
+                                    ),
+                                  ],
                                 ),
                               ),
-                            );
-                          }).toList(),
+                            ),
+                          ),
+                          // Filter icon (filterable cols only)
+                          if (col.filterable) ...[
+                            const SizedBox(width: 2),
+                            GestureDetector(
+                              onTap: () => _showColumnFilterMenu(
+                                  col.key, col.label),
+                              child: Icon(
+                                hasFilter
+                                    ? Icons.filter_alt
+                                    : Icons.filter_alt_outlined,
+                                size: 14,
+                                color: hasFilter
+                                    ? AppTheme.accent
+                                    : AppTheme.textMuted,
+                              ),
+                            ),
+                          ],
+                        ]),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+
+              // ── Data rows ───────────────────────────────────
+              Expanded(
+                child: page.isEmpty
+                    ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.inbox_outlined,
+                          size: 36, color: AppTheme.textMuted),
+                      const SizedBox(height: 10),
+                      Text(
+                        _isPrivileged
+                            ? 'No tickets found'
+                            : 'You have not submitted any tickets yet.',
+                        style: const TextStyle(
+                            color: AppTheme.textSecondary,
+                            fontSize: 13),
+                      ),
+                    ],
+                  ),
+                )
+                    : ListView.builder(
+                  itemCount: page.length,
+                  itemBuilder: (_, i) {
+                    final r      = page[i];
+                    final isEven = i % 2 == 0;
+                    final ticket = _tickets.firstWhere(
+                          (t) => t.id == r['ticket_id'],
+                      orElse: () => Ticket(
+                        id:                r['ticket_id'] ?? '',
+                        title:             r['subject'] ?? '',
+                        categoryName:      r['category'] ?? '',
+                        status:            _mapStatus(r['status'] ?? ''),
+                        priority:          _mapPriority(r['priority']),
+                        submitter:         r['username'] ?? '',
+                        submitterInitials: (r['username'] ?? 'U')
+                            .toString()
+                            .substring(0, 1)
+                            .toUpperCase(),
+                        createdAt: DateTime.tryParse(
+                            r['created_at'] ?? '') ??
+                            DateTime.now(),
+                        description: r['description'] ?? '', rawStatus: '',
+                      ),
+                    );
+
+                    return GestureDetector(
+                      onTap: () => _openTicket(ticket),
+                      child: MouseRegion(
+                        cursor: SystemMouseCursors.click,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: isEven
+                                ? Colors.transparent
+                                : AppTheme.border.withOpacity(0.15),
+                            border: const Border(
+                              bottom: BorderSide(
+                                  color: AppTheme.border,
+                                  width: 0.5),
+                            ),
+                          ),
+                          child: Row(
+                            children: cols.map((col) {
+                              final val =
+                              (r[col.key] ?? '').toString();
+                              return SizedBox(
+                                width: col.width,
+                                child: Padding(
+                                  padding: const EdgeInsets
+                                      .symmetric(
+                                      horizontal: 12,
+                                      vertical: 10),
+                                  child: col.key == 'status'
+                                      ? _statusChip(val)
+                                      : col.key == 'priority'
+                                      ? _priorityChip(val)
+                                      : Text(
+                                    val.isEmpty ? '—' : val,
+                                    style: const TextStyle(
+                                      color: AppTheme.textPrimary,
+                                      fontSize: 12,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
                         ),
                       ),
-                    ),
-                  );
-                },
+                    );
+                  },
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -970,25 +1020,114 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
 
   // ── Column filter popup ───────────────────────────────────
   void _showColumnFilterMenu(String key, String label) async {
-    // ── Date columns → custom range picker ──────────────────
     if (key == 'created_at' || key == 'updated_at') {
-      final result = await showDateRangePickerDialog(
+      // Show a small dialog with sort options + date range picker trigger
+      await showDialog(
         context: context,
-        title: label,
-        initialFrom: _dateFrom[key],
-        initialTo:   _dateTo[key],
+        builder: (ctx) => AlertDialog(
+          backgroundColor: AppTheme.surface,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          title: Text('Sort / Filter – $label',
+              style: const TextStyle(color: AppTheme.textPrimary, fontSize: 15)),
+          content: SizedBox(
+            width: 260,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  dense: true,
+                  title: const Text('Sort Oldest → Newest',
+                      style: TextStyle(color: AppTheme.textPrimary, fontSize: 13)),
+                  leading: Icon(Icons.arrow_upward, size: 16,
+                      color: (_sortColumn == key && _isAscending)
+                          ? AppTheme.accent
+                          : AppTheme.textMuted),
+                  onTap: () {
+                    setState(() {
+                      _sortColumn  = key;
+                      _isAscending = true;
+                      _currentPage = 1;
+                    });
+                    Navigator.pop(ctx);
+                  },
+                ),
+                ListTile(
+                  dense: true,
+                  title: const Text('Sort Newest → Oldest',
+                      style: TextStyle(color: AppTheme.textPrimary, fontSize: 13)),
+                  leading: Icon(Icons.arrow_downward, size: 16,
+                      color: (_sortColumn == key && !_isAscending)
+                          ? AppTheme.accent
+                          : AppTheme.textMuted),
+                  onTap: () {
+                    setState(() {
+                      _sortColumn  = key;
+                      _isAscending = false;
+                      _currentPage = 1;
+                    });
+                    Navigator.pop(ctx);
+                  },
+                ),
+                const Divider(color: AppTheme.border),
+                ListTile(
+                  dense: true,
+                  title: Text(
+                    _hasDateFilter(key)
+                        ? 'Change date range…'
+                        : 'Filter by date range…',
+                    style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
+                  ),
+                  leading: Icon(
+                    Icons.date_range,
+                    size: 16,
+                    color: _hasDateFilter(key) ? AppTheme.accent : AppTheme.textMuted,
+                  ),
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    final result = await showDateRangePickerDialog(
+                      context: context,
+                      title: label,
+                      initialFrom: _dateFrom[key],
+                      initialTo:   _dateTo[key],
+                    );
+                    if (result != null) {
+                      setState(() {
+                        _dateFrom[key] = result.from;
+                        _dateTo[key]   = result.to;
+                        _currentPage   = 1;
+                      });
+                    }
+                  },
+                ),
+                if (_hasDateFilter(key))
+                  ListTile(
+                    dense: true,
+                    title: const Text('Clear date filter',
+                        style: TextStyle(color: AppTheme.textMuted, fontSize: 13)),
+                    leading: const Icon(Icons.clear, size: 16, color: AppTheme.textMuted),
+                    onTap: () {
+                      setState(() {
+                        _dateFrom[key] = null;
+                        _dateTo[key]   = null;
+                        _currentPage   = 1;
+                      });
+                      Navigator.pop(ctx);
+                    },
+                  ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
       );
-      if (result != null) {
-        setState(() {
-          _dateFrom[key] = result.from;
-          _dateTo[key]   = result.to;
-          _currentPage   = 1;
-        });
-      }
       return;
     }
 
-    // ── Generic column filter ────────────────────────────────
     final options = _uniqueValues(key);
     if (options.isEmpty) return;
 
@@ -1007,6 +1146,49 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                // ── Sort options ───────────────────────────
+                ListTile(
+                  dense: true,
+                  title: const Text('Sort A → Z',
+                      style: TextStyle(color: AppTheme.textPrimary, fontSize: 13)),
+                  leading: Icon(
+                    Icons.arrow_upward,
+                    size: 16,
+                    color: (_sortColumn == key && _isAscending)
+                        ? AppTheme.accent
+                        : AppTheme.textMuted,
+                  ),
+                  onTap: () {
+                    setState(() {
+                      _sortColumn  = key;
+                      _isAscending = true;
+                      _currentPage = 1;
+                    });
+                    Navigator.pop(ctx);
+                  },
+                ),
+                ListTile(
+                  dense: true,
+                  title: const Text('Sort Z → A',
+                      style: TextStyle(color: AppTheme.textPrimary, fontSize: 13)),
+                  leading: Icon(
+                    Icons.arrow_downward,
+                    size: 16,
+                    color: (_sortColumn == key && !_isAscending)
+                        ? AppTheme.accent
+                        : AppTheme.textMuted,
+                  ),
+                  onTap: () {
+                    setState(() {
+                      _sortColumn  = key;
+                      _isAscending = false;
+                      _currentPage = 1;
+                    });
+                    Navigator.pop(ctx);
+                  },
+                ),
+                const Divider(color: AppTheme.border),
+                // ── Value filter options ───────────────────
                 ListTile(
                   dense: true,
                   title: const Text('All (clear filter)',
@@ -1596,7 +1778,6 @@ class _DateRangePickerDialogState extends State<_DateRangePickerDialog> {
       padding: const EdgeInsets.all(20),
       child: Column(
         children: [
-          // Dual calendars
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1625,7 +1806,6 @@ class _DateRangePickerDialogState extends State<_DateRangePickerDialog> {
 
           const SizedBox(height: 20),
 
-          // Date + time inputs row
           Row(children: [
             Expanded(child: _buildDateTimeFields(
               dateLabel: 'Start date',
@@ -1835,7 +2015,6 @@ class _DateRangePickerDialogState extends State<_DateRangePickerDialog> {
                   fontSize: 13,
                   fontStyle: FontStyle.italic,
                 ),
-
                 border: InputBorder.none,
                 isDense: true,
                 contentPadding: EdgeInsets.zero,
@@ -1872,26 +2051,18 @@ class _DateRangePickerDialogState extends State<_DateRangePickerDialog> {
           },
           style: TextButton.styleFrom(
             foregroundColor: AppTheme.textMuted,
-            padding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 10,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           ),
-          child: const Text('Clear',
-              style: TextStyle(fontSize: 13)),
+          child: const Text('Clear', style: TextStyle(fontSize: 13)),
         ),
         const Spacer(),
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
           style: TextButton.styleFrom(
             foregroundColor: AppTheme.textMuted,
-            padding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 10,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           ),
-          child: const Text('Cancel',
-              style: TextStyle(fontSize: 13)),
+          child: const Text('Cancel', style: TextStyle(fontSize: 13)),
         ),
         const SizedBox(width: 8),
         ElevatedButton(
@@ -1904,10 +2075,7 @@ class _DateRangePickerDialogState extends State<_DateRangePickerDialog> {
             backgroundColor: AppTheme.accent,
             foregroundColor: Colors.white,
             disabledBackgroundColor: AppTheme.accent.withOpacity(0.3),
-            padding: const EdgeInsets.symmetric(
-              horizontal: 20,
-              vertical: 10,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(8),
             ),
@@ -1916,7 +2084,6 @@ class _DateRangePickerDialogState extends State<_DateRangePickerDialog> {
               fontWeight: FontWeight.w600,
             ),
           ),
-
           child: const Text('Apply'),
         ),
       ]),

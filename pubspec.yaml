@@ -32,12 +32,13 @@ dependencies:
     sdk: flutter
   file_picker: ^9.2.3
   http: ^0.13.6
-  intl: ^0.18.1
+  intl: ^0.20.2
   provider: ^6.1.1
   shared_preferences: ^2.2.2
   universal_html: ^2.2.4
   excel: ^4.0.6
   csv: ^6.0.0
+  flutter_quill: ^11.5.0
 
 
   # The following adds the Cupertino Icons font to your application.

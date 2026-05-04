@@ -24,18 +24,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   bool get _hasNewActivity {
     if (_activities.isEmpty) return false;
-
     if (_lastSeenActivityTime == null) return true;
-
     return _activities.first.time.isAfter(_lastSeenActivityTime!);
   }
 
-
   List<ActivityItem> get _visibleActivities {
-    if (_isPrivileged) {
-      return _activities;
-    }
-
+    if (_isPrivileged) return _activities;
     return _activities
         .where((a) =>
     a.actor.toLowerCase().trim() ==
@@ -48,7 +42,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   String _currentUserRole  = '';
   bool   _userLoaded       = false;
 
-  /// Roles that can see ALL tickets
   static const _privilegedRoles = {'admin', 'endorser', 'approver', 'resolver'};
 
   bool get _isPrivileged =>
@@ -106,7 +99,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 getColor: _activityColor,
                 getLabel: _actionLabel,
               ),
-
             ),
           ),
         ),
@@ -132,7 +124,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   // ── Filter & Search ───────────────────────────────────────
   String _selectedFilter = 'All';
-  final List<String> _filters = ['All', 'For', 'In', 'Resolved', 'Cancelled'];
+
+  /// Filter pills — the "For X" labels must match exactly what the API returns.
+  final List<String> _filters = [
+    'All',
+    'For Assessment',
+    'For Endorsement',
+    'For Approval',
+    'For Assignment',
+    'In Progress',
+    'Resolved',
+    'Cancelled',
+  ];
 
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
@@ -140,20 +143,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _isExporting = false;
 
   // ── Data ─────────────────────────────────────────────────
-  /// ALL tickets loaded from API — never filtered by role here
-  final List<Ticket> _allTickets  = [];
-  final List<ActivityItem> _activities = [];
+  final List<Ticket>       _allTickets  = [];
+  final List<ActivityItem> _activities  = [];
   final Map<String, int>   _categoryCount = {};
 
-  Map<String, int> _statsCounts = {
-    'total': 0, 'forAssessment': 0, 'inProgress': 0, 'resolved': 0,
-  };
-
   // ── Role-filtered ticket list ─────────────────────────────
-  /// Base list after role filter (before status/search filter)
   List<Ticket> get _roleFilteredTickets {
     if (_isPrivileged) return _allTickets;
-    // Regular user ("user" role) → only own tickets
     return _allTickets
         .where((t) =>
     t.submitter.toLowerCase().trim() ==
@@ -161,32 +157,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
         .toList();
   }
 
-  // ── Status + search filter applied on top ────────────────
+  // ── Status + search filter ────────────────────────────────
   List<Ticket> get _filteredTickets {
     List<Ticket> list;
-    switch (_selectedFilter) {
-      case 'For':
-        list = _roleFilteredTickets
-            .where((t) => t.status == TicketStatus.forAssessment)
-            .toList();
-        break;
-      case 'In':
-        list = _roleFilteredTickets
-            .where((t) => t.status == TicketStatus.inProgress)
-            .toList();
-        break;
-      case 'Resolved':
-        list = _roleFilteredTickets
-            .where((t) => t.status == TicketStatus.resolved)
-            .toList();
-        break;
-      case 'Cancelled':
-        list = _roleFilteredTickets
-            .where((t) => t.status == TicketStatus.cancelled)
-            .toList();
-        break;
-      default:
-        list = List.from(_roleFilteredTickets);
+
+    if (_selectedFilter == 'All') {
+      list = List.from(_roleFilteredTickets);
+    } else if (_selectedFilter == 'In Progress') {
+      list = _roleFilteredTickets
+          .where((t) => t.status == TicketStatus.inProgress)
+          .toList();
+    } else if (_selectedFilter == 'Resolved') {
+      list = _roleFilteredTickets
+          .where((t) => t.status == TicketStatus.resolved)
+          .toList();
+    } else if (_selectedFilter == 'Cancelled') {
+      list = _roleFilteredTickets
+          .where((t) => t.status == TicketStatus.cancelled)
+          .toList();
+    } else {
+      // "For Assessment" / "For Endorsement" / "For Approval" / "For Assignment"
+      // Match the rawStatus directly (case-insensitive)
+      final filterNorm = _selectedFilter.toLowerCase().replaceAll(' ', '');
+      list = _roleFilteredTickets.where((t) {
+        final raw = t.rawStatus.toLowerCase().replaceAll(' ', '');
+        return raw == filterNorm;
+      }).toList();
     }
 
     if (_searchQuery.isEmpty) return list;
@@ -202,15 +198,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // ── Stats derived from role-filtered list ─────────────────
   Map<String, int> get _visibleStats {
     final visible = _roleFilteredTickets;
+
+    int countRaw(String norm) => visible.where((t) {
+      return t.rawStatus.toLowerCase().replaceAll(' ', '') == norm;
+    }).length;
+
+    final forTotal = countRaw('forassessment')
+        + countRaw('forendorsement')
+        + countRaw('forapproval')
+        + countRaw('forassignment');
+
     return {
-      'total':         visible.length,
-      'forAssessment': visible.where((t) => t.status == TicketStatus.forAssessment).length,
-      'inProgress':    visible.where((t) => t.status == TicketStatus.inProgress).length,
-      'resolved':      visible.where((t) => t.status == TicketStatus.resolved).length,
+      'total':          visible.length,
+      'forTotal':       forTotal,
+      'forAssessment':  countRaw('forassessment'),
+      'forEndorsement': countRaw('forendorsement'),
+      'forApproval':    countRaw('forapproval'),
+      'forAssignment':  countRaw('forassignment'),
+      'inProgress':     visible.where((t) => t.status == TicketStatus.inProgress).length,
+      'resolved':       visible.where((t) => t.status == TicketStatus.resolved).length,
     };
   }
 
-  // ── Category counts derived from role-filtered list ───────
+  // ── Category counts ───────────────────────────────────────
   Map<String, int> get _visibleCategoryCount {
     final Map<String, int> counts = {};
     for (final t in _roleFilteredTickets) {
@@ -223,7 +233,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    _loadCurrentUser();          // loads role first, then tickets
+    _loadCurrentUser();
     _searchController.addListener(() {
       setState(() => _searchQuery = _searchController.text);
     });
@@ -236,7 +246,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.dispose();
   }
 
-  // ── Load current user (same pattern as status_sidebar) ────
+  // ── Load current user ─────────────────────────────────────
   Future<void> _loadCurrentUser() async {
     try {
       final savedUsername = await ApiLogin.getUsername();
@@ -254,11 +264,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         role = (match['role'] ?? '').toString();
       }
 
-      // fallback — first user in list
       if (role.isEmpty && users.isNotEmpty) {
         role = users.first['role'] ?? '';
       }
-
 
       if (mounted) {
         setState(() {
@@ -271,7 +279,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       if (mounted) setState(() => _userLoaded = true);
     }
 
-    // Load tickets only after we know the role
     await _loadTickets();
   }
 
@@ -291,21 +298,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final ticketData = await ApiTicket.getAllTickets();
 
     final tickets = ticketData.map((e) {
-      TicketStatus status;
-      switch ((e['status'] ?? '').toLowerCase()) {
-        case 'forassessment':
-        case 'for assessment':
-          status = TicketStatus.forAssessment; break;
-        case 'inprogress':
-        case 'in progress':
-          status = TicketStatus.inProgress; break;
-        case 'resolved':
-          status = TicketStatus.resolved; break;
-        case 'cancelled':
-          status = TicketStatus.cancelled; break;
-        default:
-          status = TicketStatus.forAssessment;
-      }
+      final rawSt = (e['status'] ?? '').toString().trim();
 
       final rawPriority = e['priority'];
       int priorityValue;
@@ -330,7 +323,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         id:                e['ticket_id'] ?? '',
         title:             e['subject'] ?? '',
         categoryName:      e['category'] ?? 'Uncategorized',
-        status:            status,
+        status:            mapStatus(rawSt),  // enum for logic
+        rawStatus:         rawSt,             // real label for display
         priority:          priority,
         submitter:         e['username'] ?? 'Unknown',
         submitterInitials: (e['username'] ?? 'U').substring(0, 1).toUpperCase(),
@@ -339,7 +333,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       );
     }).toList();
 
-    // Activity feed
+    // ── Activity feed ─────────────────────────────────────
     final activities = <ActivityItem>[];
     for (final t in tickets) {
       activities.add(ActivityItem(
@@ -354,7 +348,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       if (t.status == TicketStatus.inProgress ||
           t.status == TicketStatus.resolved   ||
           t.status == TicketStatus.cancelled) {
-        final actType   = t.status == TicketStatus.inProgress
+        final actType = t.status == TicketStatus.inProgress
             ? ActivityType.moved
             : t.status == TicketStatus.resolved
             ? ActivityType.resolved
@@ -377,7 +371,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     activities.sort((a, b) => b.time.compareTo(a.time));
 
-    // Category counts (all tickets, for privileged; own only, for user)
     final Map<String, int> catCount = {};
     for (final t in tickets) {
       catCount[t.categoryName] = (catCount[t.categoryName] ?? 0) + 1;
@@ -385,17 +378,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     if (!mounted) return;
     setState(() {
-      _allTickets ..clear()..addAll(tickets);
-      _activities ..clear()..addAll(activities.take(20));
+      _allTickets   ..clear()..addAll(tickets);
+      _activities   ..clear()..addAll(activities.take(20));
       _categoryCount..clear()..addAll(catCount);
-      // _statsCounts is now computed dynamically via _visibleStats getter
     });
   }
 
   // ── Build ─────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    // Show full-screen loader until we know the user role
     if (!_userLoaded) {
       return const Scaffold(
         backgroundColor: AppTheme.sidebarBg,
@@ -420,11 +411,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // ── Role badge ─────────────────────────────────
-                    if (!_isPrivileged)
-                      _buildUserBanner(),
+                    if (!_isPrivileged) _buildUserBanner(),
                     if (!_isPrivileged) const SizedBox(height: 16),
-
                     _buildStatsRow(),
                     const SizedBox(height: 24),
                     _buildMainContent(filtered, catCounts, maxCat),
@@ -435,7 +423,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ],
         ),
 
-        // ── Overlay ─────────────────────────────────────────
         if (_isSidebarOpen || _isCreateOpen)
           GestureDetector(
             onTap: () => setState(() {
@@ -445,7 +432,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             child: Container(color: Colors.black54),
           ),
 
-        // ── Ticket Detail sidebar ────────────────────────────
         AnimatedPositioned(
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeInOut,
@@ -457,7 +443,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ),
 
-        // ── Create Ticket sidebar ────────────────────────────
         AnimatedPositioned(
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeInOut,
@@ -491,15 +476,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
         Expanded(
           child: RichText(
             text: TextSpan(
-              style: const TextStyle(
-                  color: AppTheme.textSecondary, fontSize: 12),
+              style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
               children: [
                 const TextSpan(text: 'Viewing as '),
                 TextSpan(
                   text: _currentUsername,
                   style: const TextStyle(
-                      color: AppTheme.textPrimary,
-                      fontWeight: FontWeight.w600),
+                      color: AppTheme.textPrimary, fontWeight: FontWeight.w600),
                 ),
                 const TextSpan(text: ' — you can only see tickets you submitted.'),
               ],
@@ -519,150 +502,172 @@ class _DashboardScreenState extends State<DashboardScreen> {
         color: AppTheme.sidebarBg,
         border: Border(bottom: BorderSide(color: AppTheme.border)),
       ),
-      child: Row(
-        children: [
-          const Text(
-            'Dashboard',
-            style: TextStyle(
-              color: AppTheme.textPrimary,
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isNarrow = constraints.maxWidth < 700;
 
-          // ── Role chip ──────────────────────────────────────
-          if (_currentUserRole.isNotEmpty) ...[
-            const SizedBox(width: 10),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: _roleColor.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(5),
-                border: Border.all(color: _roleColor.withOpacity(0.5)),
+          Widget content = Row(
+            mainAxisSize: isNarrow ? MainAxisSize.min : MainAxisSize.max,
+            children: [
+              const Text(
+                'Dashboard',
+                style: TextStyle(
+                  color: AppTheme.textPrimary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
+
+              if (_currentUserRole.isNotEmpty) ...[
+                const SizedBox(width: 10),
                 Container(
-                  width: 5, height: 5,
-                  margin: const EdgeInsets.only(right: 5),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                      color: _roleColor, shape: BoxShape.circle),
+                    color: _roleColor.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(5),
+                    border: Border.all(color: _roleColor.withOpacity(0.5)),
+                  ),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Container(
+                      width: 5, height: 5,
+                      margin: const EdgeInsets.only(right: 5),
+                      decoration: BoxDecoration(
+                          color: _roleColor, shape: BoxShape.circle),
+                    ),
+                    Text(
+                      _currentUserRole.toUpperCase(),
+                      style: TextStyle(
+                          color: _roleColor,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.6),
+                    ),
+                  ]),
                 ),
-                Text(
-                  _currentUserRole.toUpperCase(),
-                  style: TextStyle(
-                      color: _roleColor,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.6),
-                ),
-              ]),
-            ),
-          ],
+              ],
 
-          const SizedBox(width: 16),
+              const SizedBox(width: 16),
 
-          // ── Search ─────────────────────────────────────────
-          Expanded(
-            child: Container(
-              height: 36,
-              decoration: BoxDecoration(
-                color: AppTheme.surface,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppTheme.border),
-              ),
-              child: Row(children: [
-                const SizedBox(width: 12),
-                const Icon(Icons.search, size: 16, color: AppTheme.textSecondary),
-                const SizedBox(width: 8),
+              // Search box
+              if (isNarrow)
+                SizedBox(
+                  width: 260,
+                  height: 36,
+                  child: _buildSearchBox(),
+                )
+              else
                 Expanded(
-                  child: TextField(
-                    controller: _searchController,
-                    style: const TextStyle(
-                        color: AppTheme.textPrimary, fontSize: 13),
-                    decoration: const InputDecoration(
-                      hintText: 'Search tickets, users...',
-                      hintStyle:
-                      TextStyle(color: AppTheme.textMuted, fontSize: 13),
-                      border: InputBorder.none,
-                      isDense: true,
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                  ),
+                  child: _buildSearchBox(),
                 ),
-                if (_searchQuery.isNotEmpty)
-                  GestureDetector(
-                    onTap: () => _searchController.clear(),
-                    child: const Padding(
-                      padding: EdgeInsets.only(right: 8),
-                      child: Icon(Icons.close,
-                          size: 14, color: AppTheme.textSecondary),
-                    ),
+
+              const SizedBox(width: 16),
+
+              CompositedTransformTarget(
+                link: _notificationLink,
+                child: Stack(children: [
+                  IconButton(
+                    icon: const Icon(Icons.notifications_outlined,
+                        color: AppTheme.textSecondary),
+                    onPressed: _toggleNotificationPanel,
+                    tooltip: 'Recent Activity',
                   ),
-              ]),
-            ),
-          ),
-
-          const SizedBox(width: 16),
-
-          // ── Notifications ──────────────────────────────────
-          CompositedTransformTarget(
-            link: _notificationLink,
-            child: Stack(children: [
-              IconButton(
-                icon: const Icon(Icons.notifications_outlined,
-                    color: AppTheme.textSecondary),
-                onPressed: _toggleNotificationPanel,
-                tooltip: 'Recent Activity',
+                  if (_hasNewActivity)
+                    const Positioned(
+                      right: 8, top: 8,
+                      child: CircleAvatar(
+                        radius: 4,
+                        backgroundColor: AppTheme.statusCancelled,
+                      ),
+                    ),
+                ]),
               ),
-              if (_hasNewActivity)
-                const Positioned(
-                  right: 8,
-                  top: 8,
-                  child: CircleAvatar(
-                    radius: 4,
-                    backgroundColor: AppTheme.statusCancelled,
-                  ),
+
+              if (_isPrivileged)
+                IconButton(
+                  icon: _isExporting
+                      ? const SizedBox(
+                      width: 18, height: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppTheme.textSecondary))
+                      : const Icon(Icons.download_outlined,
+                      color: AppTheme.textSecondary),
+                  tooltip: 'Export tickets to Excel',
+                  onPressed: _isExporting ? null : _handleExport,
                 ),
 
-            ]),
-          ),
+              const SizedBox(width: 8),
 
-          // ── Export (privileged only) ───────────────────────
-          if (_isPrivileged)
-            IconButton(
-              icon: _isExporting
-                  ? const SizedBox(
-                  width: 18, height: 18,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2, color: AppTheme.textSecondary))
-                  : const Icon(Icons.download_outlined,
-                  color: AppTheme.textSecondary),
-              tooltip: 'Export tickets to Excel',
-              onPressed: _isExporting ? null : _handleExport,
-            ),
+              ElevatedButton.icon(
+                onPressed: () => setState(() {
+                  _isSidebarOpen = false;
+                  _isCreateOpen  = true;
+                }),
+                icon: const Icon(Icons.add, size: 16),
+                label: const Text('New Ticket'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.accent,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 10),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                  textStyle: const TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          );
 
-          const SizedBox(width: 8),
+          if (isNarrow) {
+            return SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: content,
+            );
+          }
 
-          // ── New Ticket ─────────────────────────────────────
-          ElevatedButton.icon(
-            onPressed: () => setState(() {
-              _isSidebarOpen = false;
-              _isCreateOpen  = true;
-            }),
-            icon: const Icon(Icons.add, size: 16),
-            label: const Text('New Ticket'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.accent,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
-              textStyle:
-              const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-            ),
-          ),
-        ],
+          return content;
+        },
       ),
+    );
+  }
+
+// Extract search box into its own method
+  Widget _buildSearchBox() {
+    return Container(
+      height: 36,
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: Row(children: [
+        const SizedBox(width: 12),
+        const Icon(Icons.search, size: 16, color: AppTheme.textSecondary),
+        const SizedBox(width: 8),
+        Expanded(
+          child: TextField(
+            controller: _searchController,
+            style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
+            decoration: const InputDecoration(
+              hintText: 'Search tickets, users...',
+              hintStyle: TextStyle(color: AppTheme.textMuted, fontSize: 13),
+              border: InputBorder.none,
+              isDense: true,
+              contentPadding: EdgeInsets.zero,
+            ),
+          ),
+        ),
+        if (_searchQuery.isNotEmpty)
+          GestureDetector(
+            onTap: () => _searchController.clear(),
+            child: const Padding(
+              padding: EdgeInsets.only(right: 8),
+              child: Icon(Icons.close,
+                  size: 14, color: AppTheme.textSecondary),
+            ),
+          ),
+      ]),
     );
   }
 
@@ -675,14 +680,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         title: const Text('Export Tickets',
             style: TextStyle(color: AppTheme.textPrimary)),
-        content: const Text(
-            'Download all tickets as an Excel file?',
+        content: const Text('Download all tickets as an Excel file?',
             style: TextStyle(color: AppTheme.textSecondary)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel',
-                style: TextStyle(color: AppTheme.textMuted)),
+            child: const Text('Cancel', style: TextStyle(color: AppTheme.textMuted)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -721,57 +724,47 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   // ── Role accent color ─────────────────────────────────────
-  // Color get _roleColor {
-  //   switch (_currentUserRole.toLowerCase().trim()) {
-  //     case 'admin':    return Colors.white;
-  //     case 'endorser': return Colors.white;
-  //     case 'approver': return Colors.white;
-  //     case 'resolver': return Colors.white;
-  //     default:         return Colors.white;   // "user"
-  //   }
-  // }
-
   Color get _roleColor {
     switch (_currentUserRole.toLowerCase().trim()) {
       case 'admin':    return Colors.black;
       case 'endorser': return Colors.black;
       case 'approver': return Colors.black;
       case 'resolver': return Colors.black;
-      default:         return Colors.black;   // "user"
+      default:         return Colors.black;
     }
   }
 
-  // ── Stats row ─────────────────────────────────────────────
+  // ── Stats row — keeps original 4-card layout ──────────────
   Widget _buildStatsRow() {
     final s = _visibleStats;
     return Row(children: [
-      StatsCard(
+      Expanded(child: StatsCard(
         title: 'Total Tickets',
         count: s['total'] ?? 0,
         subtitle: _isPrivileged ? 'All time records' : 'Your tickets',
         accentColor: AppTheme.accent,
-      ),
+      )),
       const SizedBox(width: 16),
-      StatsCard(
-        title: 'For Assessment',
-        count: s['forAssessment'] ?? 0,
-        subtitle: 'awaiting review',
+      Expanded(child: StatsCard(
+        title: 'For Review',
+        count: s['forTotal'] ?? 0,
+        subtitle: 'status',
         accentColor: AppTheme.statusAssessment,
-      ),
+      )),
       const SizedBox(width: 16),
-      StatsCard(
+      Expanded(child: StatsCard(
         title: 'In Progress',
         count: s['inProgress'] ?? 0,
-        subtitle: 'being worked',
+        subtitle: 'being worked on',
         accentColor: AppTheme.statusProgress,
-      ),
+      )),
       const SizedBox(width: 16),
-      StatsCard(
+      Expanded(child: StatsCard(
         title: 'Resolved',
         count: s['resolved'] ?? 0,
         subtitle: 'completed',
         accentColor: AppTheme.statusResolved,
-      ),
+      )),
     ]);
   }
 
@@ -828,8 +821,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             padding: const EdgeInsets.all(32),
             child: Center(
               child: Column(mainAxisSize: MainAxisSize.min, children: [
-                Icon(Icons.inbox_outlined,
-                    size: 36, color: AppTheme.textMuted),
+                Icon(Icons.inbox_outlined, size: 36, color: AppTheme.textMuted),
                 const SizedBox(height: 10),
                 Text(
                   _isPrivileged
@@ -878,37 +870,41 @@ class _DashboardScreenState extends State<DashboardScreen> {
           style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
         ),
         const Spacer(),
-        Row(
-          children: _filters.map((f) {
-            final isSelected = _selectedFilter == f;
-            return GestureDetector(
-              onTap: () => setState(() => _selectedFilter = f),
-              child: Container(
-                margin: const EdgeInsets.only(left: 6),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? AppTheme.accent.withOpacity(0.15)
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(
-                      color: isSelected ? AppTheme.accent : AppTheme.border),
-                ),
-                child: Text(
-                  f,
-                  style: TextStyle(
-                    color: isSelected
-                        ? AppTheme.accent
-                        : AppTheme.textSecondary,
-                    fontSize: 12,
-                    fontWeight:
-                    isSelected ? FontWeight.w600 : FontWeight.normal,
-                  ),
-                ),
+        // ── Scrollable filter pills ───────────────────────
+        Container(
+          height: 32,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            color: AppTheme.surface,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: AppTheme.border),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: _selectedFilter,
+              dropdownColor: AppTheme.surface,
+              icon: const Icon(Icons.keyboard_arrow_down,
+                  size: 16, color: AppTheme.textSecondary),
+              style: const TextStyle(
+                color: AppTheme.textPrimary,
+                fontSize: 12,
               ),
-            );
-          }).toList(),
+              items: _filters.map((f) {
+                return DropdownMenuItem(
+                  value: f,
+                  child: Text(f),
+                );
+              }).toList(),
+              onChanged: (value) {
+                if (value != null) {
+                  setState(() => _selectedFilter = value);
+                }
+              },
+            ),
+          ),
         ),
+
+
       ]),
     );
   }
@@ -936,8 +932,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const SizedBox(height: 16),
           if (counts.isEmpty)
             const Text('No data',
-                style: TextStyle(
-                    color: AppTheme.textMuted, fontSize: 12))
+                style: TextStyle(color: AppTheme.textMuted, fontSize: 12))
           else
             ...counts.entries.map((e) => Padding(
               padding: const EdgeInsets.only(bottom: 10),
@@ -951,19 +946,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Color _getCategoryColor(String category) {
     final c = category.toLowerCase();
-    if (c.contains('network'))  return AppTheme.catNetwork;
-    if (c.contains('software')) return AppTheme.catSoftware;
-    if (c.contains('storage'))  return AppTheme.catStorage;
-    if (c.contains('database')) return AppTheme.catDatabase;
-    if (c.contains('endpoint')) return AppTheme.catEndpoint;
-    if (c.contains('server'))   return AppTheme.catStorage;
+    if (c.contains('network'))     return AppTheme.catNetwork;
+    if (c.contains('software'))    return AppTheme.catSoftware;
+    if (c.contains('storage'))     return AppTheme.catStorage;
+    if (c.contains('database'))    return AppTheme.catDatabase;
+    if (c.contains('endpoint'))    return AppTheme.catEndpoint;
+    if (c.contains('server'))      return AppTheme.catStorage;
     if (c.contains('application')) return AppTheme.catApplications;
     return AppTheme.accent;
   }
 
   // ── Recent activity ───────────────────────────────────────
   Widget _buildRecentActivity() {
-    // For plain users, only show their own activity
     final items = _isPrivileged
         ? _activities
         : _activities
@@ -1002,8 +996,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             child: Padding(
               padding: EdgeInsets.symmetric(vertical: 12),
               child: Text('No recent activity',
-                  style: TextStyle(
-                      color: AppTheme.textSecondary, fontSize: 12)),
+                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
             ),
           )
               : Column(
@@ -1020,7 +1013,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Supporting widgets (unchanged visual style)
+// Supporting widgets — unchanged from original
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _NotificationDropdown extends StatelessWidget {
@@ -1057,8 +1050,7 @@ class _NotificationDropdown extends StatelessWidget {
         padding: EdgeInsets.symmetric(vertical: 20),
         child: Center(
           child: Text('No recent activity',
-              style: TextStyle(
-                  color: AppTheme.textSecondary, fontSize: 12)),
+              style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
         ),
       )
           : Column(
@@ -1083,8 +1075,7 @@ class _NotificationDropdown extends StatelessWidget {
                   Container(
                     width: 8, height: 8,
                     margin: const EdgeInsets.only(top: 3),
-                    decoration: BoxDecoration(
-                        color: color, shape: BoxShape.circle),
+                    decoration: BoxDecoration(color: color, shape: BoxShape.circle),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -1094,24 +1085,21 @@ class _NotificationDropdown extends StatelessWidget {
                         RichText(
                           text: TextSpan(
                             style: const TextStyle(
-                                fontSize: 12,
-                                color: AppTheme.textSecondary),
+                                fontSize: 12, color: AppTheme.textSecondary),
                             children: [
                               TextSpan(
                                   text: item.actor,
                                   style: const TextStyle(
                                       color: AppTheme.textPrimary,
                                       fontWeight: FontWeight.w600)),
-                              TextSpan(
-                                  text: ' ${getLabel(item.type)}'),
+                              TextSpan(text: ' ${getLabel(item.type)}'),
                             ],
                           ),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           '${item.ticketId} · ${item.ticketTitle}',
-                          style: const TextStyle(
-                              fontSize: 11, color: AppTheme.textMuted),
+                          style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -1119,8 +1107,7 @@ class _NotificationDropdown extends StatelessWidget {
                         Text(item.timeAgo,
                             style: TextStyle(
                                 fontSize: 10,
-                                color:
-                                AppTheme.textMuted.withOpacity(0.7))),
+                                color: AppTheme.textMuted.withOpacity(0.7))),
                       ],
                     ),
                   ),
@@ -1164,8 +1151,7 @@ class _CategoryBar extends StatelessWidget {
       SizedBox(
         width: 90,
         child: Text(label,
-            style: const TextStyle(
-                color: AppTheme.textSecondary, fontSize: 11),
+            style: const TextStyle(color: AppTheme.textSecondary, fontSize: 11),
             overflow: TextOverflow.ellipsis),
       ),
       const SizedBox(width: 8),
@@ -1181,8 +1167,7 @@ class _CategoryBar extends StatelessWidget {
             child: Container(
                 height: 4,
                 decoration: BoxDecoration(
-                    color: color,
-                    borderRadius: BorderRadius.circular(2))),
+                    color: color, borderRadius: BorderRadius.circular(2))),
           ),
         ]),
       ),
@@ -1190,8 +1175,7 @@ class _CategoryBar extends StatelessWidget {
       SizedBox(
         width: 20,
         child: Text(count.toString(),
-            style: const TextStyle(
-                color: AppTheme.textSecondary, fontSize: 11),
+            style: const TextStyle(color: AppTheme.textSecondary, fontSize: 11),
             textAlign: TextAlign.right),
       ),
     ]);
@@ -1223,8 +1207,7 @@ class _ActivityTile extends StatelessWidget {
           Container(
             width: 8, height: 8,
             margin: const EdgeInsets.only(top: 3),
-            decoration:
-            BoxDecoration(color: color, shape: BoxShape.circle),
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -1233,8 +1216,7 @@ class _ActivityTile extends StatelessWidget {
               children: [
                 RichText(
                   text: TextSpan(
-                    style: const TextStyle(
-                        fontSize: 12, color: AppTheme.textSecondary),
+                    style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
                     children: [
                       TextSpan(
                           text: item.actor,
@@ -1247,8 +1229,7 @@ class _ActivityTile extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text('${item.ticketId} · ${item.ticketTitle}',
-                    style: const TextStyle(
-                        fontSize: 11, color: AppTheme.textMuted),
+                    style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis),
                 const SizedBox(height: 2),

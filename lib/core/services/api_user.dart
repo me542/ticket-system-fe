@@ -2,38 +2,23 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'api_login.dart';
 
-
 class ApiUser {
-  static const String baseUrl = 'http://localhost:8080/api/user';
-
+  static const String baseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://idiyanale-be.bakawan-ai.com') + '/api/user';
 
   // ================= TOKEN =================
   static Future<String?> getToken() async {
     final token = await ApiLogin.getToken();
-
-
-    print("TOKEN FROM ApiLogin: $token"); // 🔥 DEBUG
-
-
     return token;
   }
-
 
   // ================= HEADERS =================
   static Future<Map<String, String>> _headers() async {
     final token = await getToken();
-
-
     final headers = {
       'Content-Type': 'application/json',
       if (token != null && token.isNotEmpty)
         'Authorization': 'Bearer $token',
     };
-
-
-    print("HEADERS: $headers"); // 🔥 DEBUG
-
-
     return headers;
   }
 
@@ -65,15 +50,9 @@ class ApiUser {
         headers: await _headers(),
         body: body,
       );
-
-
-      print("CREATE STATUS: ${response.statusCode}");
-      print("CREATE BODY: ${response.body}");
-
-
       return response.statusCode == 200 || response.statusCode == 201;
     } catch (e) {
-      print("CREATE ERROR: $e");
+      //
       return false;
     }
   }
@@ -108,15 +87,9 @@ class ApiUser {
         headers: await _headers(),
         body: body,
       );
-
-
-      print("UPDATE STATUS: ${response.statusCode}");
-      print("UPDATE BODY: ${response.body}");
-
-
       return response.statusCode == 200;
     } catch (e) {
-      print("UPDATE ERROR: $e");
+      //
       return false;
     }
   }
@@ -138,15 +111,9 @@ class ApiUser {
         headers: await _headers(),
         body: body,
       );
-
-
-      print("DISABLE STATUS: ${response.statusCode}");
-      print("DISABLE BODY: ${response.body}");
-
-
       return response.statusCode == 200;
     } catch (e) {
-      print("DISABLE ERROR: $e");
+      //
       return false;
     }
   }
@@ -166,15 +133,10 @@ class ApiUser {
         headers: await _headers(),
         body: body,
       );
-
-      print("ENABLE STATUS: ${response.statusCode}");
-      print("ENABLE BODY: ${response.body}");
-
       return response.statusCode == 200;
     } catch (e) {
-      print("ENABLE ERROR: $e");
+      //
       return false;
     }
   }
 }
-

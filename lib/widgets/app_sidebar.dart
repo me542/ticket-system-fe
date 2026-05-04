@@ -17,136 +17,143 @@ class AppSidebar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final roleFuture = ApiLogin.getRole(); // ✅ reuse for all role checks
+    final roleFuture = ApiLogin.getRole();
 
     return Container(
       width: 220,
       color: AppTheme.sidebarBg,
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Logo
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
-            child: Row(
-              children: [
-                Image.asset(
-                  '/Users/bakawan-user/Desktop/ticket-system-fe/lib/assets/favicon1.png',
-                  width: 60,
-                  height: 60,
-                  fit: BoxFit.contain,
-                ),
-                const SizedBox(width: 12),
-                const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'IDIYANALE',
-                      style: TextStyle(
-                        color: Color(0xFFDAB76B),
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1.2,
-                      ),
+          // 🔥 SCROLLABLE CONTENT
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Logo
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
+                    child: Row(
+                      children: [
+                        Image.asset(
+                          '/Users/bakawan-user/Desktop/ticket-system-fe/lib/assets/favicon1.png',
+                          width: 60,
+                          height: 60,
+                          fit: BoxFit.contain,
+                        ),
+                        const SizedBox(width: 12),
+                        const Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'IDIYANALE',
+                              style: TextStyle(
+                                color: Color(0xFFDAB76B),
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 1.2,
+                              ),
+                            ),
+                            Text(
+                              'Bakawan Ticketing System',
+                              style: TextStyle(
+                                color: AppTheme.textSecondary,
+                                fontSize: 7,
+                                letterSpacing: 1.0,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                    Text(
-                      'Bakawan Ticketing System',
-                      style: TextStyle(
-                        color: AppTheme.textSecondary,
-                        fontSize: 7,
-                        letterSpacing: 1.0,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+                  ),
+
+                  _sectionLabel('MAIN'),
+
+                  _navItem(
+                    icon: Icons.dashboard_outlined,
+                    label: 'Dashboard',
+                    route: 'dashboard',
+                  ),
+
+                  _navItem(
+                    icon: Icons.confirmation_number_outlined,
+                    label: 'All Tickets',
+                    route: 'tickets',
+                    badge: allTicketsCount,
+                  ),
+
+                  // Reports (Admin)
+                  FutureBuilder<String>(
+                    future: roleFuture,
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData) return const SizedBox();
+
+                      if (snapshot.data == 'admin') {
+                        return _navItem(
+                          icon: Icons.report,
+                          label: 'Reports',
+                          route: 'reports',
+                        );
+                      }
+
+                      return const SizedBox.shrink();
+                    },
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  _sectionLabel('MANAGEMENT'),
+
+                  // Users
+                  FutureBuilder<String>(
+                    future: roleFuture,
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData) return const SizedBox();
+
+                      if (snapshot.data == 'admin') {
+                        return _navItem(
+                          icon: Icons.people_outline,
+                          label: 'User',
+                          route: 'users',
+                        );
+                      }
+
+                      return const SizedBox.shrink();
+                    },
+                  ),
+
+                  // Template
+                  FutureBuilder<String>(
+                    future: roleFuture,
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData) return const SizedBox();
+
+                      if (snapshot.data == 'admin') {
+                        return _navItem(
+                          icon: Icons.report,
+                          label: 'Template',
+                          route: 'template',
+                        );
+                      }
+
+                      return const SizedBox.shrink();
+                    },
+                  ),
+
+                  _navItem(
+                    icon: Icons.settings_outlined,
+                    label: 'Settings',
+                    route: 'settings',
+                  ),
+
+                  const SizedBox(height: 20),
+                ],
+              ),
             ),
           ),
 
-          // MAIN section
-          _sectionLabel('MAIN'),
-
-          _navItem(
-            icon: Icons.dashboard_outlined,
-            label: 'Dashboard',
-            route: 'dashboard',
-          ),
-
-          _navItem(
-            icon: Icons.confirmation_number_outlined,
-            label: 'All Tickets',
-            route: 'tickets',
-            badge: allTicketsCount,
-          ),
-
-          // ✅ REPORTS (ADMIN ONLY)
-          FutureBuilder<String>(
-            future: roleFuture,
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) return const SizedBox();
-
-              if (snapshot.data == 'admin') {
-                return _navItem(
-                  icon: Icons.report,
-                  label: 'Reports',
-                  route: 'reports',
-                );
-              }
-
-              return const SizedBox.shrink();
-            },
-          ),
-
-          const SizedBox(height: 16),
-
-          _sectionLabel('MANAGEMENT'),
-
-          // ✅ USERS (ADMIN ONLY)
-          FutureBuilder<String>(
-            future: roleFuture,
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) return const SizedBox();
-
-              if (snapshot.data == 'admin') {
-                return _navItem(
-                  icon: Icons.people_outline,
-                  label: 'User',
-                  route: 'users',
-                );
-              }
-
-              return const SizedBox.shrink();
-            },
-          ),
-
-          // ✅ Template (ADMIN ONLY)
-          FutureBuilder<String>(
-            future: roleFuture,
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) return const SizedBox();
-
-              if (snapshot.data == 'admin') {
-                return _navItem(
-                  icon: Icons.report,
-                  label: 'Template',
-                  route: 'template',
-                );
-              }
-
-              return const SizedBox.shrink();
-            },
-          ),
-
-
-          _navItem(
-            icon: Icons.settings_outlined,
-            label: 'Settings',
-            route: 'settings',
-          ),
-
-          const Spacer(),
-
-          // User profile at bottom
+          // 🔥 FIXED BOTTOM USER (NO OVERFLOW)
           FutureBuilder(
             future: Future.wait([
               ApiLogin.getUsername(),
@@ -168,8 +175,7 @@ class AppSidebar extends StatelessWidget {
 
               return Container(
                 margin: const EdgeInsets.all(12),
-                padding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 decoration: BoxDecoration(
                   color: AppTheme.surfaceElevated,
                   borderRadius: BorderRadius.circular(10),
@@ -228,6 +234,7 @@ class AppSidebar extends StatelessWidget {
       ),
     );
   }
+
 
   Widget _sectionLabel(String label) {
     return Padding(

@@ -1,0 +1,18 @@
+#version: '3.8'
+#
+#services:
+#  flutter-app:
+#    build:
+#      context: .
+#      dockerfile: Dockerfile
+#    ports:
+#      - "8080:80"
+#    restart: unless-stopped
+#
+#  backend-api:
+#    image: your-backend-image   # e.g. node:18, python:3.11, etc.
+#    ports:
+#      - "3000:3000"
+#    env_file:
+#      - .env                    # your .env is loaded here
+#    restart: unless-stopped

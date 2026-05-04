@@ -1,3 +1,4 @@
+import 'dart:async';          // ← add this
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -13,7 +14,6 @@ import 'screens/reports.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:universal_html/html.dart' as html;
 
-// Global ThemeMode notifier
 final themeModeNotifier = ValueNotifier<ThemeMode>(ThemeMode.light);
 
 void main() async {
@@ -46,7 +46,7 @@ class MyApp extends StatelessWidget {
   }
 }
 
-// ── AuthGate ──────────────────────────────────────────────────────────────────
+// ── AuthGate (unchanged) ──────────────────────────────────────────────────────
 class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
 
@@ -67,7 +67,6 @@ class _AuthGateState extends State<AuthGate> {
   Future<void> _checkAuth() async {
     bool valid = false;
 
-    // Read from sessionStorage (per-tab) on web
     if (kIsWeb) {
       final token = html.window.sessionStorage['user_token'] ?? '';
       if (token.isNotEmpty) {
@@ -91,7 +90,6 @@ class _AuthGateState extends State<AuthGate> {
         }
       }
     } else {
-      // Mobile: use SharedPreferences
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('user_token') ?? '';
       valid = token.isNotEmpty;
@@ -117,7 +115,7 @@ class _AuthGateState extends State<AuthGate> {
   }
 }
 
-// ── MainShell ─────────────────────────────────────────────────────────────────
+// ── MainShell with Auto-Refresh ───────────────────────────────────────────────
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
 
@@ -127,24 +125,48 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   String _currentRoute = 'dashboard';
+  Timer? _refreshTimer;                          // ← timer reference
+  int _refreshKey = 0;                           // ← forces child rebuild
+
+  @override
+  void initState() {
+    super.initState();
+    _startAutoRefresh();
+  }
+
+  void _startAutoRefresh() {
+    _refreshTimer = Timer.periodic(
+      const Duration(minutes: 1),               // ← every 5 minutes
+          (_) {
+        if (mounted) {
+          setState(() => _refreshKey++);         // ← triggers all screens to rebuild
+        }
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();                     // ← always cancel on exit
+    super.dispose();
+  }
 
   Widget _buildContent() {
     switch (_currentRoute) {
       case 'tickets':
-        return const AllTicketsScreen();
+        return AllTicketsScreen(key: ValueKey('tickets_$_refreshKey'));
       case 'reports':
-        return const Reports();
+        return Reports(key: ValueKey('reports_$_refreshKey'));
       case 'users':
-        return const UserScreen();
+        return UserScreen(key: ValueKey('users_$_refreshKey'));
       case 'template':
-        return const TemplateScreen();
+        return TemplateScreen(key: ValueKey('template_$_refreshKey'));
       case 'settings':
-        return const SettingsScreen();
+        return SettingsScreen(key: ValueKey('settings_$_refreshKey'));
       default:
-        return const DashboardScreen();
+        return DashboardScreen(key: ValueKey('dashboard_$_refreshKey'));
     }
   }
-
 
   @override
   Widget build(BuildContext context) {

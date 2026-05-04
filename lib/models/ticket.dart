@@ -7,6 +7,11 @@ class Ticket {
   final String categoryName;
 
   final TicketStatus status;
+
+  /// The exact status string from the API, e.g. "For Endorsement", "For Approval".
+  /// Use this for display — never rely on [statusLabel] when you need the real sub-status.
+  final String rawStatus;
+
   final TicketPriority priority;
   final String submitter;
   final String submitterInitials;
@@ -18,6 +23,7 @@ class Ticket {
     required this.title,
     required this.categoryName,
     required this.status,
+    required this.rawStatus,
     required this.priority,
     required this.submitter,
     required this.submitterInitials,
@@ -25,47 +31,44 @@ class Ticket {
     required this.description,
   });
 
-  // ✅ no hardcode at all
   String get categoryLabel => categoryName;
 
+  /// Returns the real status label:
+  /// - For "For X" tickets → shows the exact API string (e.g. "For Endorsement")
+  /// - For other statuses  → falls back to the enum label
   String get statusLabel {
+    final raw = rawStatus.trim();
+    if (raw.isNotEmpty) return raw;
     switch (status) {
-      case TicketStatus.forAssessment:
-        return 'For Assessment';
-      case TicketStatus.inProgress:
-        return 'In Progress';
-      case TicketStatus.resolved:
-        return 'Resolved';
-      case TicketStatus.cancelled:
-        return 'Cancelled';
+      case TicketStatus.forAssessment: return 'For Assessment';
+      case TicketStatus.inProgress:   return 'In Progress';
+      case TicketStatus.resolved:     return 'Resolved';
+      case TicketStatus.cancelled:    return 'Cancelled';
     }
   }
 
   String get priorityLabel {
     switch (priority) {
-      case TicketPriority.priority1:
-        return 'Priority 1';
-      case TicketPriority.priority2:
-        return 'Priority 2';
-      case TicketPriority.priority3:
-        return 'Priority 3';
-      case TicketPriority.priority4:
-        return 'Priority 4';
+      case TicketPriority.priority1: return 'Priority 1';
+      case TicketPriority.priority2: return 'Priority 2';
+      case TicketPriority.priority3: return 'Priority 3';
+      case TicketPriority.priority4: return 'Priority 4';
     }
   }
 
-  // ✅ clean API mapping
   factory Ticket.fromJson(Map<String, dynamic> json) {
+    final rawSt = (json['status'] ?? '').toString().trim();
     return Ticket(
-      id: json['id'].toString(),
-      title: json['title'] ?? '',
-      categoryName: json['category'] ?? '',
-      status: mapStatus(json['status'] ?? ''),
-      priority: mapPriority(json['priority'] ?? ''),
-      submitter: json['submitter'] ?? '',
+      id:                json['id'].toString(),
+      title:             json['title'] ?? '',
+      categoryName:      json['category'] ?? '',
+      status:            mapStatus(rawSt),
+      rawStatus:         rawSt,
+      priority:          mapPriority((json['priority'] ?? '').toString()),
+      submitter:         json['submitter'] ?? '',
       submitterInitials: json['submitterInitials'] ?? '',
-      createdAt: DateTime.tryParse(json['createdAt'] ?? '') ?? DateTime.now(),
-      description: json['description'] ?? '',
+      createdAt:         DateTime.tryParse(json['createdAt'] ?? '') ?? DateTime.now(),
+      description:       json['description'] ?? '',
     );
   }
 }
@@ -99,26 +102,23 @@ enum ActivityType { submitted, moved, resolved, cancelled, assigned }
 
 
 // ─────────────────────────────────────────────
-// MAPPERS (still needed for logic)
+// MAPPERS
 // ─────────────────────────────────────────────
 
 TicketStatus mapStatus(String status) {
-  final s = status.toLowerCase();
-
-  if (s.contains('progress')) return TicketStatus.inProgress;
+  final s = status.toLowerCase().replaceAll(RegExp(r'[\s_\-]'), '');
+  if (s.startsWith('for'))  return TicketStatus.forAssessment;
+  if (s == 'inprogress')    return TicketStatus.inProgress;
   if (s.contains('resolved')) return TicketStatus.resolved;
-  if (s.contains('cancel')) return TicketStatus.cancelled;
-
+  if (s.contains('cancel'))   return TicketStatus.cancelled;
   return TicketStatus.forAssessment;
 }
 
 TicketPriority mapPriority(String priority) {
   final p = priority.toLowerCase();
-
   if (p.contains('1')) return TicketPriority.priority1;
   if (p.contains('2')) return TicketPriority.priority2;
   if (p.contains('3')) return TicketPriority.priority3;
   if (p.contains('4')) return TicketPriority.priority4;
-
   return TicketPriority.priority4;
 }

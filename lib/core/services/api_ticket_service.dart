@@ -4,7 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'api_login.dart';
 
 class TicketService {
-  static const String baseUrl = 'http://localhost:8080/api/user';
+  static const String baseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://idiyanale-be.bakawan-ai.com') + '/api/user';
 
   // ─────────────────────────────────────────────
   // CREATE TICKET
@@ -48,13 +48,9 @@ class TicketService {
 
       final response = await request.send();
       final body = await response.stream.bytesToString();
-
-      print('CREATE STATUS: ${response.statusCode}');
-      print('CREATE BODY: $body');
-
       return response.statusCode == 201;
     } catch (e) {
-      print('CREATE ERROR: $e');
+      //
       return false;
     }
   }
@@ -66,7 +62,6 @@ class TicketService {
     try {
       final token = await ApiLogin.getToken();
       if (token == null) {
-        print("NO TOKEN FOUND");
         return [];
       }
 
@@ -75,10 +70,6 @@ class TicketService {
       final res = await http.get(uri, headers: {
         'Authorization': 'Bearer $token',
       });
-
-      print("STATUS: ${res.statusCode}");
-      print("BODY: ${res.body}");
-
       if (res.statusCode != 200) return [];
 
       final decoded = jsonDecode(res.body);
@@ -97,8 +88,6 @@ class TicketService {
           list = decoded['tickets'];
         }
       }
-
-      print("PARSED TICKETS COUNT: ${list.length}");
 
       return list.map<Map<String, dynamic>>((e) {
         final Map<String, dynamic> t = Map<String, dynamic>.from(e as Map);
@@ -135,8 +124,6 @@ class TicketService {
         'Authorization': 'Bearer $token',
       });
 
-      print("GET BY ID: ${res.body}");
-
       if (res.statusCode != 200) return null;
 
       final decoded = jsonDecode(res.body)['data'];
@@ -147,7 +134,6 @@ class TicketService {
 
       return decoded;
     } catch (e) {
-      print('GET BY ID ERROR: $e');
       return null;
     }
   }
@@ -166,8 +152,6 @@ class TicketService {
         'Authorization': 'Bearer $token',
       });
 
-      print("USER TICKETS: ${res.body}");
-
       if (res.statusCode != 200) return [];
 
       final decoded = jsonDecode(res.body);
@@ -185,7 +169,6 @@ class TicketService {
         };
       }).toList();
     } catch (e) {
-      print('USER TICKETS ERROR: $e');
       return [];
     }
   }

@@ -49,6 +49,7 @@ class TicketRow extends StatelessWidget {
           bottom: BorderSide(color: AppTheme.border, width: 0.5),
         ),
       ),
+
       child: Row(
         children: [
           // Ticket ID + Title

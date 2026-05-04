@@ -43,7 +43,6 @@ class _ReportsState extends State<Reports> {
       final sheet = excel['Report'];
       excel.delete('Sheet1');
 
-      // ── Styles ────────────────────────────────────────────
       final titleStyle = CellStyle(
         bold: true,
         backgroundColorHex: ExcelColor.fromHexString('#1A7A1A'),
@@ -86,7 +85,6 @@ class _ReportsState extends State<Reports> {
         60, 180, 480, 1440, 2880, 7200, 20160, 43200, 86400, 129600
       ];
 
-      // ── Compute data ──────────────────────────────────────
       final bucketData = List.generate(
         durationBuckets.length, (_) => List.filled(12, 0),
       );
@@ -137,11 +135,7 @@ class _ReportsState extends State<Reports> {
 
       const int rStart = 15;
 
-      // ─────────────────────────────────────────────────────
       // LEFT TABLE
-      // ─────────────────────────────────────────────────────
-
-      // Title
       final titleCellL = sheet.cell(
         CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0),
       );
@@ -152,7 +146,6 @@ class _ReportsState extends State<Reports> {
         CellIndex.indexByColumnRow(columnIndex: 13, rowIndex: 0),
       );
 
-      // Header row
       final leftHeaders = ['Duration', ...months, 'Total'];
       for (var c = 0; c < leftHeaders.length; c++) {
         final cell = sheet.cell(
@@ -162,7 +155,6 @@ class _ReportsState extends State<Reports> {
         cell.cellStyle = headerStyle;
       }
 
-      // Bucket rows
       for (var bi = 0; bi < durationBuckets.length; bi++) {
         final row = bi + 2;
         sheet.cell(
@@ -187,7 +179,6 @@ class _ReportsState extends State<Reports> {
         totalCell.cellStyle = totalStyle;
       }
 
-      // Total row
       const totalRow = 13;
       sheet.cell(
         CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: totalRow),
@@ -215,7 +206,6 @@ class _ReportsState extends State<Reports> {
       grandTotalCell.value     = TextCellValue(grandTotal == 0 ? '-' : grandTotal.toString());
       grandTotalCell.cellStyle = totalStyle;
 
-      // Variance row
       const varRow = 14;
       sheet.cell(
         CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: varRow),
@@ -237,11 +227,7 @@ class _ReportsState extends State<Reports> {
         cell.cellStyle = totalVar != 0 ? varianceStyle : dashStyle;
       }
 
-      // ─────────────────────────────────────────────────────
       // RIGHT TABLE
-      // ─────────────────────────────────────────────────────
-
-      // Title
       final titleCellR = sheet.cell(
         CellIndex.indexByColumnRow(columnIndex: rStart, rowIndex: 0),
       );
@@ -252,7 +238,6 @@ class _ReportsState extends State<Reports> {
         CellIndex.indexByColumnRow(columnIndex: rStart + 6, rowIndex: 0),
       );
 
-      // Header row
       const rightHeaders = [
         'Month', 'Request', 'Cancelled', 'Disapproved',
         'Pending', 'Avg Resolution Time', 'Cancelled',
@@ -265,7 +250,6 @@ class _ReportsState extends State<Reports> {
         cell.cellStyle = headerStyle;
       }
 
-      // Month rows
       int totalReq = 0, totalCan = 0, totalDis = 0, totalPen = 0;
       double totalMins = 0.0;
       int totalResCount = 0;
@@ -303,7 +287,6 @@ class _ReportsState extends State<Reports> {
         }
       }
 
-      // Total row
       const rTotalRow = 15;
       final overallAvg = totalResCount > 0 ? totalMins / totalResCount : 0.0;
       final rTotalData = [
@@ -323,7 +306,6 @@ class _ReportsState extends State<Reports> {
         cell.cellStyle = totalStyle;
       }
 
-      // Variance row
       const rVarRow = 16;
       sheet.cell(
         CellIndex.indexByColumnRow(columnIndex: rStart, rowIndex: rVarRow),
@@ -337,7 +319,6 @@ class _ReportsState extends State<Reports> {
         ).value = TextCellValue('-');
       }
 
-      // ── Column widths ─────────────────────────────────────
       sheet.setColumnWidth(0, 12.0);
       for (var i = 1; i <= 12; i++) sheet.setColumnWidth(i, 10.0);
       sheet.setColumnWidth(13, 8.0);
@@ -350,7 +331,6 @@ class _ReportsState extends State<Reports> {
       sheet.setColumnWidth(rStart + 5, 20.0);
       sheet.setColumnWidth(rStart + 6, 12.0);
 
-      // ── Download ──────────────────────────────────────────
       final bytes = excel.encode();
       if (bytes == null) throw Exception('Failed to encode');
       final now      = DateTime.now();
@@ -392,7 +372,6 @@ class _ReportsState extends State<Reports> {
       _monthly = {};
 
       for (final t in data) {
-
         final created = _parseDate(
           t['created_at'] ?? t['createdAt'] ?? t['date_created'],
         );
@@ -415,7 +394,6 @@ class _ReportsState extends State<Reports> {
 
         final status = (t['status'] ?? '').toString().toLowerCase();
 
-        // FIX: use num.tryParse so it safely handles both num and String types
         double parsedMinutes = 0.0;
 
         final rawMinutes = t['resolution_minutes'];
@@ -424,7 +402,6 @@ class _ReportsState extends State<Reports> {
           if (parsed > 0) parsedMinutes = parsed.toDouble();
         }
 
-        // Fallback: compute from timestamps if resolution_minutes is still 0
         if (parsedMinutes == 0.0) {
           final resolved = _parseDate(
             t['resolved_at'] ?? t['resolvedAt'],
@@ -433,13 +410,11 @@ class _ReportsState extends State<Reports> {
           if (created != null && resolved != null) {
             final diff = resolved.difference(created).inMinutes.toDouble();
             if (diff > 0) parsedMinutes = diff;
-          } else {
           }
         }
 
         if (status.contains('resolved')) {
           m['resolved']++;
-          // FIX: only count toward average if we actually have a valid time
           if (parsedMinutes > 0) {
             m['totalMinutes'] += parsedMinutes;
             m['resolvedCount']++;
@@ -452,8 +427,7 @@ class _ReportsState extends State<Reports> {
           m['pending']++;
         }
       }
-    } catch (e) {
-    }
+    } catch (e) {}
 
     setState(() => _loading = false);
   }
@@ -503,7 +477,6 @@ class _ReportsState extends State<Reports> {
     return "${minutes.toStringAsFixed(1)} min";
   }
 
-  // ===================== STATS =====================
   Map<String, dynamic> _stats() {
     double total = 0;
     double resolved = 0;
@@ -551,11 +524,16 @@ class _ReportsState extends State<Reports> {
 
   Widget _header() {
     const h = [
-      "Date","Total","Resolved",
-      "Cancelled","Disapprove","Pending","Avg Time"
+      "Date", "Total", "Resolved",
+      "Cancelled", "Disapprove", "Pending", "Avg Time"
     ];
-    return Row(
-      children: h.map((e) => _cell(e, header: true)).toList(),
+    return Container(
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: AppTheme.border)),
+      ),
+      child: Row(
+        children: h.map((e) => _cell(e, header: true)).toList(),
+      ),
     );
   }
 
@@ -584,49 +562,51 @@ class _ReportsState extends State<Reports> {
     final s = _stats();
 
     Widget card(String title, String value) {
-      return Expanded(
-        child: Container(
-          margin: const EdgeInsets.only(right: 12),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppTheme.surface,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppTheme.border),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title,
-                  style: const TextStyle(fontSize: 12, color: AppTheme.textMuted)),
-              const SizedBox(height: 8),
-              Text(value,
-                  style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.textPrimary)),
-            ],
-          ),
+      return Container(
+        width: 200, // fixed width instead of Expanded
+        margin: const EdgeInsets.only(right: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppTheme.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppTheme.border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title,
+                style: const TextStyle(fontSize: 12, color: AppTheme.textMuted)),
+            const SizedBox(height: 8),
+            Text(value,
+                style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.textPrimary)),
+          ],
         ),
       );
     }
 
-    return Row(
-      children: [
-        card("Total Request (Month)", "${s['total'].toInt()}"),
-        card("Avg Req / Day", (s['avgPerDay'] as double).toStringAsFixed(1)),
-        card(
-          "Completion Rate",
-          s['total'] == 0
-              ? "No data"
-              : "${(s['completionRate'] as double).toStringAsFixed(1)}%",
-        ),
-        card(
-          "Avg Resolution Time",
-          s['avgResolution'] == 0
-              ? "No data"
-              : _formatMinutes((s['avgResolution'] as num).toDouble()),
-        ),
-      ],
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          card("Total Request (Month)", "${s['total'].toInt()}"),
+          card("Avg Req / Day", (s['avgPerDay'] as double).toStringAsFixed(1)),
+          card(
+            "Completion Rate",
+            s['total'] == 0
+                ? "No data"
+                : "${(s['completionRate'] as double).toStringAsFixed(1)}%",
+          ),
+          card(
+            "Avg Resolution Time",
+            s['avgResolution'] == 0
+                ? "No data"
+                : _formatMinutes((s['avgResolution'] as num).toDouble()),
+          ),
+        ],
+      ),
     );
   }
 
@@ -693,11 +673,25 @@ class _ReportsState extends State<Reports> {
                         ? const Center(child: CircularProgressIndicator())
                         : Column(
                       children: [
-                        _header(),
+                        // ── Horizontally scrollable table ──
                         Expanded(
-                          child: ListView.builder(
-                            itemCount: rows.length,
-                            itemBuilder: (_, i) => _row(rows[i], i % 2 == 0),
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: SizedBox(
+                              width: 160 * 7, // 7 columns × 160
+                              child: Column(
+                                children: [
+                                  _header(),
+                                  Expanded(
+                                    child: ListView.builder(
+                                      itemCount: rows.length,
+                                      itemBuilder: (_, i) =>
+                                          _row(rows[i], i % 2 == 0),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
                       ],

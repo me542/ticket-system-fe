@@ -5,7 +5,7 @@ import 'package:universal_html/html.dart' as html;
 import 'api_login.dart';
 
 class ApiAttachment {
-  static const String _baseUrl = 'http://localhost:8080/api/user';
+  static const String _baseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://http://idiyanale-be.bakawan-ai.com') + '/api/user';
 
   // ── Auth header helper ────────────────────────────────────────────────────
   static Future<Map<String, String>> _authHeaders() async {
@@ -15,10 +15,6 @@ class ApiAttachment {
     };
   }
 
-  // ── Fetch raw bytes (used by _AuthImage widget in the sidebar) ────────────
-  // The URL coming from the backend is already a full URL like:
-  // http://localhost:8080/uploads/attachments/SR000001_xxx_file.png
-  // We fetch it with the auth token so protected files work too.
   static Future<Uint8List?> fetchBytes(String url) async {
     if (url.isEmpty) return null;
     try {
@@ -31,10 +27,6 @@ class ApiAttachment {
     }
   }
 
-  // ── View file — opens in a new browser tab ────────────────────────────────
-  // On Flutter Web we use universal_html to open a blob URL.
-  // The route is: GET /api/user/attachments/:id
-  // But the sidebar passes the full file URL directly, so we support both.
   static Future<void> viewFile(String url, String fileName) async {
     if (url.isEmpty) return;
 
@@ -44,8 +36,6 @@ class ApiAttachment {
     if (kIsWeb) {
       _openBlobInNewTab(bytes, fileName);
     } else {
-      // On mobile/desktop you could use open_file or path_provider.
-      // For now throw so the caller can handle it.
       throw UnsupportedError('viewFile is only supported on Web');
     }
   }
@@ -64,9 +54,6 @@ class ApiAttachment {
     }
   }
 
-  // ── View attachment by numeric DB id ─────────────────────────────────────
-  // Calls GET /api/user/attachments/:id with auth token.
-  // Returns bytes so the caller can display or save.
   static Future<Uint8List?> fetchAttachmentById(String attachmentId) async {
     if (attachmentId.isEmpty) return null;
     try {

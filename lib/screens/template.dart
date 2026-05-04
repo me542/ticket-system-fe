@@ -68,10 +68,8 @@ class _TemplateScreenState extends State<TemplateScreen> {
 
     final token = await ApiLogin.getToken() ?? '';
     final raw = await ApiCategory.fetchCategories(token: token);
-
-    debugPrint('>>> raw categories count: ${raw.length}');
     if (raw.isNotEmpty) {
-      debugPrint('>>> first item keys: ${raw.first.keys.toList()}');
+      //
     }
 
     final Map<String, Map<String, dynamic>> built = {};
@@ -112,7 +110,6 @@ class _TemplateScreenState extends State<TemplateScreen> {
               s['description']?.toString() ??
                   s['Description']?.toString() ??
                   '';
-          debugPrint('>>>   sub id=$subId name=$subName desc=$subDesc');
           return {
             'name': subName,
             'description': subDesc,
@@ -327,9 +324,6 @@ class _TemplateScreenState extends State<TemplateScreen> {
       final token = await ApiLogin.getToken() ?? '';
       final subId = _subId(targetCategory, targetSub);
 
-      debugPrint(
-          '>>> SAVE: category=$targetCategory sub=$targetSub id=$subId');
-
       if (subId.isEmpty) {
         _snack('Could not find subcategory ID', color: Colors.red);
         setState(() => _saving = false);
@@ -418,13 +412,23 @@ class _TemplateScreenState extends State<TemplateScreen> {
           ),
         ),
         Expanded(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(width: 420, child: _buildDetailsPanel()),
-              const VerticalDivider(width: 1, color: AppTheme.border),
-              Expanded(child: _buildDescriptionPanel()),
-            ],
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: SizedBox(
+                  width: constraints.maxWidth < 700 ? 700 : constraints.maxWidth,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(width: 420, child: _buildDetailsPanel()),
+                      const VerticalDivider(width: 1, color: AppTheme.border),
+                      Expanded(child: _buildDescriptionPanel()),
+                    ],
+                  ),
+                ),
+              );
+            },
           ),
         ),
       ],
@@ -624,35 +628,41 @@ class _TemplateScreenState extends State<TemplateScreen> {
 
           const SizedBox(height: 24),
 
-          Row(
-            children: [
-              if (_isEditing) ...[
-                OutlinedButton(
-                  onPressed: _cancelEdit,
-                  child: const Text('Cancel'),
-                ),
-                const SizedBox(width: 8),
-                _saving
-                    ? const SizedBox(
-                  height: 20,
-                  width: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-                    : ElevatedButton.icon(
-                  onPressed: _save,
-                  icon: const Icon(Icons.save, size: 16),
-                  label: const Text('Save'),
-                ),
-              ] else ...[
-                ElevatedButton.icon(
-                  onPressed:
-                  _formSubcategory != null ? _startEditing : null,
-                  icon: const Icon(Icons.edit, size: 16),
-                  label: const Text('Edit Description'),
-                ),
-              ],
-            ],
-          ),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              return Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                alignment: WrapAlignment.start,
+                children: [
+                  if (_isEditing) ...[
+                    OutlinedButton(
+                      onPressed: _cancelEdit,
+                      child: const Text('Cancel'),
+                    ),
+                    _saving
+                        ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                        : ElevatedButton.icon(
+                      onPressed: _save,
+                      icon: const Icon(Icons.save, size: 16),
+                      label: const Text('Save'),
+                    ),
+                  ] else ...[
+                    ElevatedButton.icon(
+                      onPressed: _formSubcategory != null ? _startEditing : null,
+                      icon: const Icon(Icons.edit, size: 16),
+                      label: const Text('Edit Description'),
+                    ),
+                  ],
+                ],
+              );
+            },
+          )
+
         ],
       ),
     );

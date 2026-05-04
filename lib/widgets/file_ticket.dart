@@ -7,6 +7,7 @@ import '../core/services/api_user_data.dart';
 import '../core/services/api_category.dart';
 import '../data/light_theme.dart';
 
+
 class CreateTicketSidebar extends StatefulWidget {
   final VoidCallback onClose;
   final VoidCallback? onCreated;
@@ -93,18 +94,14 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
   Future<void> _loadUsers() async {
     final users = await ApiGetUser.fetchUsers();
     if (!mounted) return;
-
-    debugPrint('>>> _loadUsers total users: ${users.length}');
     for (final u in users) {
-      debugPrint('>>>   user: ${u['username']} | role: "${u['role']}"');
+      //
     }
 
     // Filter endorsers — role field is now always a non-null String
     final endorserUsers = users
         .where((u) => (u['role'] ?? '').toLowerCase() == 'endorser')
         .toList();
-
-    debugPrint('>>> endorsers found: ${endorserUsers.length}');
 
     // Show full_name in dropdown; fall back to username
     final endorserNames = endorserUsers

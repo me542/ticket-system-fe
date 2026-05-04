@@ -771,7 +771,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Email',
+                        'Username',
                         style: TextStyle(
                           color: Color(0xFF8A92A3),
                           fontSize: 12,
@@ -791,8 +791,8 @@ class _LoginScreenState extends State<LoginScreen> {
                           ).nextFocus(); // 👈 go to password
                         },
                         decoration: InputDecoration(
-                          hintText: 'admin@example.com',
-                          hintStyle: const TextStyle(color: Color(0xFF4A5268)),
+                          hintText: 'example.user',
+                          hintStyle: const TextStyle(color: Color(0xBD6B7283)),
                           prefixIcon: const Icon(
                             Icons.email_outlined,
                             color: Color(0xFF268A15),
@@ -869,8 +869,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         onSubmitted: (_) =>
                             _handleLogin(), // 👈 ENTER triggers login
                         decoration: InputDecoration(
-                          hintText: 'Password',
-                          hintStyle: const TextStyle(color: Color(0xFF4A5268)),
+                          hintText: 'Enter Password',
+                          hintStyle: const TextStyle(color: Color(0xBD6B7283)),
                           prefixIcon: const Icon(
                             Icons.lock_outlined,
                             color: Color(0xFF268A15),
@@ -902,7 +902,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             borderSide: BorderSide(
                               color: passwordError != null
                                   ? Colors.red
-                                  : const Color(0xFF2A3142),
+                                  : const Color(0xFFE5E7EB),
                               width: 2,
                             ),
                           ),

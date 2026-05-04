@@ -5,7 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'api_login.dart';
 
 class ApiTicket {
-  static const String baseUrl = 'http://localhost:8080/api/user';
+  static const String baseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://idiyanale-be.bakawan-ai.com') + '/api/user';
 
   /// CREATE TICKET
   static Future<bool> createTicket({
@@ -52,12 +52,9 @@ class ApiTicket {
       final response = await request.send();
       final resBody = await response.stream.bytesToString();
 
-      debugPrint('>>> CREATE TICKET STATUS: ${response.statusCode}');
-      debugPrint('>>> CREATE TICKET BODY: $resBody');
-
       return response.statusCode == 201;
     } catch (e) {
-      debugPrint('CREATE TICKET ERROR: $e');
+      //
       return false;
     }
   }
