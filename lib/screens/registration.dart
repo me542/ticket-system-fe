@@ -546,7 +546,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Image.asset(
-                            '/Users/bakawan-user/Desktop/ticket-system-fe/lib/assets/favicon1.png',
+                            'assets/favicon1.png',
                             width: 220,
                             height: 220,
                             fit: BoxFit.contain,
