@@ -546,7 +546,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Image.asset(
-                            'assets/favicon1.png',
+                            'lib/assets/favicon1.png',
                             width: 220,
                             height: 220,
                             fit: BoxFit.contain,

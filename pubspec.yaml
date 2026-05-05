@@ -65,8 +65,8 @@ dev_dependencies:
 # The following section is specific to Flutter packages.
 flutter:
   assets:
-    - assets/favicon1.png
-    - assets/favicon.png
+    - lib/assets/favicon1.png
+    - lib/assets/favicon.png
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in

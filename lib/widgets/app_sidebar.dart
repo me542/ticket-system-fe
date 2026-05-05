@@ -36,7 +36,7 @@ class AppSidebar extends StatelessWidget {
                     child: Row(
                       children: [
                         Image.asset(
-                          'assets/favicon1.png',
+                          'lib/assets/favicon1.png',
                           width: 60,
                           height: 60,
                           fit: BoxFit.contain,

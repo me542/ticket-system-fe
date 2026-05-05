@@ -713,7 +713,7 @@ class _LoginScreenState extends State<LoginScreen> {
               Container(
                 child: Center(
                   child: Image.asset(
-                    'assets/favicon1.png', // ✅ correct path
+                    'lib/assets/favicon1.png', // ✅ correct path
                     width: 200,
                     height: 200,
                     fit: BoxFit.contain,
