@@ -20,23 +20,67 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _usernameController = TextEditingController();
   final _positionController = TextEditingController();
 
-
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
-
 
   String? nameError;
   String? emailError;
   String? passwordError;
   String? confirmPasswordError;
+  String? positionError;
 
+  // ================= POSITION LIST =================
+  static const List<String> _positions = [
+    'Analytics Engineer - OIC',
+    'Application Analyst 2',
+    'Application Developer',
+    'Application Developer 1 - OIC',
+    'Business Intelligence Analyst - OIC',
+    'Business Intelligence Lead OIC',
+    'Business Relationship Manager - OIC',
+    'Chief Data Officer - OIC',
+    'Chief Data Scientist - OIC',
+    'Chief Operating Officer - OIC',
+    'Cloud Engineer - OIC',
+    'Cloud Operations Administrator - OIC',
+    'Cloud Operations Support',
+    'Compliance',
+    'Compliance Officer',
+    'Data Scientist OIC',
+    'DDFA- OIC',
+    'Developer',
+    'Developer 1',
+    'Developer 1 - OIC',
+    'Developer 2 - OIC',
+    'Finance Assistant',
+    'Information Security Officer - OIC',
+    'Junior Analytics Developer',
+    'Junior Analytics Engineer',
+    'Junior Data Engineer',
+    'Machine Learning Engineer OIC',
+    'Product Specialist',
+    'Product Specialist 1',
+    'Product Specialist 1 - OIC',
+    'Product Specialist Head OIC',
+    'Project Manager - OIC',
+    'Quality Assurance Analyst',
+    'Quality Assurance Analyst 1',
+    'Quality Assurance Manager',
+    'Report Specialist I',
+    'Report Specialist II',
+    'Report Specialist II - OIC',
+    'Report Specialist III',
+    'Report Specialist III - OIC',
+    'Risk Management Officer - OIC',
+    'Senior Finance Officer OIC',
+  ];
 
   // ================= PASSWORD RULES =================
-  bool get _hasMinLength       => _passwordController.text.length >= 8;
-  bool get _hasUppercase       => _passwordController.text.contains(RegExp(r'[A-Z]'));
-  bool get _hasLowercase       => _passwordController.text.contains(RegExp(r'[a-z]'));
-  bool get _hasNumber          => _passwordController.text.contains(RegExp(r'[0-9]'));
-  bool get _hasSpecialChar     => _passwordController.text.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\\/`~;]'));
+  bool get _hasMinLength   => _passwordController.text.length >= 8;
+  bool get _hasUppercase   => _passwordController.text.contains(RegExp(r'[A-Z]'));
+  bool get _hasLowercase   => _passwordController.text.contains(RegExp(r'[a-z]'));
+  bool get _hasNumber      => _passwordController.text.contains(RegExp(r'[0-9]'));
+  bool get _hasSpecialChar => _passwordController.text.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\\/`~;]'));
 
   String? _validatePassword(String password) {
     if (password.isEmpty) return "Password is required";
@@ -47,7 +91,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (!_hasSpecialChar) return "Must contain a special character";
     return null;
   }
-
 
   // ================= FORM =================
   Widget _buildForm() {
@@ -62,9 +105,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ],
         ),
 
-
         const SizedBox(height: 15),
-
 
         Row(
           children: [
@@ -74,17 +115,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ],
         ),
 
-
         const SizedBox(height: 15),
-
 
         _passwordField(),
         const SizedBox(height: 15),
         _confirmPasswordField(),
 
-
         const SizedBox(height: 25),
-
 
         SizedBox(
           width: double.infinity,
@@ -104,7 +141,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ],
     );
   }
-
 
   // ================= FIELD BUILDER =================
   Widget _field(String label, TextEditingController controller, String? error) {
@@ -128,8 +164,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-
-  // ================= POSITION =================
+  // ================= POSITION (AUTOCOMPLETE) =================
   Widget _positionField() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -143,38 +178,99 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
         const SizedBox(height: 5),
 
-
-        DropdownButtonFormField<String>(
-          dropdownColor: Colors.white,
-          value: _positionController.text.isEmpty
-              ? null
-              : _positionController.text,
-          items: ["Analytics Engineer - OIC, Application Analyst 2, Application Developer, Application Developer 1 - OIC, Business Intelligence Analyst - OIC, Business Intelligence Lead OIC, Business Relationship Manager - OIC, Chief Data Officer - OIC, Chief Data Scientist - OIC, Chief Operating Officer - OIC, Cloud Engineer - OIC, Cloud Operations Administrator - OIC, Cloud Operations Support, Compliance, Compliance Officer, Data Scientist OIC, DDFA- OIC, Developer, Developer 1, Developer 1 - OIC, Developer 2 - OIC, Finance Assistant, Information Security Officer - OIC, Junior Analytics Developer, Junior Analytics Engineer, Junior Data Engineer, Machine Learning Engineer OIC, Product Specialist, Product Specialist 1, Product Specialist 1 - OIC, Product Specialist Head OIC, Project Manager - OIC, Quality Assurance Analyst, Quality Assurance Analyst 1, Quality Assurance Manager, Report Specialist I, Report Specialist II, Report Specialist II - OIC, Report Specialist III, Report Specialist III - OIC, Risk Management Officer - OIC, Senior Finance Officer OIC"]
-              .map(
-                (pos) => DropdownMenuItem(
-              value: pos,
-              child: Text(
-                pos,
-                style: const TextStyle(color: Color(0xFF111827)),
-              ),
-            ),
-          )
-              .toList(),
-          onChanged: (value) {
+        Autocomplete<String>(
+          optionsBuilder: (TextEditingValue textEditingValue) {
+            if (textEditingValue.text.isEmpty) {
+              return _positions; // show all when field is empty
+            }
+            return _positions.where((pos) =>
+                pos.toLowerCase().contains(
+                    textEditingValue.text.toLowerCase()));
+          },
+          onSelected: (String selection) {
             setState(() {
-              _positionController.text = value!;
+              _positionController.text = selection;
+              positionError = null;
             });
           },
-          decoration: _inputDecoration("Select position", null),
+          fieldViewBuilder: (context, fieldController, focusNode, onSubmitted) {
+            // Pre-fill if a position was already chosen
+            if (_positionController.text.isNotEmpty &&
+                fieldController.text.isEmpty) {
+              fieldController.text = _positionController.text;
+            }
+
+            return TextField(
+              controller: fieldController,
+              focusNode: focusNode,
+              style: const TextStyle(color: Color(0xFF111827)),
+              onChanged: (val) {
+                _positionController.text = val;
+                if (positionError != null) setState(() => positionError = null);
+              },
+              decoration: _inputDecoration(
+                "Search position…",
+                positionError,
+                suffix: const Padding(
+                  padding: EdgeInsets.only(right: 8),
+                  child: Icon(Icons.arrow_drop_down, color: Color(0xFF6B7280)),
+                ),
+              ),
+            );
+          },
+          optionsViewBuilder: (context, onSelected, options) {
+            return Align(
+              alignment: Alignment.topLeft,
+              child: Material(
+                elevation: 6,
+                borderRadius: BorderRadius.circular(8),
+                color: Colors.white,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 220),
+                  child: ListView.builder(
+                    padding: EdgeInsets.zero,
+                    shrinkWrap: true,
+                    itemCount: options.length,
+                    itemBuilder: (context, index) {
+                      final option = options.elementAt(index);
+                      return InkWell(
+                        onTap: () => onSelected(option),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 12),
+                          child: Text(
+                            option,
+                            style: const TextStyle(
+                              color: Color(0xFF111827),
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            );
+          },
         ),
+
+        // Show error below the autocomplete field
+        if (positionError != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 6, left: 12),
+            child: Text(
+              positionError!,
+              style: const TextStyle(color: Colors.red, fontSize: 12),
+            ),
+          ),
       ],
     );
   }
 
   // ================= PASSWORD =================
   Widget _passwordField() {
-    final password = _passwordController.text;
-    final showRules = password.isNotEmpty;
+    final showRules = _passwordController.text.isNotEmpty;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -195,16 +291,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
           enableSuggestions: false,
           autocorrect: false,
           style: const TextStyle(color: Color(0xFF111827)),
-          onChanged: (_) => setState(() {}), // rebuild to update rule indicators
+          onChanged: (_) => setState(() {}),
           decoration: _inputDecoration(
             "Password",
             passwordError,
             suffix: IconButton(
-              onPressed: () {
-                setState(() {
-                  _obscurePassword = !_obscurePassword;
-                });
-              },
+              onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
               icon: Icon(
                 _obscurePassword ? Icons.visibility_off : Icons.visibility,
                 color: const Color(0xFF268A15),
@@ -215,7 +307,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
         const SizedBox(height: 8),
 
-        // ── Live password rule indicators ──────────────────
         _passwordRule("At least 8 characters",   _hasMinLength,   showRules),
         _passwordRule("Uppercase letter (A–Z)",   _hasUppercase,   showRules),
         _passwordRule("Lowercase letter (a–z)",   _hasLowercase,   showRules),
@@ -229,15 +320,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Widget _passwordRule(String label, bool met, bool showRules) {
     final color = !showRules
         ? const Color(0xFF9CA3AF)
-        : met
-        ? const Color(0xFF268A15)
-        : Colors.red;
+        : met ? const Color(0xFF268A15) : Colors.red;
 
     final icon = !showRules
         ? Icons.radio_button_unchecked
-        : met
-        ? Icons.check_circle
-        : Icons.cancel;
+        : met ? Icons.check_circle : Icons.cancel;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 3),
@@ -245,16 +332,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
         children: [
           Icon(icon, size: 14, color: color),
           const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(fontSize: 12, color: color, height: 1.4),
-          ),
+          Text(label, style: TextStyle(fontSize: 12, color: color, height: 1.4)),
         ],
       ),
     );
   }
 
-
+  // ================= CONFIRM PASSWORD =================
   Widget _confirmPasswordField() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -268,7 +352,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
         const SizedBox(height: 5),
 
-
         TextField(
           controller: _confirmPasswordController,
           obscureText: _obscureConfirmPassword,
@@ -277,13 +360,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
             "Confirm Password",
             confirmPasswordError,
             suffix: GestureDetector(
-              onTap: () => setState(() {
-                _obscureConfirmPassword = !_obscureConfirmPassword;
-              }),
+              onTap: () => setState(() =>
+              _obscureConfirmPassword = !_obscureConfirmPassword),
               child: Icon(
-                _obscureConfirmPassword
-                    ? Icons.visibility_off
-                    : Icons.visibility,
+                _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
                 color: const Color(0xFF268A15),
               ),
             ),
@@ -293,15 +373,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-
   // ================= DECORATION =================
-  InputDecoration _inputDecoration(
-      String hint,
-      String? error, {
-        Widget? suffix,
-      }) {
+  InputDecoration _inputDecoration(String hint, String? error, {Widget? suffix}) {
     final isError = error != null;
-
 
     return InputDecoration(
       hintText: hint,
@@ -309,16 +383,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
       suffixIcon: suffix,
       filled: true,
       fillColor: const Color(0xFFF4F6F9),
-
-
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
         borderSide: BorderSide(
           color: isError ? Colors.red : const Color(0xFFE5E7EB),
         ),
       ),
-
-
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
         borderSide: BorderSide(
@@ -326,31 +396,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
           width: 2,
         ),
       ),
-
-
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
         borderSide: const BorderSide(color: Colors.red, width: 2),
       ),
-
-
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
         borderSide: const BorderSide(color: Colors.red, width: 2),
       ),
-
-
       errorText: error,
     );
   }
-
 
   bool _isValidEmail(String email) {
     final emailRegex = RegExp(r'^[\w\.-]+@[\w\.-]+\.\w+$');
     return emailRegex.hasMatch(email);
   }
 
-
+  // ================= REGISTER HANDLER =================
   void _handleRegister() async {
     setState(() {
       nameError = _nameController.text.isEmpty ? "Name is required" : null;
@@ -363,10 +426,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
         emailError = null;
       }
 
-      // ✅ Full password validation
+      positionError = _positionController.text.isEmpty
+          ? "Please select a position"
+          : null;
+
       passwordError = _validatePassword(_passwordController.text);
 
-      // ✅ Confirm password check
       if (_confirmPasswordController.text.isEmpty) {
         confirmPasswordError = "Please confirm your password";
       } else if (_confirmPasswordController.text != _passwordController.text) {
@@ -376,9 +441,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
       }
     });
 
-
     if (nameError == null &&
         emailError == null &&
+        positionError == null &&
         passwordError == null &&
         confirmPasswordError == null) {
       try {
@@ -390,18 +455,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
           password: _passwordController.text,
         );
 
-
         if (!mounted) return;
-
-
         _showSuccessDialog();
       } catch (e) {
         if (!mounted) return;
-
-
-        String message = e.toString();
-
-
+        final message = e.toString();
         if (message.toLowerCase().contains("exist")) {
           _showErrorDialog("User already exists");
         } else {
@@ -411,16 +469,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
-
+  // ================= SUCCESS DIALOG =================
   void _showSuccessDialog() {
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) {
         return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 400),
             child: Padding(
@@ -428,45 +484,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(
-                    Icons.check_circle,
-                    color: Color(0xFF268A15),
-                    size: 60,
-                  ),
-
-
+                  const Icon(Icons.check_circle, color: Color(0xFF268A15), size: 60),
                   const SizedBox(height: 15),
-
-
                   const Text(
                     "Registration Successful",
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
-
-
                   const SizedBox(height: 10),
-
-
                   const Text(
                     "Your account has been created successfully. Wait for the Admin to approve your registration",
                     textAlign: TextAlign.center,
                   ),
-
-
                   const SizedBox(height: 20),
-
-
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: () {
                         Navigator.of(dialogContext).pop();
-
                         Navigator.pushAndRemoveUntil(
                           context,
-                          MaterialPageRoute(
-                            builder: (context) => LoginScreen(),
-                          ),
+                          MaterialPageRoute(builder: (context) => LoginScreen()),
                               (route) => false,
                         );
                       },
@@ -486,15 +523,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-
+  // ================= ERROR DIALOG =================
   void _showErrorDialog(String message) {
     showDialog(
       context: context,
       builder: (context) {
         return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 300),
             child: Padding(
@@ -503,38 +538,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const Icon(Icons.error, color: Colors.red, size: 60),
-
-
                   const SizedBox(height: 15),
-
-
                   const Text(
                     "Registration Failed",
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
-
-
                   const SizedBox(height: 10),
-
-
                   Text(message, textAlign: TextAlign.center),
-
-
                   const SizedBox(height: 20),
-
-
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                      },
+                      onPressed: () => Navigator.pop(context),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.red,
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
+                            borderRadius: BorderRadius.circular(8)),
                       ),
                       child: const Text("OK"),
                     ),
@@ -548,7 +568,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-
+  // ================= BUILD =================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -557,10 +577,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
         builder: (context, constraints) {
           bool isMobile = constraints.maxWidth < 900;
 
-
           return Row(
             children: [
-              // ================= LEFT PANEL (LOGO) =================
               if (!isMobile)
                 Expanded(
                   flex: 4,
@@ -577,8 +595,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             fit: BoxFit.contain,
                           ),
                           const SizedBox(height: 20),
-
-
                           const Text(
                             'IDIYANALE',
                             style: TextStyle(
@@ -587,11 +603,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               color: Color(0xFF1A1A1A),
                             ),
                           ),
-
-
                           const SizedBox(height: 10),
-
-
                           const Text(
                             'Bakawan Ticketing System',
                             style: TextStyle(
@@ -605,8 +617,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                 ),
 
-
-              // ================= RIGHT PANEL (FORM) =================
               Expanded(
                 flex: 6,
                 child: Container(
@@ -635,19 +645,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               Row(
                                 children: [
                                   IconButton(
-                                    onPressed: () {
-                                      Navigator.pop(context);
-                                    },
+                                    onPressed: () => Navigator.pop(context),
                                     icon: const Icon(
                                       Icons.arrow_back,
                                       color: Color(0xFF111827),
                                     ),
                                   ),
-
-
                                   const SizedBox(width: 5),
-
-
                                   const Text(
                                     "Create Account",
                                     style: TextStyle(
@@ -658,11 +662,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                   ),
                                 ],
                               ),
-
-
                               const SizedBox(height: 20),
-
-
                               _buildForm(),
                             ],
                           ),
