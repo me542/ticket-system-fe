@@ -5,7 +5,7 @@ import 'package:universal_html/html.dart' as html;
 import 'api_login.dart';
 
 class ApiAttachment {
-  static const String _baseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://http://idiyanale-be.bakawan-ai.com') + '/api/user';
+  static const String _baseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://idiyanale-be.bakawan-ai.com') + '/api/user';
 
   // ── Auth header helper ────────────────────────────────────────────────────
   static Future<Map<String, String>> _authHeaders() async {
