@@ -793,9 +793,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   // ── Tickets table ─────────────────────────────────────────
   Widget _buildTicketsTable(List<Ticket> tickets) {
-    // Show all tickets but keep exactly 6 rows visible — user scrolls for more
-    const double rowHeight   = 56.0;
-    const int    visibleRows = 6;
+    final visible = tickets.take(8).toList();
 
     return Container(
       decoration: BoxDecoration(
@@ -818,7 +816,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Expanded(flex: 2, child: _TableHeader('SUBMITTER')),
             ]),
           ),
-          tickets.isEmpty
+          visible.isEmpty
               ? Padding(
             padding: const EdgeInsets.all(32),
             child: Center(
@@ -836,22 +834,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ]),
             ),
           )
-              : SizedBox(
-            height: rowHeight * visibleRows,
-            child: ListView.builder(
-              physics: const ClampingScrollPhysics(),
-              itemCount: tickets.length,
-              itemBuilder: (context, index) {
-                final t = tickets[index];
-                return SizedBox(
-                  height: rowHeight,
-                  child: GestureDetector(
-                    onTap: () => _openTicket(t),
-                    child: TicketRow(ticket: t),
-                  ),
-                );
-              },
-            ),
+              : Column(
+            children: visible.take(6).map<Widget>((t) {
+              return GestureDetector(
+                onTap: () => _openTicket(t),
+                child: TicketRow(ticket: t),
+              );
+            }).toList(),
           ),
         ],
       ),
