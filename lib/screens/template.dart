@@ -359,6 +359,184 @@ class _TemplateScreenState extends State<TemplateScreen> {
     }
   }
 
+  // --- EDIT CATEGORY
+  Future<void> _editCategoryDialog() async {
+    final current = _formCategory;
+    if (current == null) return;
+
+    final ctrl = TextEditingController(text: current);
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Edit Category'),
+        content: TextField(
+          controller: ctrl,
+          decoration: const InputDecoration(hintText: 'New category name'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              final newName = ctrl.text.trim();
+              if (newName.isEmpty) return;
+
+              final token = await ApiLogin.getToken() ?? '';
+              final id = int.tryParse(_categoryMap[current]?['category_id'] ?? '');
+
+              if (id == null) return;
+
+              final success = await ApiCategory.updateCategory(
+                categoryId: id,
+                newName: newName,
+                token: token,
+              );
+
+              if (success) {
+                Navigator.pop(ctx);
+                _snack('Category updated');
+                await _loadCategories(preserveSelection: false);
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+
+    ctrl.dispose();
+  }
+
+  // --- DELETE CATEGORY
+  Future<void> _deleteCategory() async {
+    final current = _formCategory;
+    if (current == null) return;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Category'),
+        content: Text('Delete "$current"?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    final token = await ApiLogin.getToken() ?? '';
+    final id = int.tryParse(_categoryMap[current]?['category_id'] ?? '');
+
+    if (id == null) return;
+
+    final success = await ApiCategory.deleteCategory(
+      categoryId: id,
+      token: token,
+    );
+
+    if (success) {
+      _snack('Category deleted');
+      await _loadCategories(preserveSelection: false);
+    }
+  }
+
+  // --- EDIT SUBCATEGORY
+  Future<void> _editSubcategoryDialog() async {
+    final cat = _formCategory;
+    final sub = _formSubcategory;
+
+    if (cat == null || sub == null) return;
+
+    final ctrl = TextEditingController(text: sub);
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Edit Subcategory'),
+        content: TextField(
+          controller: ctrl,
+          decoration: const InputDecoration(hintText: 'New subcategory name'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              final newName = ctrl.text.trim();
+              if (newName.isEmpty) return;
+
+              final token = await ApiLogin.getToken() ?? '';
+              final subId = int.tryParse(_subId(cat, sub));
+
+              if (subId == null) return;
+
+              final success = await ApiCategory.updateSubcategoryName(
+                subcategoryId: subId,
+                name: newName,
+                token: token,
+              );
+
+              if (success) {
+                Navigator.pop(ctx);
+                _snack('Subcategory updated');
+                await _loadCategories();
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+
+    ctrl.dispose();
+  }
+
+  // --- DELETE SUBCATEGORY
+  Future<void> _deleteSubcategory() async {
+    final cat = _formCategory;
+    final sub = _formSubcategory;
+
+    if (cat == null || sub == null) return;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Subcategory'),
+        content: Text('Delete "$sub"?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    final token = await ApiLogin.getToken() ?? '';
+    final subId = int.tryParse(_subId(cat, sub));
+
+    if (subId == null) return;
+
+    final success = await ApiCategory.deleteSubcategory(
+      subcategoryId: subId,
+      token: token,
+    );
+
+    if (success) {
+      _snack('Subcategory deleted');
+      await _loadCategories();
+    }
+  }
+
   // ── CANCEL EDIT ────────────────────────────────────────────────────────────
   void _cancelEdit() {
     final cat = _editingCategory ?? _formCategory;
@@ -452,6 +630,7 @@ class _TemplateScreenState extends State<TemplateScreen> {
           _section('Template Details', [
 
             // ── Category ──────────────────────────────────────────────
+            // ── Category ──────────────────────────────────────────────
             _formRow(
               label: 'Category *',
               child: _loadingCats
@@ -464,7 +643,6 @@ class _TemplateScreenState extends State<TemplateScreen> {
                 value: _formCategory,
                 items: [..._categoryMap.keys, addCategoryKey],
                 hint: 'Select category',
-                // Lock while editing so target can't drift
                 onChanged: _isEditing
                     ? null
                     : (v) {
@@ -486,6 +664,30 @@ class _TemplateScreenState extends State<TemplateScreen> {
               ),
             ),
 
+// 👇 ADD THIS RIGHT HERE
+            Padding(
+              padding: const EdgeInsets.only(left: 140, bottom: 12),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.edit, size: 18),
+                    tooltip: 'Edit Category',
+                    onPressed: _formCategory != null && !_isEditing
+                        ? _editCategoryDialog
+                        : null,
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete, size: 18, color: Colors.red),
+                    tooltip: 'Delete Category',
+                    onPressed: _formCategory != null && !_isEditing
+                        ? _deleteCategory
+                        : null,
+                  ),
+                ],
+              ),
+            ),
+
+            // ── Subcategory ───────────────────────────────────────────
             // ── Subcategory ───────────────────────────────────────────
             _formRow(
               label: 'Subcategory',
@@ -502,7 +704,6 @@ class _TemplateScreenState extends State<TemplateScreen> {
                   addSubcategoryKey,
                 ],
                 hint: 'Select subcategory',
-                // Lock while editing so target can't drift
                 onChanged: _isEditing
                     ? null
                     : (v) {
@@ -512,11 +713,33 @@ class _TemplateScreenState extends State<TemplateScreen> {
                   }
                   setState(() => _formSubcategory = v);
                   if (v != null && _formCategory != null) {
-                    // Show this sub's DB description
                     _descCtrl.text =
                         _subDescription(_formCategory!, v);
                   }
                 },
+              ),
+            ),
+
+// 👇 ADD THIS RIGHT HERE
+            Padding(
+              padding: const EdgeInsets.only(left: 140, bottom: 12),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.edit, size: 18),
+                    tooltip: 'Edit Subcategory',
+                    onPressed: _formSubcategory != null && !_isEditing
+                        ? _editSubcategoryDialog
+                        : null,
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete, size: 18, color: Colors.red),
+                    tooltip: 'Delete Subcategory',
+                    onPressed: _formSubcategory != null && !_isEditing
+                        ? _deleteSubcategory
+                        : null,
+                  ),
+                ],
               ),
             ),
 
