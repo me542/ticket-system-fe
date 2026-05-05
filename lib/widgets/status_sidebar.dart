@@ -70,6 +70,8 @@ class _TicketSidebarState extends State<TicketSidebar> {
 
   final ScrollController _scrollController = ScrollController();
 
+  ScrollController? _descController;
+
 
   @override
   void initState() {
@@ -1025,16 +1027,20 @@ class _TicketSidebarState extends State<TicketSidebar> {
           _sectionLabel('Description'),
           const SizedBox(height: 8),
 
-          // 👇 Make only the text area scrollable
           SizedBox(
-            height: 120, // adjust height as needed
-            child: SingleChildScrollView(
-              child: Text(
-                desc.isEmpty ? 'No description provided.' : desc,
-                style: const TextStyle(
-                  color: AppTheme.textSecondary,
-                  fontSize: 13,
-                  height: 1.55,
+            height: 200,
+            child: Scrollbar(
+              controller: _descController,
+              thumbVisibility: true, // 👈 always show on right
+              child: SingleChildScrollView(
+                controller: _descController,
+                child: Text(
+                  desc.isEmpty ? 'No description provided.' : desc,
+                  style: const TextStyle(
+                    color: AppTheme.textSecondary,
+                    fontSize: 13,
+                    height: 1.55,
+                  ),
                 ),
               ),
             ),

@@ -9,7 +9,6 @@ import '../widgets/file_ticket.dart';
 import '../widgets/stats_card.dart';
 import 'package:ticket_system/widgets/ticket_row.dart';
 import '../widgets/status_sidebar.dart';
-import 'dart:async';
 import 'dart:ui';
 
 class DashboardScreen extends StatefulWidget {
@@ -37,9 +36,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _currentUsername.toLowerCase().trim())
         .toList();
   }
-
-  // ── Auto-refresh ─────────────────────────────────────────
-  Timer? _refreshTimer;
 
   // ── Current user ─────────────────────────────────────────
   String _currentUsername = '';
@@ -241,16 +237,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _searchController.addListener(() {
       setState(() => _searchQuery = _searchController.text);
     });
-
-    // Auto-refresh every 1 minute
-    _refreshTimer = Timer.periodic(const Duration(minutes: 1), (_) {
-      _loadTickets();
-    });
   }
 
   @override
   void dispose() {
-    _refreshTimer?.cancel();
     _notificationOverlay?.remove();
     _searchController.dispose();
     super.dispose();
@@ -802,9 +792,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   // ── Tickets table ─────────────────────────────────────────
-  Widget _buildTicketsTable(List<Ticket> tickets) {
-    final visible = tickets.take(8).toList();
+  // Each TicketRow is ~56 px; 6 rows visible = 336 px fixed height
+  static const double _rowHeight   = 56.0;
+  static const int    _visibleRows = 6;
 
+  Widget _buildTicketsTable(List<Ticket> tickets) {
     return Container(
       decoration: BoxDecoration(
         color: AppTheme.surface,
@@ -826,7 +818,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Expanded(flex: 2, child: _TableHeader('SUBMITTER')),
             ]),
           ),
-          visible.isEmpty
+          tickets.isEmpty
               ? Padding(
             padding: const EdgeInsets.all(32),
             child: Center(
@@ -844,13 +836,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ]),
             ),
           )
-              : Column(
-            children: visible.take(6).map<Widget>((t) {
-              return GestureDetector(
-                onTap: () => _openTicket(t),
-                child: TicketRow(ticket: t),
-              );
-            }).toList(),
+              : SizedBox(
+            // Fixed height shows exactly 6 rows; scrolls when there are more
+            height: _rowHeight * _visibleRows,
+            child: Scrollbar(
+              thumbVisibility: true,
+              child: ListView.builder(
+                padding: EdgeInsets.zero,
+                itemCount: tickets.length,
+                itemExtent: _rowHeight,
+                itemBuilder: (context, index) {
+                  final t = tickets[index];
+                  return GestureDetector(
+                    onTap: () => _openTicket(t),
+                    child: TicketRow(ticket: t),
+                  );
+                },
+              ),
+            ),
           ),
         ],
       ),
