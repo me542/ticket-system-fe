@@ -1017,18 +1017,26 @@ class _TicketSidebarState extends State<TicketSidebar> {
       'details',
       'body',
     ], fallback: widget.ticket?.description ?? '');
+
     return _card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _sectionLabel('Description'),
           const SizedBox(height: 8),
-          Text(
-            desc.isEmpty ? 'No description provided.' : desc,
-            style: const TextStyle(
-              color: AppTheme.textSecondary,
-              fontSize: 13,
-              height: 1.55,
+
+          // 👇 Make only the text area scrollable
+          SizedBox(
+            height: 120, // adjust height as needed
+            child: SingleChildScrollView(
+              child: Text(
+                desc.isEmpty ? 'No description provided.' : desc,
+                style: const TextStyle(
+                  color: AppTheme.textSecondary,
+                  fontSize: 13,
+                  height: 1.55,
+                ),
+              ),
             ),
           ),
         ],
