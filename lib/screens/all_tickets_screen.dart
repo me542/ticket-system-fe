@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -77,6 +78,9 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
 
   // ── Horizontal scroll controller ─────────────────────────
   final ScrollController _hScrollController = ScrollController();
+
+  // ── Auto-refresh timer ────────────────────────────────────
+  Timer? _refreshTimer;
 
   // ── Sort ──────────────────────────────────────────────────
   String _sortColumn    = 'created_at';
@@ -212,6 +216,12 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
   void initState() {
     super.initState();
     _loadCurrentUser();
+
+    // Auto-refresh every 1 minute
+    _refreshTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      _fetchAllTickets();
+    });
+
     _searchController.addListener(() {
       setState(() {
         _search      = _searchController.text;
@@ -222,6 +232,7 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
 
   @override
   void dispose() {
+    _refreshTimer?.cancel();
     _searchController.dispose();
     _hScrollController.dispose();
     super.dispose();

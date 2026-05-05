@@ -31,6 +31,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
   String? confirmPasswordError;
 
 
+  // ================= PASSWORD RULES =================
+  bool get _hasMinLength       => _passwordController.text.length >= 8;
+  bool get _hasUppercase       => _passwordController.text.contains(RegExp(r'[A-Z]'));
+  bool get _hasLowercase       => _passwordController.text.contains(RegExp(r'[a-z]'));
+  bool get _hasNumber          => _passwordController.text.contains(RegExp(r'[0-9]'));
+  bool get _hasSpecialChar     => _passwordController.text.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\\/`~;]'));
+
+  String? _validatePassword(String password) {
+    if (password.isEmpty) return "Password is required";
+    if (!_hasMinLength)   return "Must be at least 8 characters";
+    if (!_hasUppercase)   return "Must contain an uppercase letter";
+    if (!_hasLowercase)   return "Must contain a lowercase letter";
+    if (!_hasNumber)      return "Must contain a number";
+    if (!_hasSpecialChar) return "Must contain a special character";
+    return null;
+  }
+
+
   // ================= FORM =================
   Widget _buildForm() {
     return Column(
@@ -104,10 +122,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         TextField(
           controller: controller,
           style: const TextStyle(color: Color(0xFF111827)),
-          decoration: _inputDecoration(
-            label,
-            error,
-          ), // The error is already handled here!
+          decoration: _inputDecoration(label, error),
         ),
       ],
     );
@@ -134,7 +149,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           value: _positionController.text.isEmpty
               ? null
               : _positionController.text,
-          items: ["Product Specialist", "Cloud Operation Support", "Developer"]
+          items: ["Analytics Engineer - OIC, Application Analyst 2, Application Developer, Application Developer 1 - OIC, Business Intelligence Analyst - OIC, Business Intelligence Lead OIC, Business Relationship Manager - OIC, Chief Data Officer - OIC, Chief Data Scientist - OIC, Chief Operating Officer - OIC, Cloud Engineer - OIC, Cloud Operations Administrator - OIC, Cloud Operations Support, Compliance, Compliance Officer, Data Scientist OIC, DDFA- OIC, Developer, Developer 1, Developer 1 - OIC, Developer 2 - OIC, Finance Assistant, Information Security Officer - OIC, Junior Analytics Developer, Junior Analytics Engineer, Junior Data Engineer, Machine Learning Engineer OIC, Product Specialist, Product Specialist 1, Product Specialist 1 - OIC, Product Specialist Head OIC, Project Manager - OIC, Quality Assurance Analyst, Quality Assurance Analyst 1, Quality Assurance Manager, Report Specialist I, Report Specialist II, Report Specialist II - OIC, Report Specialist III, Report Specialist III - OIC, Risk Management Officer - OIC, Senior Finance Officer OIC"]
               .map(
                 (pos) => DropdownMenuItem(
               value: pos,
@@ -158,6 +173,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   // ================= PASSWORD =================
   Widget _passwordField() {
+    final password = _passwordController.text;
+    final showRules = password.isNotEmpty;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -177,7 +195,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           enableSuggestions: false,
           autocorrect: false,
           style: const TextStyle(color: Color(0xFF111827)),
-
+          onChanged: (_) => setState(() {}), // rebuild to update rule indicators
           decoration: _inputDecoration(
             "Password",
             passwordError,
@@ -188,31 +206,51 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 });
               },
               icon: Icon(
-                _obscurePassword
-                    ? Icons.visibility_off
-                    : Icons.visibility,
+                _obscurePassword ? Icons.visibility_off : Icons.visibility,
                 color: const Color(0xFF268A15),
               ),
             ),
           ),
         ),
 
-        const SizedBox(height: 6),
+        const SizedBox(height: 8),
 
-        const Text(
-          'Password must:\n'
-              '• Minimum 8 characters\n'
-              '• Uppercase letter\n'
-              '• Lowercase letter\n'
-              '• Number\n'
-              '• Special character',
-          style: TextStyle(
-            fontSize: 12,
-            color: Color(0xFF6B7280),
-            height: 1.4,
-          ),
-        ),
+        // ── Live password rule indicators ──────────────────
+        _passwordRule("At least 8 characters",   _hasMinLength,   showRules),
+        _passwordRule("Uppercase letter (A–Z)",   _hasUppercase,   showRules),
+        _passwordRule("Lowercase letter (a–z)",   _hasLowercase,   showRules),
+        _passwordRule("Number (0–9)",              _hasNumber,      showRules),
+        _passwordRule("Special character (!@#…)", _hasSpecialChar, showRules),
       ],
+    );
+  }
+
+  // ================= PASSWORD RULE ROW =================
+  Widget _passwordRule(String label, bool met, bool showRules) {
+    final color = !showRules
+        ? const Color(0xFF9CA3AF)
+        : met
+        ? const Color(0xFF268A15)
+        : Colors.red;
+
+    final icon = !showRules
+        ? Icons.radio_button_unchecked
+        : met
+        ? Icons.check_circle
+        : Icons.cancel;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 3),
+      child: Row(
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(fontSize: 12, color: color, height: 1.4),
+          ),
+        ],
+      ),
     );
   }
 
@@ -251,10 +289,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
           ),
         ),
-
-
-
-
       ],
     );
   }
@@ -277,7 +311,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
       fillColor: const Color(0xFFF4F6F9),
 
 
-      // ================= NORMAL BORDER =================
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
         borderSide: BorderSide(
@@ -286,7 +319,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ),
 
 
-      // ================= FOCUSED BORDER =================
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
         borderSide: BorderSide(
@@ -296,7 +328,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ),
 
 
-      // ================= ERROR BORDER =================
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
         borderSide: const BorderSide(color: Colors.red, width: 2),
@@ -324,24 +355,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
     setState(() {
       nameError = _nameController.text.isEmpty ? "Name is required" : null;
 
-
-      // ✅ EMAIL VALIDATION
       if (_emailController.text.isEmpty) {
         emailError = "Email is required";
       } else if (!_isValidEmail(_emailController.text)) {
         emailError = "Enter a valid email";
+      } else {
+        emailError = null;
       }
 
+      // ✅ Full password validation
+      passwordError = _validatePassword(_passwordController.text);
 
-      passwordError = _passwordController.text.isEmpty
-          ? "Password is required"
-          : null;
-
-
-      confirmPasswordError =
-      _confirmPasswordController.text != _passwordController.text
-          ? "Passwords do not match"
-          : null;
+      // ✅ Confirm password check
+      if (_confirmPasswordController.text.isEmpty) {
+        confirmPasswordError = "Please confirm your password";
+      } else if (_confirmPasswordController.text != _passwordController.text) {
+        confirmPasswordError = "Passwords do not match";
+      } else {
+        confirmPasswordError = null;
+      }
     });
 
 
@@ -350,7 +382,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         passwordError == null &&
         confirmPasswordError == null) {
       try {
-        final result = await ApiRegistration.registerUser(
+        await ApiRegistration.registerUser(
           username: _usernameController.text,
           email: _emailController.text,
           fullName: _nameController.text,
@@ -381,9 +413,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
 
   void _showSuccessDialog() {
-    final parentContext = context; // 👈 save screen context
-
-
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -431,10 +460,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: () {
-                        Navigator.of(dialogContext).pop(); // 👈 close dialog
+                        Navigator.of(dialogContext).pop();
 
-
-                        // 👇 use parent context
                         Navigator.pushAndRemoveUntil(
                           context,
                           MaterialPageRoute(
@@ -469,9 +496,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             borderRadius: BorderRadius.circular(16),
           ),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxWidth: 300, // 👈 controls width
-            ),
+            constraints: const BoxConstraints(maxWidth: 300),
             child: Padding(
               padding: const EdgeInsets.all(24),
               child: Column(
@@ -509,7 +534,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
-                        ), // 👈 text color here
+                        ),
                       ),
                       child: const Text("OK"),
                     ),
@@ -654,6 +679,3 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 }
-
-
-

@@ -9,6 +9,7 @@ import '../widgets/file_ticket.dart';
 import '../widgets/stats_card.dart';
 import 'package:ticket_system/widgets/ticket_row.dart';
 import '../widgets/status_sidebar.dart';
+import 'dart:async';
 import 'dart:ui';
 
 class DashboardScreen extends StatefulWidget {
@@ -36,6 +37,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _currentUsername.toLowerCase().trim())
         .toList();
   }
+
+  // ── Auto-refresh ─────────────────────────────────────────
+  Timer? _refreshTimer;
 
   // ── Current user ─────────────────────────────────────────
   String _currentUsername = '';
@@ -237,10 +241,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _searchController.addListener(() {
       setState(() => _searchQuery = _searchController.text);
     });
+
+    // Auto-refresh every 1 minute
+    _refreshTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      _loadTickets();
+    });
   }
 
   @override
   void dispose() {
+    _refreshTimer?.cancel();
     _notificationOverlay?.remove();
     _searchController.dispose();
     super.dispose();

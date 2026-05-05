@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../core/services/api_login.dart';
 import '../core/services/api_user_data.dart';
@@ -18,12 +19,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _role = '';
   String _position = '';
 
+  Timer? _refreshTimer;
 
   @override
   void initState() {
     super.initState();
     _loadUserInfo();
-    //_darkMode = themeModeNotifier.value == ThemeMode.dark;
+
+    // Auto-refresh every 1 minute
+    _refreshTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      _loadUserInfo();
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadUserInfo() async {

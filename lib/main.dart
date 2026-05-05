@@ -1,4 +1,3 @@
-import 'dart:async';          // ← add this
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -46,7 +45,7 @@ class MyApp extends StatelessWidget {
   }
 }
 
-// ── AuthGate (unchanged) ──────────────────────────────────────────────────────
+// ── AuthGate ──────────────────────────────────────────────────────
 class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
 
@@ -115,7 +114,7 @@ class _AuthGateState extends State<AuthGate> {
   }
 }
 
-// ── MainShell with Auto-Refresh ───────────────────────────────────────────────
+// ── MainShell ───────────────────────────────────────────────────────────────
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
 
@@ -125,50 +124,21 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   String _currentRoute = 'dashboard';
-  Timer? _refreshTimer;                          // ← timer reference
-  int _refreshKey = 0;                           // ← forces child rebuild
-
-  @override
-  void initState() {
-    super.initState();
-    _startAutoRefresh();
-  }
-
-  void _startAutoRefresh() {
-    _refreshTimer = Timer.periodic(
-      const Duration(minutes: 1),
-          (_) {
-        if (mounted) {
-          final savedRoute = _currentRoute; // ← snapshot current route
-          setState(() {
-            _refreshKey++;
-            _currentRoute = savedRoute;     // ← restore it after rebuild
-          });
-        }
-      },
-    );
-  }
-
-  @override
-  void dispose() {
-    _refreshTimer?.cancel();                     // ← always cancel on exit
-    super.dispose();
-  }
 
   Widget _buildContent() {
     switch (_currentRoute) {
       case 'tickets':
-        return AllTicketsScreen(key: ValueKey('tickets_$_refreshKey'));
+        return const AllTicketsScreen();
       case 'reports':
-        return Reports(key: ValueKey('reports_$_refreshKey'));
+        return const Reports();
       case 'users':
-        return UserScreen(key: ValueKey('users_$_refreshKey'));
+        return const UserScreen();
       case 'template':
-        return TemplateScreen(key: ValueKey('template_$_refreshKey'));
+        return const TemplateScreen();
       case 'settings':
-        return SettingsScreen(key: ValueKey('settings_$_refreshKey'));
+        return const SettingsScreen();
       default:
-        return DashboardScreen(key: ValueKey('dashboard_$_refreshKey'));
+        return const DashboardScreen();
     }
   }
 
