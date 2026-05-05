@@ -511,6 +511,8 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
                       : _styledDropdown(
                     value: _subNames(_category).contains(_subCategory)
                         ? _subCategory
+                        : _subNames(_category).isNotEmpty          // ← fallback to first
+                        ? _subNames(_category).first
                         : null,
                     items: _subNames(_category),
                     hint: 'Select subcategory',
@@ -519,7 +521,7 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
                 ),
                 const SizedBox(height: 10),
 
-                // ── ENDORSER ──
+// ── ENDORSER ──
                 _fieldCard(
                   label: 'ENDORSER',
                   child: _endorsers.isEmpty
@@ -527,13 +529,14 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
                       : _styledDropdown(
                     value: _endorsers.contains(_endorser)
                         ? _endorser
+                        : _endorsers.isNotEmpty                    // ← fallback to first
+                        ? _endorsers.first
                         : null,
                     items: _endorsers,
                     hint: 'Select endorser',
                     onChanged: (v) => setState(() => _endorser = v),
                   ),
                 ),
-                const SizedBox(height: 10),
 
                 // ── ORGANIZATION ──
                 _fieldCard(

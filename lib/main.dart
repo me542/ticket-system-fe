@@ -136,10 +136,14 @@ class _MainShellState extends State<MainShell> {
 
   void _startAutoRefresh() {
     _refreshTimer = Timer.periodic(
-      const Duration(minutes: 1),               // ← every 5 minutes
+      const Duration(minutes: 1),
           (_) {
         if (mounted) {
-          setState(() => _refreshKey++);         // ← triggers all screens to rebuild
+          final savedRoute = _currentRoute; // ← snapshot current route
+          setState(() {
+            _refreshKey++;
+            _currentRoute = savedRoute;     // ← restore it after rebuild
+          });
         }
       },
     );
