@@ -793,7 +793,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   // ── Tickets table ─────────────────────────────────────────
   Widget _buildTicketsTable(List<Ticket> tickets) {
-    final visible = tickets.take(8).toList();
+    final visible = tickets.toList();
 
     return Container(
       decoration: BoxDecoration(

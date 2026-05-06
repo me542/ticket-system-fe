@@ -4,97 +4,193 @@ import 'package:http/http.dart' as http;
 import 'package:universal_html/html.dart' as html;
 import 'api_login.dart';
 
-class ApiAttachment {
-  static const String _baseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://idiyanale-be.bakawan-ai.com') + '/api/user';
+// ── Custom exceptions ─────────────────────────────────────────────────────────
 
-  // ── Auth header helper ────────────────────────────────────────────────────
+class AttachmentException implements Exception {
+  final String message;
+  final int? statusCode;
+  final Object? cause;
+
+  const AttachmentException(this.message, {this.statusCode, this.cause});
+
+  @override
+  String toString() {
+    final parts = ['AttachmentException: $message'];
+    if (statusCode != null) parts.add('(HTTP $statusCode)');
+    if (cause != null) parts.add('— caused by: $cause');
+    return parts.join(' ');
+  }
+}
+
+class AttachmentNotFoundException extends AttachmentException {
+  const AttachmentNotFoundException(String id)
+      : super('Attachment not found: $id', statusCode: 404);
+}
+
+class AttachmentUnauthorizedException extends AttachmentException {
+  const AttachmentUnauthorizedException()
+      : super('Unauthorized — token may be missing or expired', statusCode: 401);
+}
+
+class AttachmentNetworkException extends AttachmentException {
+  const AttachmentNetworkException(Object cause)
+      : super('Network error while fetching attachment', cause: cause);
+}
+
+// ── Main class ────────────────────────────────────────────────────────────────
+
+class ApiAttachment {
+  static const String _baseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'http://idiyanale-be.bakawan-ai.com',
+  ) +
+      '/api/user';
+
+  // ── Auth header helper ──────────────────────────────────────────────────────
+
   static Future<Map<String, String>> _authHeaders() async {
     final token = await ApiLogin.getToken();
-    return {
-      'Authorization': 'Bearer ${token ?? ''}',
-    };
+    if (token == null || token.isEmpty) {
+      throw const AttachmentUnauthorizedException();
+    }
+    return {'Authorization': 'Bearer $token'};
   }
 
-  static Future<Uint8List?> fetchBytes(String url) async {
-    if (url.isEmpty) return null;
+  // ── Fetch raw bytes from any authenticated URL ──────────────────────────────
+
+  /// Fetches the raw bytes at [url].
+  ///
+  /// Throws:
+  /// - [AttachmentUnauthorizedException] on 401
+  /// - [AttachmentNotFoundException] on 404
+  /// - [AttachmentException] on other non-200 responses
+  /// - [AttachmentNetworkException] on network/socket errors
+  /// - [ArgumentError] if [url] is empty
+  static Future<Uint8List> fetchBytes(String url) async {
+    if (url.isEmpty) throw ArgumentError.value(url, 'url', 'URL must not be empty');
+
+    final Map<String, String> headers;
     try {
-      final headers = await _authHeaders();
-      final res = await http.get(Uri.parse(url), headers: headers);
-      if (res.statusCode == 200) return res.bodyBytes;
-      return null;
+      headers = await _authHeaders();
+    } catch (_) {
+      rethrow;
+    }
+
+    final http.Response res;
+    try {
+      res = await http.get(Uri.parse(url), headers: headers);
     } catch (e) {
-      return null;
+      throw AttachmentNetworkException(e);
     }
+
+    _assertOk(res, context: url);
+    return res.bodyBytes;
   }
 
+  // ── View file in a new browser tab ─────────────────────────────────────────
+
+  /// Opens [url] in a new browser tab.
+  ///
+  /// Web only — throws [UnsupportedError] on other platforms.
   static Future<void> viewFile(String url, String fileName) async {
-    if (url.isEmpty) return;
+    if (url.isEmpty) throw ArgumentError.value(url, 'url', 'URL must not be empty');
+    if (fileName.isEmpty) throw ArgumentError.value(fileName, 'fileName', 'File name must not be empty');
+
+    if (!kIsWeb) throw UnsupportedError('viewFile is only supported on Web');
 
     final bytes = await fetchBytes(url);
-    if (bytes == null) throw Exception('Could not load file');
-
-    if (kIsWeb) {
-      _openBlobInNewTab(bytes, fileName);
-    } else {
-      throw UnsupportedError('viewFile is only supported on Web');
-    }
+    _openBlobInNewTab(bytes, fileName);
   }
 
-  // ── Download file — triggers browser "Save As" dialog ────────────────────
+  // ── Trigger browser "Save As" dialog ───────────────────────────────────────
+
+  /// Downloads [url] and triggers a browser save-as dialog.
+  ///
+  /// Web only — throws [UnsupportedError] on other platforms.
   static Future<void> downloadFile(String url, String fileName) async {
-    if (url.isEmpty) return;
+    if (url.isEmpty) throw ArgumentError.value(url, 'url', 'URL must not be empty');
+    if (fileName.isEmpty) throw ArgumentError.value(fileName, 'fileName', 'File name must not be empty');
+
+    if (!kIsWeb) throw UnsupportedError('downloadFile is only supported on Web');
 
     final bytes = await fetchBytes(url);
-    if (bytes == null) throw Exception('Could not load file');
-
-    if (kIsWeb) {
-      _triggerDownload(bytes, fileName);
-    } else {
-      throw UnsupportedError('downloadFile is only supported on Web');
-    }
+    _triggerDownload(bytes, fileName);
   }
 
-  static Future<Uint8List?> fetchAttachmentById(String attachmentId) async {
-    if (attachmentId.isEmpty) return null;
+  // ── Fetch attachment by ID ──────────────────────────────────────────────────
+
+  /// Fetches an attachment from `/uploads/attachments/[attachmentId]`.
+  ///
+  /// Throws:
+  /// - [ArgumentError] if [attachmentId] is empty
+  /// - [AttachmentUnauthorizedException] on 401
+  /// - [AttachmentNotFoundException] on 404
+  /// - [AttachmentException] on other non-200 responses
+  /// - [AttachmentNetworkException] on network/socket errors
+  static Future<Uint8List> fetchAttachmentById(String attachmentId) async {
+    if (attachmentId.isEmpty) {
+      throw ArgumentError.value(attachmentId, 'attachmentId', 'Attachment ID must not be empty');
+    }
+
+    final Map<String, String> headers;
     try {
-      final headers = await _authHeaders();
-      final res = await http.get(
+      headers = await _authHeaders();
+    } catch (_) {
+      rethrow;
+    }
+
+    final http.Response res;
+    try {
+      res = await http.get(
         Uri.parse('$_baseUrl/uploads/attachments/$attachmentId'),
         headers: headers,
       );
-      if (res.statusCode == 200) return res.bodyBytes;
-      return null;
     } catch (e) {
-      return null;
+      throw AttachmentNetworkException(e);
     }
+
+    _assertOk(res, context: attachmentId);
+    return res.bodyBytes;
   }
 
-  // ── Open blob in new tab (Web only) ──────────────────────────────────────
+  // ── Open blob in new tab (Web only) ────────────────────────────────────────
+
   static void _openBlobInNewTab(Uint8List bytes, String fileName) {
     final mimeType = _mimeFromName(fileName);
     final blob = html.Blob([bytes], mimeType);
     final url = html.Url.createObjectUrlFromBlob(blob);
 
-    // Open in new tab
-    html.window.open(url, '_blank');
+    final window = html.window.open(url, '_blank');
+    if (window == null) {
+      html.Url.revokeObjectUrl(url);
+      throw const AttachmentException(
+        'Could not open a new tab — the browser may have blocked the pop-up',
+      );
+    }
 
-    // Revoke after a short delay so the tab has time to load
     Future.delayed(const Duration(seconds: 5), () {
       html.Url.revokeObjectUrl(url);
     });
   }
 
-  // ── Trigger browser download (Web only) ──────────────────────────────────
+  // ── Trigger browser download (Web only) ────────────────────────────────────
+
   static void _triggerDownload(Uint8List bytes, String fileName) {
     final mimeType = _mimeFromName(fileName);
     final blob = html.Blob([bytes], mimeType);
     final url = html.Url.createObjectUrlFromBlob(blob);
 
+    final body = html.document.body;
+    if (body == null) {
+      html.Url.revokeObjectUrl(url);
+      throw const AttachmentException('Cannot trigger download — document body is unavailable');
+    }
+
     final anchor = html.AnchorElement(href: url)
       ..setAttribute('download', fileName)
       ..style.display = 'none';
 
-    html.document.body!.append(anchor);
+    body.append(anchor);
     anchor.click();
     anchor.remove();
 
@@ -103,7 +199,41 @@ class ApiAttachment {
     });
   }
 
-  // ── MIME type helper ──────────────────────────────────────────────────────
+  // ── Response assertion helper ───────────────────────────────────────────────
+
+  static void _assertOk(http.Response res, {required String context}) {
+    if (res.statusCode == 200) return;
+
+    switch (res.statusCode) {
+      case 401:
+        throw const AttachmentUnauthorizedException();
+      case 403:
+        throw AttachmentException(
+          'Forbidden — insufficient permissions for: $context',
+          statusCode: 403,
+        );
+      case 404:
+        throw AttachmentNotFoundException(context);
+      case 422:
+        throw AttachmentException(
+          'Unprocessable request for: $context',
+          statusCode: 422,
+        );
+      case >= 500:
+        throw AttachmentException(
+          'Server error while fetching: $context',
+          statusCode: res.statusCode,
+        );
+      default:
+        throw AttachmentException(
+          'Unexpected response for: $context',
+          statusCode: res.statusCode,
+        );
+    }
+  }
+
+  // ── MIME type helper ────────────────────────────────────────────────────────
+
   static String _mimeFromName(String fileName) {
     final ext = fileName.split('.').last.toLowerCase();
     switch (ext) {
