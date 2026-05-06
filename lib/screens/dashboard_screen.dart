@@ -834,13 +834,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ]),
             ),
           )
-              : Column(
-            children: visible.take(6).map<Widget>((t) {
-              return GestureDetector(
-                onTap: () => _openTicket(t),
-                child: TicketRow(ticket: t),
-              );
-            }).toList(),
+              : SizedBox(
+            height: 300, // adjust height as needed
+            child: SingleChildScrollView(
+              child: Column(
+                children: visible.map<Widget>((t) {
+                  return GestureDetector(
+                    onTap: () => _openTicket(t),
+                    child: TicketRow(ticket: t),
+                  );
+                }).toList(),
+              ),
+            ),
           ),
         ],
       ),
