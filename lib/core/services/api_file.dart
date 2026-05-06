@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';   // ← add this import
 import 'package:file_picker/file_picker.dart';
 import 'api_login.dart';
 
@@ -10,19 +12,33 @@ class ApiTicket {
           defaultValue: 'http://idiyanale-be.bakawan-ai.com') +
           '/api/user';
 
+  /// Maps file extension → MIME type (must match backend allowedTypes exactly)
+  static MediaType _mimeType(String? extension) {
+    switch (extension?.toLowerCase()) {
+      case 'jpg':
+      case 'jpeg':
+        return MediaType('image', 'jpeg');
+      case 'png':
+        return MediaType('image', 'png');
+      case 'pdf':
+        return MediaType('application', 'pdf');
+      default:
+        return MediaType('application', 'octet-stream');
+    }
+  }
+
   /// CREATE TICKET
-  /// Returns the ticket_code string on success, or null on failure.
   static Future<String?> createTicket({
     required String subject,
     required String tickettype,
     required String category,
-    required String subcategory,   // kept for UI; sent as extra field
-    required String institution,   // ✅ renamed from 'organization' → matches backend
+    required String subcategory,
+    required String institution,
     required int priority,
     required String description,
     required String endorser,
-    String assignee = '',          // optional, backend accepts it
-    String approver = '',          // optional, backend accepts it
+    String assignee = '',
+    String approver = '',
     PlatformFile? file,
   }) async {
     try {
@@ -34,25 +50,29 @@ class ApiTicket {
 
       request.headers['Authorization'] = 'Bearer $token';
 
-      // ── Fields — keys match backend c.FormValue(...) calls exactly ──────
       request.fields['subject']     = subject;
       request.fields['tickettype']  = tickettype;
       request.fields['category']    = category;
-      request.fields['subcategory'] = subcategory;   // extra; backend ignores if unused
-      request.fields['institution'] = institution;   // ✅ was 'organization'
+      request.fields['subcategory'] = subcategory;
+      request.fields['institution'] = institution;
       request.fields['priority']    = priority.toString();
       request.fields['description'] = description;
       request.fields['endorser']    = endorser;
       request.fields['assignee']    = assignee;
       request.fields['approver']    = approver;
 
-      // ── File — key must be 'attachments' to match form.File["attachments"] ─
+      // ✅ Explicitly set Content-Type so backend validation passes
       if (file != null && file.bytes != null) {
+        final mime = _mimeType(file.extension);
+
+        debugPrint('📎 Attaching: ${file.name} | ext: ${file.extension} | mime: $mime');
+
         request.files.add(
           http.MultipartFile.fromBytes(
-            'attachments',   // ✅ was 'attachment' (singular) — backend uses plural
+            'attachments',
             file.bytes!,
             filename: file.name,
+            contentType: mime,   // ✅ this was missing — backend was getting empty Content-Type
           ),
         );
       }
@@ -60,21 +80,18 @@ class ApiTicket {
       final streamedResponse = await request.send();
       final resBody = await streamedResponse.stream.bytesToString();
 
-      // 🔍 Temporary debug — remove before production
-      debugPrint('STATUS: ${streamedResponse.statusCode}');
-      debugPrint('BODY:   $resBody');
-      debugPrint('FIELDS: ${request.fields}');
+      debugPrint('📤 STATUS: ${streamedResponse.statusCode}');
+      debugPrint('📤 BODY:   $resBody');
 
       if (streamedResponse.statusCode == 201) {
-        // ✅ Parse and return ticket_code so the UI can display it
         final decoded = jsonDecode(resBody);
-        final ticketCode =
-        decoded['data']?['ticket_code'] as String?;
-        return ticketCode ?? '';   // non-null = success
+        final ticketCode = decoded['data']?['ticket_code'] as String?;
+        return ticketCode ?? '';
       }
 
       return null;
     } catch (e) {
+      debugPrint('❌ createTicket error: $e');
       return null;
     }
   }
@@ -105,7 +122,7 @@ class ApiTicket {
               'subject':            t['subject']             ?? '',
               'category':           t['category']            ?? '',
               'description':        t['description']         ?? '',
-              'institution':        t['institution']         ?? '',   // ✅ matches backend field
+              'institution':        t['institution']         ?? '',
               'tickettype':         t['tickettype']          ?? '',
               'priority':           t['priority']            ?? '',
               'status':             t['status']              ?? '',
@@ -153,7 +170,7 @@ class ApiTicket {
   }
 
   /// GET SINGLE TICKET BY SR NUMBER
-  static Future<Map<String, dynamic>?> getTicketByID(String ticketID) async {
+  static Future<Object?> getTicketByID(String ticketID) async {
     try {
       final token = await ApiLogin.getToken();
       if (token == null) return null;
@@ -185,7 +202,7 @@ class ApiTicket {
       }
       return null;
     } catch (e) {
-      return null;
+      return [];
     }
   }
 }
