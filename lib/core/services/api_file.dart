@@ -60,6 +60,11 @@ class ApiTicket {
       final streamedResponse = await request.send();
       final resBody = await streamedResponse.stream.bytesToString();
 
+      // 🔍 Temporary debug — remove before production
+      debugPrint('STATUS: ${streamedResponse.statusCode}');
+      debugPrint('BODY:   $resBody');
+      debugPrint('FIELDS: ${request.fields}');
+
       if (streamedResponse.statusCode == 201) {
         // ✅ Parse and return ticket_code so the UI can display it
         final decoded = jsonDecode(resBody);
