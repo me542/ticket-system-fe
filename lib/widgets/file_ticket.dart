@@ -221,7 +221,7 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
   Future<void> _pickFile() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['jpg', 'jpeg', 'png', 'pdf'],
+      allowedExtensions: ['jpg', 'jpeg', 'png', 'pdf', 'docs', 'xlsx'],
       withData: true,
     );
     if (result != null && result.files.isNotEmpty) {

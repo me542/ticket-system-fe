@@ -22,6 +22,12 @@ class ApiTicket {
         return MediaType('image', 'png');
       case 'pdf':
         return MediaType('application', 'pdf');
+      case 'xlsx':
+        return MediaType('application',
+            'vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      case 'docx':
+        return MediaType('application',
+            'vnd.openxmlformats-officedocument.wordprocessingml.document');
       default:
         return MediaType('application', 'octet-stream');
     }

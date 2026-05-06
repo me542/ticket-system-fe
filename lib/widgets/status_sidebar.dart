@@ -1072,14 +1072,23 @@ class _TicketSidebarState extends State<TicketSidebar> {
           _sectionLabel('Attachments'),
           const SizedBox(height: 10),
           ...attachments.map((att) {
-            final filePath = (att['file_path'] ?? '').toString();
-            final fileName = (att['file_name'] ?? filePath.split('/').last)
-                .toString();
-            final url = filePath;
-            final isImage = RegExp(
-              r'\.(jpg|jpeg|png|gif|webp|bmp)$',
-              caseSensitive: false,
-            ).hasMatch(fileName);
+            // ✅ Try all possible key names the backend might return
+            final fileUrl = (att['file_url']        // ← GORM json tag for FileURL
+                ?? att['FileURL']         // ← fallback for raw struct
+                ?? att['file_path']       // ← old fallback
+                ?? '').toString();
+
+            final fileName = (att['file_name']      // ← GORM json tag for FileName
+                ?? att['FileName']       // ← fallback
+                ?? fileUrl.split('/').last).toString();
+
+            final ext = fileName.split('.').last.toLowerCase();
+
+            final isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp']
+                .contains(ext);
+            final isPdf   = ext == 'pdf';
+
+            debugPrint('📎 Attachment → name: $fileName | url: $fileUrl');
 
             return Container(
               margin: const EdgeInsets.only(bottom: 8),
@@ -1091,60 +1100,110 @@ class _TicketSidebarState extends State<TicketSidebar> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (isImage && url.isNotEmpty)
+                  // ── Image preview ──────────────────────────────────────
+                  if (isImage && fileUrl.isNotEmpty)
                     MouseRegion(
                       cursor: SystemMouseCursors.click,
                       child: GestureDetector(
-                        onTap: () => _fetchAndOpen(url, fileName),
+                        onTap: () => _fetchAndOpen(fileUrl, fileName),
                         child: ClipRRect(
                           borderRadius: const BorderRadius.vertical(
                             top: Radius.circular(8),
                           ),
-                          child: _AuthImage(url: url, height: 160),
+                          child: _AuthImage(url: fileUrl, height: 160),
                         ),
                       ),
                     ),
+
+                  // ── PDF preview label ──────────────────────────────────
+                  if (isPdf && fileUrl.isNotEmpty)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 20, horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withOpacity(0.06),
+                        borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(8)),
+                      ),
+                      child: const Column(
+                        children: [
+                          Icon(Icons.picture_as_pdf,
+                              color: Colors.orange, size: 36),
+                          SizedBox(height: 6),
+                          Text('PDF Document',
+                              style: TextStyle(
+                                  color: AppTheme.textMuted, fontSize: 12)),
+                        ],
+                      ),
+                    ),
+
+                  // ── File row ───────────────────────────────────────────
                   Padding(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
+                        horizontal: 12, vertical: 8),
                     child: Row(
                       children: [
                         Icon(
                           isImage
                               ? Icons.image_outlined
+                              : isPdf
+                              ? Icons.picture_as_pdf_outlined
                               : Icons.insert_drive_file_outlined,
-                          color: isImage ? Colors.blue : Colors.orange,
+                          color: isImage
+                              ? Colors.blue
+                              : isPdf
+                              ? Colors.orange
+                              : Colors.blueGrey,
                           size: 20,
                         ),
                         const SizedBox(width: 10),
                         Expanded(
-                          child: Text(
-                            fileName,
-                            style: const TextStyle(
-                              color: AppTheme.textPrimary,
-                              fontSize: 12,
-                            ),
-                            overflow: TextOverflow.ellipsis,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                fileName,
+                                style: const TextStyle(
+                                  color: AppTheme.textPrimary,
+                                  fontSize: 12,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              Text(
+                                ext.toUpperCase(),
+                                style: const TextStyle(
+                                  color: AppTheme.textMuted,
+                                  fontSize: 10,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         const SizedBox(width: 8),
-                        if (url.isNotEmpty)
+                        if (fileUrl.isNotEmpty) ...[
                           _attachmentButton(
                             icon: Icons.open_in_new,
                             label: 'View',
                             color: Colors.blue,
-                            onTap: () => _fetchAndOpen(url, fileName),
+                            onTap: () => _fetchAndOpen(fileUrl, fileName),
                           ),
-                        const SizedBox(width: 6),
-                        if (url.isNotEmpty)
+                          const SizedBox(width: 6),
                           _attachmentButton(
                             icon: Icons.download_outlined,
                             label: 'Save',
                             color: Colors.green,
-                            onTap: () =>
-                                _fetchAndOpen(url, fileName, download: true),
+                            onTap: () => _fetchAndOpen(
+                                fileUrl, fileName,
+                                download: true),
+                          ),
+                        ],
+                        // ── No URL fallback ────────────────────────────
+                        if (fileUrl.isEmpty)
+                          const Text(
+                            'URL unavailable',
+                            style: TextStyle(
+                                color: AppTheme.textMuted, fontSize: 11),
                           ),
                       ],
                     ),
