@@ -456,17 +456,63 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _fieldCard(
-                  label: 'SUBJECT',
-                  required: true,
-                  child: SizedBox(
-                    height: 70,
-                    child: _fieldInput(
-                      controller: _subjectCtrl,
-                      hint: 'Brief summary of the issue...',
-                    ),
+
+                _card(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(children: [
+                        const Icon(Icons.flag_outlined,
+                            size: 14, color: AppTheme.textMuted),
+                        const SizedBox(width: 6),
+                        _sectionLabel('PRIORITY'),
+                      ]),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: List.generate(4, (i) {
+                          final val = i + 1;
+                          final color = _priorityColor(val);
+                          final selected = _priority == val;
+                          return Expanded(
+                            child: GestureDetector(
+                              onTap: () => setState(() => _priority = val),
+                              child: Container(
+                                margin:
+                                EdgeInsets.only(right: i < 3 ? 6 : 0),
+                                padding:
+                                const EdgeInsets.symmetric(vertical: 9),
+                                decoration: BoxDecoration(
+                                  color: selected
+                                      ? color.withOpacity(0.15)
+                                      : AppTheme.sidebarBg,
+                                  borderRadius: BorderRadius.circular(7),
+                                  border: Border.all(
+                                    color: selected
+                                        ? color
+                                        : AppTheme.border,
+                                  ),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    'P$val',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: selected
+                                          ? color
+                                          : AppTheme.textSecondary,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        }),
+                      ),
+                    ],
                   ),
                 ),
+
                 const SizedBox(height: 20),
 
                 // ── TICKET TYPE ──
@@ -560,62 +606,18 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // ── PRIORITY ──
-                _card(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(children: [
-                        const Icon(Icons.flag_outlined,
-                            size: 14, color: AppTheme.textMuted),
-                        const SizedBox(width: 6),
-                        _sectionLabel('PRIORITY'),
-                      ]),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: List.generate(4, (i) {
-                          final val = i + 1;
-                          final color = _priorityColor(val);
-                          final selected = _priority == val;
-                          return Expanded(
-                            child: GestureDetector(
-                              onTap: () => setState(() => _priority = val),
-                              child: Container(
-                                margin:
-                                EdgeInsets.only(right: i < 3 ? 6 : 0),
-                                padding:
-                                const EdgeInsets.symmetric(vertical: 9),
-                                decoration: BoxDecoration(
-                                  color: selected
-                                      ? color.withOpacity(0.15)
-                                      : AppTheme.sidebarBg,
-                                  borderRadius: BorderRadius.circular(7),
-                                  border: Border.all(
-                                    color: selected
-                                        ? color
-                                        : AppTheme.border,
-                                  ),
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    'P$val',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                      color: selected
-                                          ? color
-                                          : AppTheme.textSecondary,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
-                        }),
-                      ),
-                    ],
+
+                _fieldCard(
+                  label: 'SUBJECT',
+                  required: true,
+                  child: SizedBox(
+                    height: 70,
+                    child: _fieldInput(
+                      controller: _subjectCtrl,
+                      hint: 'Brief summary of the issue...',
+                    ),
                   ),
                 ),
-
                 const SizedBox(height: 10),
 
                 // ── DESCRIPTION ──────────────────────────────────────────
