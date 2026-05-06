@@ -114,7 +114,7 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
 
     setState(() {
       _endorsers = endorserNames;
-      if (endorserNames.isNotEmpty) _endorser = endorserNames.first;
+      _endorser = null; // No auto-selection — user must explicitly pick
     });
   }
 
@@ -372,7 +372,7 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
       _file = null;
       _fileBytes = null;
       _descManuallyEdited = false;
-      if (_endorsers.isNotEmpty) _endorser = _endorsers.first;
+      _endorser = null;
     });
 
     // Restore template description
