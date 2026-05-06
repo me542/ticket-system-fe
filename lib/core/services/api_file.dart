@@ -5,60 +5,74 @@ import 'package:file_picker/file_picker.dart';
 import 'api_login.dart';
 
 class ApiTicket {
-  static const String baseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://idiyanale-be.bakawan-ai.com') + '/api/user';
+  static const String baseUrl =
+      String.fromEnvironment('API_BASE_URL',
+          defaultValue: 'http://idiyanale-be.bakawan-ai.com') +
+          '/api/user';
 
   /// CREATE TICKET
-  static Future<bool> createTicket({
+  /// Returns the ticket_code string on success, or null on failure.
+  static Future<String?> createTicket({
     required String subject,
     required String tickettype,
     required String category,
-    required String subcategory,
-    required String organization,
+    required String subcategory,   // kept for UI; sent as extra field
+    required String institution,   // ✅ renamed from 'organization' → matches backend
     required int priority,
     required String description,
     required String endorser,
+    String assignee = '',          // optional, backend accepts it
+    String approver = '',          // optional, backend accepts it
     PlatformFile? file,
   }) async {
     try {
       final token = await ApiLogin.getToken();
-      if (token == null) return false;
+      if (token == null) return null;
 
       final uri = Uri.parse('$baseUrl/ticket/create');
-      var request = http.MultipartRequest('POST', uri);
+      final request = http.MultipartRequest('POST', uri);
 
       request.headers['Authorization'] = 'Bearer $token';
 
-      // ── REQUIRED FIELDS (MATCH BACKEND EXACTLY)
-      request.fields['subject'] = subject;
-      request.fields['tickettype'] = tickettype;
-      request.fields['category'] = category;
-      request.fields['subcategory'] = subcategory;
-      request.fields['organization'] = organization; // ✅ FIXED
-      request.fields['priority'] = priority.toString();
+      // ── Fields — keys match backend c.FormValue(...) calls exactly ──────
+      request.fields['subject']     = subject;
+      request.fields['tickettype']  = tickettype;
+      request.fields['category']    = category;
+      request.fields['subcategory'] = subcategory;   // extra; backend ignores if unused
+      request.fields['institution'] = institution;   // ✅ was 'organization'
+      request.fields['priority']    = priority.toString();
       request.fields['description'] = description;
-      request.fields['endorser'] = endorser;
+      request.fields['endorser']    = endorser;
+      request.fields['assignee']    = assignee;
+      request.fields['approver']    = approver;
 
-      // ── FILE UPLOAD (safe check)
+      // ── File — key must be 'attachments' to match form.File["attachments"] ─
       if (file != null && file.bytes != null) {
         request.files.add(
           http.MultipartFile.fromBytes(
-            'attachment', // ⚠️ confirm backend expects this
+            'attachments',   // ✅ was 'attachment' (singular) — backend uses plural
             file.bytes!,
             filename: file.name,
           ),
         );
       }
 
-      final response = await request.send();
-      final resBody = await response.stream.bytesToString();
+      final streamedResponse = await request.send();
+      final resBody = await streamedResponse.stream.bytesToString();
 
-      return response.statusCode == 201;
+      if (streamedResponse.statusCode == 201) {
+        // ✅ Parse and return ticket_code so the UI can display it
+        final decoded = jsonDecode(resBody);
+        final ticketCode =
+        decoded['data']?['ticket_code'] as String?;
+        return ticketCode ?? '';   // non-null = success
+      }
+
+      return null;
     } catch (e) {
-      //
-      return false;
+      return null;
     }
   }
-
 
   /// GET ALL TICKETS
   static Future<List<Map<String, dynamic>>> getAllTickets() async {
@@ -67,8 +81,8 @@ class ApiTicket {
       if (token == null) return [];
 
       final uri = Uri.parse('$baseUrl/list/all/tickets');
-      final res = await http.get(
-          uri, headers: {'Authorization': 'Bearer $token'});
+      final res =
+      await http.get(uri, headers: {'Authorization': 'Bearer $token'});
 
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
@@ -76,7 +90,6 @@ class ApiTicket {
 
         if (raw is List) {
           return raw.map<Map<String, dynamic>>((e) {
-            // API always wraps ticket data inside "ticket" key
             final Map<String, dynamic> t =
             (e['ticket'] is Map)
                 ? Map<String, dynamic>.from(e['ticket'] as Map)
@@ -87,7 +100,7 @@ class ApiTicket {
               'subject':            t['subject']             ?? '',
               'category':           t['category']            ?? '',
               'description':        t['description']         ?? '',
-              'institution':        t['institution']         ?? '',
+              'institution':        t['institution']         ?? '',   // ✅ matches backend field
               'tickettype':         t['tickettype']          ?? '',
               'priority':           t['priority']            ?? '',
               'status':             t['status']              ?? '',
@@ -102,7 +115,7 @@ class ApiTicket {
               'started_at':         t['started_at'],
               'resolved_at':        t['resolved_at'],
               'resolution_minutes': t['resolution_minutes']  ?? '',
-              'resolution_time':    t['resolution_time']     ?? '', // ← fixed key + string
+              'resolution_time':    t['resolution_time']     ?? '',
             };
           }).toList();
         }
@@ -110,7 +123,6 @@ class ApiTicket {
       }
       return [];
     } catch (e) {
-      //
       return [];
     }
   }
@@ -122,8 +134,8 @@ class ApiTicket {
       if (token == null) return [];
 
       final uri = Uri.parse('$baseUrl/ticket/user');
-      final res = await http.get(
-          uri, headers: {'Authorization': 'Bearer $token'});
+      final res =
+      await http.get(uri, headers: {'Authorization': 'Bearer $token'});
 
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
@@ -131,7 +143,6 @@ class ApiTicket {
       }
       return [];
     } catch (e) {
-      //
       return [];
     }
   }
@@ -143,8 +154,8 @@ class ApiTicket {
       if (token == null) return null;
 
       final uri = Uri.parse('$baseUrl/tickets/$ticketID');
-      final res = await http.get(
-          uri, headers: {'Authorization': 'Bearer $token'});
+      final res =
+      await http.get(uri, headers: {'Authorization': 'Bearer $token'});
 
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
@@ -169,7 +180,6 @@ class ApiTicket {
       }
       return null;
     } catch (e) {
-      //
       return null;
     }
   }

@@ -334,7 +334,7 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
         tickettype: _ticketType,
         category: _category ?? '',
         subcategory: _subCategory ?? '',
-        organization: _organization,
+        institution: _organization,
         priority: _priority,
         description: _descCtrl.text.trim(),
         file: _file,
