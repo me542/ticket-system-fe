@@ -1035,24 +1035,18 @@ class _TicketSidebarState extends State<TicketSidebar> {
                 thickness: WidgetStateProperty.all(4),
                 radius: const Radius.circular(4),
                 thumbColor: WidgetStateProperty.all(AppTheme.border),
-
-                // 👇 IMPORTANT: forces scrollbar to edge
-                crossAxisMargin: 0,
-                mainAxisMargin: 0,
               ),
               child: Scrollbar(
                 controller: _descController,
                 child: SingleChildScrollView(
                   controller: _descController,
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: 12), // 👈 move padding HERE
-                    child: Text(
-                      desc.isEmpty ? 'No description provided.' : desc,
-                      style: const TextStyle(
-                        color: AppTheme.textSecondary,
-                        fontSize: 13,
-                        height: 1.55,
-                      ),
+                  padding: const EdgeInsets.only(right: 16), // 👈 keep text clear of scrollbar
+                  child: Text(
+                    desc.isEmpty ? 'No description provided.' : desc,
+                    style: const TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontSize: 13,
+                      height: 1.55,
                     ),
                   ),
                 ),
@@ -1459,13 +1453,16 @@ class _TicketSidebarState extends State<TicketSidebar> {
     ]);
     final resolverName = assigneeName; // same person resolves after grab
 
-    // ✅ AFTER
     final endorseDone =
-        _isEndorsed || _isApproved || _isAssigned || _isResolved;
+        _isEndorsed ||
+            _isApproved ||
+            _isAssigned ||
+            _isResolved ||
+            _isCancelled;
     final approveDone =
-        _isApproved || _isAssigned || _isResolved;
-    final assignDone = _isAssigned || _isResolved;
-    final resolveDone = _isResolved;
+        _isApproved || _isAssigned || _isResolved || _isCancelled;
+    final assignDone = _isAssigned || _isResolved || _isCancelled;
+    final resolveDone = _isResolved || _isCancelled;
 
     return _card(
       child: Column(
