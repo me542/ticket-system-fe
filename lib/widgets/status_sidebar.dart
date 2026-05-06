@@ -1035,36 +1035,27 @@ class _TicketSidebarState extends State<TicketSidebar> {
                 thickness: WidgetStateProperty.all(4),
                 radius: const Radius.circular(4),
                 thumbColor: WidgetStateProperty.all(AppTheme.border),
+
+                // 👇 IMPORTANT: forces scrollbar to edge
+                crossAxisMargin: 0,
+                mainAxisMargin: 0,
               ),
-              child: Stack(
-                children: [
-                  // 🔹 Scrollable content
-                  Padding(
-                    padding: const EdgeInsets.only(right: 12), // space for scrollbar
-                    child: SingleChildScrollView(
-                      controller: _descController,
-                      child: Text(
-                        desc.isEmpty ? 'No description provided.' : desc,
-                        style: const TextStyle(
-                          color: AppTheme.textSecondary,
-                          fontSize: 13,
-                          height: 1.55,
-                        ),
+              child: Scrollbar(
+                controller: _descController,
+                child: SingleChildScrollView(
+                  controller: _descController,
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 12), // 👈 move padding HERE
+                    child: Text(
+                      desc.isEmpty ? 'No description provided.' : desc,
+                      style: const TextStyle(
+                        color: AppTheme.textSecondary,
+                        fontSize: 13,
+                        height: 1.55,
                       ),
                     ),
                   ),
-
-                  // 🔹 Fixed scrollbar on the right
-                  Positioned(
-                    top: 0,
-                    right: 0,
-                    bottom: 0,
-                    child: Scrollbar(
-                      controller: _descController,
-                      child: const SizedBox(), // required child
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
           ),
