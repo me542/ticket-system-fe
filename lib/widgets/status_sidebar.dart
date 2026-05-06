@@ -70,8 +70,6 @@ class _TicketSidebarState extends State<TicketSidebar> {
 
   final ScrollController _scrollController = ScrollController();
 
-  ScrollController? _descController;
-
 
   @override
   void initState() {
@@ -1019,44 +1017,18 @@ class _TicketSidebarState extends State<TicketSidebar> {
       'details',
       'body',
     ], fallback: widget.ticket?.description ?? '');
-
     return _card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _sectionLabel('Description'),
           const SizedBox(height: 8),
-
-          SizedBox(
-            height: 260,
-            child: ScrollbarTheme(
-              data: ScrollbarThemeData(
-                thumbVisibility: WidgetStateProperty.all(true),
-                thickness: WidgetStateProperty.all(4),
-                radius: const Radius.circular(4),
-                thumbColor: WidgetStateProperty.all(AppTheme.border),
-
-                // 👇 IMPORTANT: forces scrollbar to edge
-                crossAxisMargin: 0,
-                mainAxisMargin: 0,
-              ),
-              child: Scrollbar(
-                controller: _descController,
-                child: SingleChildScrollView(
-                  controller: _descController,
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: 24), // 👈 move padding HERE
-                    child: Text(
-                      desc.isEmpty ? 'No description provided.' : desc,
-                      style: const TextStyle(
-                        color: AppTheme.textSecondary,
-                        fontSize: 13,
-                        height: 1.55,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
+          Text(
+            desc.isEmpty ? 'No description provided.' : desc,
+            style: const TextStyle(
+              color: AppTheme.textSecondary,
+              fontSize: 13,
+              height: 1.55,
             ),
           ),
         ],
