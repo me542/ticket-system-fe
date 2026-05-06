@@ -835,7 +835,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           )
               : SizedBox(
-            height: 300, // adjust height as needed
+            height: 500, // adjust height as needed
             child: SingleChildScrollView(
               child: Column(
                 children: visible.map<Widget>((t) {
