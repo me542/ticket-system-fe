@@ -1028,7 +1028,7 @@ class _TicketSidebarState extends State<TicketSidebar> {
           const SizedBox(height: 8),
 
           SizedBox(
-            height: 200,
+            height: 260,
             child: ScrollbarTheme(
               data: ScrollbarThemeData(
                 thumbVisibility: WidgetStateProperty.all(true),
@@ -1045,7 +1045,7 @@ class _TicketSidebarState extends State<TicketSidebar> {
                 child: SingleChildScrollView(
                   controller: _descController,
                   child: Padding(
-                    padding: const EdgeInsets.only(right: 12), // 👈 move padding HERE
+                    padding: const EdgeInsets.only(right: 24), // 👈 move padding HERE
                     child: Text(
                       desc.isEmpty ? 'No description provided.' : desc,
                       style: const TextStyle(
