@@ -281,12 +281,12 @@ class _UserScreenState extends State<UserScreen> {
           // ── Search ─────────────────────────────────────────
           Expanded(
             child: Container(
-              height: 36,
-              decoration: BoxDecoration(
-                color: AppTheme.surface,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppTheme.border),
-              ),
+                height: 36,
+                decoration: BoxDecoration(
+                  color: AppTheme.surface,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppTheme.border),
+                ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -678,8 +678,11 @@ class _UserScreenState extends State<UserScreen> {
     final emailController    = TextEditingController(text: user['email']);
     final passwordController = TextEditingController();
 
-    String? selectedPosition =
-    ['Cloud Ops', 'PS', 'QA'].contains(user['position']) ? user['position'] : null;
+    // Pre-fill position — accept any stored value (full name or legacy short code)
+    String? selectedPosition = (user['position'] ?? '').isNotEmpty
+        ? user['position']
+        : null;
+
     String selectedRole =
     ['user', 'endorser', 'approver', 'resolver'].contains(user['role'])
         ? user['role']!
@@ -700,18 +703,23 @@ class _UserScreenState extends State<UserScreen> {
             width: 400,
             child: SingleChildScrollView(
               child: Column(children: [
+                // ── Full Name ──────────────────────────────
                 TextField(
                   controller: fullNameController,
                   style: const TextStyle(color: AppTheme.textPrimary),
                   decoration: const InputDecoration(labelText: 'Full Name'),
                 ),
                 const SizedBox(height: 10),
+
+                // ── Email ──────────────────────────────────
                 TextField(
                   controller: emailController,
                   style: const TextStyle(color: AppTheme.textPrimary),
                   decoration: const InputDecoration(labelText: 'Email'),
                 ),
                 const SizedBox(height: 10),
+
+                // ── Password ───────────────────────────────
                 TextField(
                   controller: passwordController,
                   obscureText: true,
@@ -722,17 +730,88 @@ class _UserScreenState extends State<UserScreen> {
                   ),
                 ),
                 const SizedBox(height: 10),
-                DropdownButtonFormField<String>(
-                  value: selectedPosition,
-                  decoration: const InputDecoration(labelText: 'Position'),
-                  items: const [
-                    DropdownMenuItem(value: 'Cloud Ops', child: Text('Cloud Operation Support')),
-                    DropdownMenuItem(value: 'PS',        child: Text('Product Specialist')),
-                    DropdownMenuItem(value: 'QA',        child: Text('Quality Assurance')),
+
+                // ── Position (Autocomplete) ────────────────
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Position',
+                      style: TextStyle(
+                        color: AppTheme.textSecondary,
+                        fontSize: 13,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Autocomplete<String>(
+                      optionsBuilder: (TextEditingValue val) {
+                        if (val.text.isEmpty) return _kPositions;
+                        return _kPositions.where((p) =>
+                            p.toLowerCase().contains(val.text.toLowerCase()));
+                      },
+                      initialValue: TextEditingValue(
+                        text: selectedPosition ?? '',
+                      ),
+                      onSelected: (String s) {
+                        setStateDialog(() => selectedPosition = s);
+                      },
+                      fieldViewBuilder: (ctx, fieldCtrl, focus, onSubmit) {
+                        return TextField(
+                          controller: fieldCtrl,
+                          focusNode: focus,
+                          style: const TextStyle(color: AppTheme.textPrimary),
+                          onChanged: (v) {
+                            setStateDialog(() => selectedPosition = v);
+                          },
+                          decoration: const InputDecoration(
+                            labelText: 'Position',
+                            hintText: 'Search position…',
+                            suffixIcon: Icon(
+                              Icons.arrow_drop_down,
+                              color: AppTheme.textSecondary,
+                            ),
+                          ),
+                        );
+                      },
+                      optionsViewBuilder: (ctx, onSelected, options) => Align(
+                        alignment: Alignment.topLeft,
+                        child: Material(
+                          elevation: 6,
+                          borderRadius: BorderRadius.circular(8),
+                          color: AppTheme.surface,
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxHeight: 220),
+                            child: ListView.builder(
+                              padding: EdgeInsets.zero,
+                              shrinkWrap: true,
+                              itemCount: options.length,
+                              itemBuilder: (_, i) {
+                                final opt = options.elementAt(i);
+                                return InkWell(
+                                  onTap: () => onSelected(opt),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 16, vertical: 12),
+                                    child: Text(
+                                      opt,
+                                      style: const TextStyle(
+                                        color: AppTheme.textPrimary,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   ],
-                  onChanged: (v) { if (v != null) setStateDialog(() => selectedPosition = v); },
                 ),
                 const SizedBox(height: 10),
+
+                // ── Role ───────────────────────────────────
                 DropdownButtonFormField<String>(
                   value: selectedRole,
                   decoration: const InputDecoration(labelText: 'Role'),
@@ -745,6 +824,8 @@ class _UserScreenState extends State<UserScreen> {
                   onChanged: (v) { if (v != null) setStateDialog(() => selectedRole = v); },
                 ),
                 const SizedBox(height: 10),
+
+                // ── Status ─────────────────────────────────
                 DropdownButtonFormField<String>(
                   value: selectedStatus,
                   decoration: const InputDecoration(labelText: 'Status'),
@@ -825,6 +906,55 @@ class _UserScreenState extends State<UserScreen> {
     );
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Position list — mirrors RegisterScreen._positions exactly
+// ─────────────────────────────────────────────────────────────────────────────
+
+const List<String> _kPositions = [
+  'Analytics Engineer - OIC',
+  'Application Analyst 2',
+  'Application Developer',
+  'Application Developer 1 - OIC',
+  'Business Intelligence Analyst - OIC',
+  'Business Intelligence Lead OIC',
+  'Business Relationship Manager - OIC',
+  'Chief Data Officer - OIC',
+  'Chief Data Scientist - OIC',
+  'Chief Operating Officer - OIC',
+  'Cloud Engineer - OIC',
+  'Cloud Operations Administrator - OIC',
+  'Cloud Operations Support',
+  'Compliance',
+  'Compliance Officer',
+  'Data Scientist OIC',
+  'DDFA- OIC',
+  'Developer',
+  'Developer 1',
+  'Developer 1 - OIC',
+  'Developer 2 - OIC',
+  'Finance Assistant',
+  'Information Security Officer - OIC',
+  'Junior Analytics Developer',
+  'Junior Analytics Engineer',
+  'Junior Data Engineer',
+  'Machine Learning Engineer OIC',
+  'Product Specialist',
+  'Product Specialist 1',
+  'Product Specialist 1 - OIC',
+  'Product Specialist Head OIC',
+  'Project Manager - OIC',
+  'Quality Assurance Analyst',
+  'Quality Assurance Analyst 1',
+  'Quality Assurance Manager',
+  'Report Specialist I',
+  'Report Specialist II',
+  'Report Specialist II - OIC',
+  'Report Specialist III',
+  'Report Specialist III - OIC',
+  'Risk Management Officer - OIC',
+  'Senior Finance Officer OIC',
+];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
