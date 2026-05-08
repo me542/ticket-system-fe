@@ -1072,15 +1072,22 @@ class _TicketSidebarState extends State<TicketSidebar> {
           _sectionLabel('Attachments'),
           const SizedBox(height: 10),
           ...attachments.map((att) {
-            // ✅ Try all possible key names the backend might return
-            final fileUrl = (att['file_url']        // ← GORM json tag for FileURL
-                ?? att['FileURL']         // ← fallback for raw struct
-                ?? att['file_path']       // ← old fallback
+            // Backend now stores file_key (S3 object key) instead of a public URL.
+            // We identify attachments by their DB row `id` and let ApiAttachment
+            // call /attachments/:id/presigned to get a short-lived S3 URL.
+            final attachmentId = (att['id'] ?? '').toString();
+
+            final fileKey = (att['file_key']        // ← current GORM json tag
+                ?? att['FileKey']         // ← raw struct fallback
                 ?? '').toString();
 
             final fileName = (att['file_name']      // ← GORM json tag for FileName
                 ?? att['FileName']       // ← fallback
-                ?? fileUrl.split('/').last).toString();
+                ?? fileKey.split('/').last).toString();
+
+            // Use the numeric attachment ID for all API calls (presigned URL route).
+            // Fall back to fileKey if id is somehow missing.
+            final fileUrl = attachmentId.isNotEmpty ? attachmentId : fileKey;
 
             final ext = fileName.split('.').last.toLowerCase();
 
@@ -1088,7 +1095,7 @@ class _TicketSidebarState extends State<TicketSidebar> {
                 .contains(ext);
             final isPdf   = ext == 'pdf';
 
-            debugPrint('📎 Attachment → name: $fileName | url: $fileUrl');
+            debugPrint('📎 Attachment → id: $attachmentId | key: $fileKey | name: $fileName');
 
             return Container(
               margin: const EdgeInsets.only(bottom: 8),

@@ -221,5 +221,33 @@ class ApiAttachment {
     }
   }
 
-  static Future<Uint8List?> fetchBytes(String url) async {}
+  // ── Fetch raw bytes for inline image preview (_AuthImage) ────────────────────
+  //
+  // `url` is either:
+  //   - A numeric attachment ID ("42") → get presigned URL first via /attachments/:id/presigned
+  //   - A presigned S3 URL             → fetch directly (no auth header needed)
+
+  static Future<Uint8List?> fetchBytes(String url) async {
+    if (url.isEmpty) return null;
+
+    try {
+      final String fetchUrl;
+      final attachmentId = _extractAttachmentId(url);
+
+      if (attachmentId != null) {
+        fetchUrl = await _getPresignedUrl(attachmentId);
+      } else {
+        fetchUrl = url;
+      }
+
+      final res = await http.get(Uri.parse(fetchUrl));
+      if (res.statusCode == 200) return res.bodyBytes;
+
+      debugPrint('⚠️ fetchBytes got HTTP ${res.statusCode} for $fetchUrl');
+      return null;
+    } catch (e) {
+      debugPrint('⚠️ fetchBytes error: $e');
+      return null;
+    }
+  }
 }
