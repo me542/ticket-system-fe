@@ -53,37 +53,62 @@ class ApiAttachment {
 
   // ── Get presigned URL from backend ──────────────────────────────────────────
   //
-  // Calls GET /api/user/attachments/:id/presigned
-  // Backend looks up FileKey, calls GeneratePresignedGetURL, returns the URL.
-  // We use this URL directly — no CORS issue because presigned S3 URLs are public.
+  // Your backend: GET /api/user/attachments/:id  → c.Redirect(presignedUrl, 302)
+  // We send the request WITHOUT following redirects, intercept the Location
+  // header, and use that presigned S3 URL directly.
 
   static Future<String> _getPresignedUrl(String attachmentId) async {
     final headers = await _authHeaders();
 
-    final http.Response res;
+    // http.Client by default follows redirects — we need to stop at the 302
+    // so we can read the Location header (the presigned S3 URL).
+    final request = http.Request(
+      'GET',
+      Uri.parse('$_baseUrl/attachments/$attachmentId'),
+    )
+      ..followRedirects = false
+      ..headers.addAll(headers);
+
+    final http.StreamedResponse streamed;
     try {
-      res = await http.get(
-        Uri.parse('$_baseUrl/attachments/$attachmentId/presigned'),
-        headers: headers,
-      );
+      final client = http.Client();
+      streamed = await client.send(request);
+      client.close();
     } catch (e) {
       throw AttachmentNetworkException(e);
     }
 
-    _assertOk(res, context: attachmentId);
-
-    // Backend returns: { "data": { "url": "https://s3.amazonaws.com/..." } }
-    // Adjust the key path to match your actual response shape
-    final decoded = jsonDecode(res.body);
-    final url = decoded['data']?['url'] as String?
-        ?? decoded['url']  as String?;
-
-    if (url == null || url.isEmpty) {
-      throw AttachmentException('Presigned URL missing in response');
+    // ✅ Backend issued a redirect → grab the presigned S3 URL from Location
+    if (streamed.statusCode == 301 ||
+        streamed.statusCode == 302 ||
+        streamed.statusCode == 307 ||
+        streamed.statusCode == 308) {
+      final location = streamed.headers['location'];
+      if (location != null && location.isNotEmpty) {
+        debugPrint('🔗 Presigned URL (redirect): $location');
+        return location;
+      }
     }
 
-    debugPrint('🔗 Presigned URL: $url');
-    return url;
+    // Fallback: backend returned 200 with JSON { "data": { "url": "..." } }
+    if (streamed.statusCode == 200) {
+      final body = await streamed.stream.bytesToString();
+      try {
+        final decoded = jsonDecode(body);
+        final url = decoded['data']?['url'] as String?
+            ?? decoded['url'] as String?;
+        if (url != null && url.isNotEmpty) {
+          debugPrint('🔗 Presigned URL (JSON): $url');
+          return url;
+        }
+      } catch (_) {}
+    }
+
+    // Anything else → throw a typed exception
+    throw AttachmentException(
+      'Could not extract presigned URL for $attachmentId',
+      statusCode: streamed.statusCode,
+    );
   }
 
   // ── View file in new tab ─────────────────────────────────────────────────────
