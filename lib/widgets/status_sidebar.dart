@@ -70,7 +70,9 @@ class _TicketSidebarState extends State<TicketSidebar> {
 
   final ScrollController _scrollController = ScrollController();
 
-  ScrollController? _descController;
+  final ScrollController _descController = ScrollController();
+
+
 
 
   @override
@@ -198,6 +200,7 @@ class _TicketSidebarState extends State<TicketSidebar> {
     _remarkCtrl.dispose();
     _remarkScroll.dispose();
     _scrollController.dispose();
+    _descController.dispose();
     super.dispose();
   }
 
@@ -1029,25 +1032,20 @@ class _TicketSidebarState extends State<TicketSidebar> {
 
           SizedBox(
             height: 200,
-            child: ScrollbarTheme(
-              data: ScrollbarThemeData(
-                thumbVisibility: WidgetStateProperty.all(true),
-                thickness: WidgetStateProperty.all(4),
-                radius: const Radius.circular(4),
-                thumbColor: WidgetStateProperty.all(AppTheme.border),
-              ),
-              child: Scrollbar(
+            child: Scrollbar(
+              controller: _descController,
+              thumbVisibility: true,
+              thickness: 4,
+              radius: const Radius.circular(4),
+              child: SingleChildScrollView(
                 controller: _descController,
-                child: SingleChildScrollView(
-                  controller: _descController,
-                  padding: const EdgeInsets.only(right: 16), // 👈 keep text clear of scrollbar
-                  child: Text(
-                    desc.isEmpty ? 'No description provided.' : desc,
-                    style: const TextStyle(
-                      color: AppTheme.textSecondary,
-                      fontSize: 13,
-                      height: 1.55,
-                    ),
+                padding: const EdgeInsets.only(right: 12),
+                child: Text(
+                  desc.isEmpty ? 'No description provided.' : desc,
+                  style: const TextStyle(
+                    color: AppTheme.textSecondary,
+                    fontSize: 13,
+                    height: 1.55,
                   ),
                 ),
               ),
