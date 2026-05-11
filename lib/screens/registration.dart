@@ -116,9 +116,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
   /// Combines first + last name into a lowercase username.
   /// e.g. "Juan" + "Dela Cruz" → "juandelacruz"
   void _updateUsername() {
-    final first = _nameController.text.trim().toLowerCase().replaceAll(' ', ' ');
-    final last  = _lastNameController.text.trim().toLowerCase().replaceAll(' ', ' ');
-    _usernameController.text = '$first$last';
+    final first = _nameController.text.trim().toLowerCase();
+    final last  = _lastNameController.text.trim().toLowerCase();
+    if (first.isEmpty && last.isEmpty) {
+      _usernameController.text = '';
+    } else if (last.isEmpty) {
+      _usernameController.text = first;
+    } else {
+      _usernameController.text = '$first $last';
+    }
   }
 
   // ================= PASSWORD RULES =================
