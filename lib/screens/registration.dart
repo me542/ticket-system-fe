@@ -137,9 +137,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
         // Row 1: Username | Email
         Row(
           children: [
-            Expanded(child: _field("user.name", _usernameController, null)),
+            Expanded(
+              child: _field(
+                "Username",
+                _usernameController,
+                null,
+                readOnly: true,
+              ),
+            ),
             const SizedBox(width: 15),
-            Expanded(child: _field("Email", _emailController, emailError)),
+            Expanded(
+              child: _emailField(),
+            ),
           ],
         ),
 
@@ -194,7 +203,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   // ================= FIELD BUILDER =================
-  Widget _field(String label, TextEditingController controller, String? error) {
+  Widget _field(
+      String label,
+      TextEditingController controller,
+      String? error, {
+        bool readOnly = false,
+      }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -208,6 +222,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         const SizedBox(height: 5),
         TextField(
           controller: controller,
+          readOnly: readOnly,
           style: const TextStyle(color: Color(0xFF111827)),
           decoration: _inputDecoration(label, error),
         ),
@@ -646,6 +661,41 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ),
         );
       },
+    );
+  }
+
+  Widget _emailField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          "Email",
+          style: TextStyle(
+            color: Color(0xFF374151),
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 5),
+
+        TextField(
+          controller: _emailController,
+          style: const TextStyle(color: Color(0xFF111827)),
+          onChanged: (value) {
+            // Auto generate username from email
+            if (value.contains('@')) {
+              final username = value.split('@').first;
+              _usernameController.text = username;
+            } else {
+              _usernameController.text = value;
+            }
+
+            setState(() {
+              emailError = null;
+            });
+          },
+          decoration: _inputDecoration("Email", emailError),
+        ),
+      ],
     );
   }
 
