@@ -37,11 +37,13 @@ class _UserScreenState extends State<UserScreen> {
     if (_search.isNotEmpty) {
       final q = _search.toLowerCase();
       list = list.where((u) =>
-      (u['username']  ?? '').toLowerCase().contains(q) ||
-          (u['full_name'] ?? '').toLowerCase().contains(q) ||
-          (u['email']     ?? '').toLowerCase().contains(q) ||
-          (u['role']      ?? '').toLowerCase().contains(q) ||
-          (u['position']  ?? '').toLowerCase().contains(q)
+      (u['username']   ?? '').toLowerCase().contains(q) ||
+          (u['first_name'] ?? '').toLowerCase().contains(q) ||
+          (u['last_name']  ?? '').toLowerCase().contains(q) ||
+          (u['email']      ?? '').toLowerCase().contains(q) ||
+          (u['role']       ?? '').toLowerCase().contains(q) ||
+          (u['position']   ?? '').toLowerCase().contains(q) ||
+          (u['institution']?? '').toLowerCase().contains(q)
       ).toList();
     }
 
@@ -169,6 +171,7 @@ class _UserScreenState extends State<UserScreen> {
   Future<void> _confirmToggleUser(Map<String, String> u, int id) async {
     final isActive = u['status'] == 'active';
     final action   = isActive ? 'Disable' : 'Enable';
+    final fullName = '${u['first_name'] ?? ''} ${u['last_name'] ?? ''}'.trim();
 
     final result = await showDialog<bool>(
       context: context,
@@ -181,7 +184,7 @@ class _UserScreenState extends State<UserScreen> {
         ),
         content: Text(
           'Are you sure you want to $action this user?\n\n'
-              'User: ${u['full_name'] ?? ''}\n'
+              'User: $fullName\n'
               'Email: ${u['email'] ?? ''}',
           style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13),
         ),
@@ -362,14 +365,16 @@ class _UserScreenState extends State<UserScreen> {
 
   // ── Column definitions ────────────────────────────────────
   static const _cols = [
-    _ColDef('Created',   'created_at', 210),
-    _ColDef('Username',  'username',   160),
-    _ColDef('Full Name', 'full_name',  180),
-    _ColDef('Email',     'email',      240),
-    _ColDef('Role',      'role',       130),
-    _ColDef('Position',  'position',   160),
-    _ColDef('Status',    'status',     110),
-    _ColDef('Actions',   '',           100),
+    _ColDef('Created',     'created_at',  210),
+    _ColDef('Username',    'username',    150),
+    _ColDef('First Name',  'first_name',  150),
+    _ColDef('Last Name',   'last_name',   150),
+    _ColDef('Email',       'email',       220),
+    _ColDef('Role',        'role',        120),
+    _ColDef('Position',    'position',    160),
+    _ColDef('Institution', 'institution', 160),
+    _ColDef('Status',      'status',      110),
+    _ColDef('Actions',     '',            100),
   ];
 
   // ── Scrollable table ──────────────────────────────────────
@@ -387,7 +392,6 @@ class _UserScreenState extends State<UserScreen> {
             ? constraints.maxWidth
             : minWidth;
 
-        // Scale columns proportionally when we have extra space
         final scale = constraints.maxWidth > minWidth
             ? constraints.maxWidth / minWidth
             : 1.0;
@@ -546,8 +550,8 @@ class _UserScreenState extends State<UserScreen> {
                 ],
               ),
             ),
-          ), // end SingleChildScrollView
-        ); // end Scrollbar
+          ),
+        );
       },
     );
   }
@@ -585,7 +589,6 @@ class _UserScreenState extends State<UserScreen> {
       ),
       child: Row(
         children: [
-          // LEFT TEXT (can shrink)
           Expanded(
             child: Text(
                   () {
@@ -603,7 +606,6 @@ class _UserScreenState extends State<UserScreen> {
 
           const SizedBox(width: 8),
 
-          // RIGHT SIDE (scrollable → prevents overflow)
           Flexible(
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -630,7 +632,6 @@ class _UserScreenState extends State<UserScreen> {
           ),
         ],
       ),
-
     );
   }
 
@@ -674,11 +675,12 @@ class _UserScreenState extends State<UserScreen> {
 
   // ── Edit user dialog ──────────────────────────────────────
   void _showEditUserDialog(Map<String, String> user) {
-    final fullNameController = TextEditingController(text: user['full_name']);
-    final emailController    = TextEditingController(text: user['email']);
-    final passwordController = TextEditingController();
+    final firstNameController  = TextEditingController(text: user['first_name']);
+    final lastNameController   = TextEditingController(text: user['last_name']);
+    final emailController      = TextEditingController(text: user['email']);
+    final passwordController   = TextEditingController();
+    final institutionController= TextEditingController(text: user['institution']);
 
-    // Pre-fill position — accept any stored value (full name or legacy short code)
     String? selectedPosition = (user['position'] ?? '').isNotEmpty
         ? user['position']
         : null;
@@ -703,11 +705,26 @@ class _UserScreenState extends State<UserScreen> {
             width: 400,
             child: SingleChildScrollView(
               child: Column(children: [
-                // ── Full Name ──────────────────────────────
-                TextField(
-                  controller: fullNameController,
-                  style: const TextStyle(color: AppTheme.textPrimary),
-                  decoration: const InputDecoration(labelText: 'Full Name'),
+
+                // ── First Name | Last Name ─────────────────
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: firstNameController,
+                        style: const TextStyle(color: AppTheme.textPrimary),
+                        decoration: const InputDecoration(labelText: 'First Name'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextField(
+                        controller: lastNameController,
+                        style: const TextStyle(color: AppTheme.textPrimary),
+                        decoration: const InputDecoration(labelText: 'Last Name'),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 10),
 
@@ -811,6 +828,14 @@ class _UserScreenState extends State<UserScreen> {
                 ),
                 const SizedBox(height: 10),
 
+                // ── Institution ────────────────────────────
+                TextField(
+                  controller: institutionController,
+                  style: const TextStyle(color: AppTheme.textPrimary),
+                  decoration: const InputDecoration(labelText: 'Institution'),
+                ),
+                const SizedBox(height: 10),
+
                 // ── Role ───────────────────────────────────
                 DropdownButtonFormField<String>(
                   value: selectedRole,
@@ -859,24 +884,28 @@ class _UserScreenState extends State<UserScreen> {
                 }
 
                 final success = await ApiUser.updateUser(
-                  id: id,
-                  fullname: fullNameController.text.trim(),
-                  email:    emailController.text.trim(),
-                  password: passwordController.text.trim().isNotEmpty
+                  id:          id,
+                  firstName:   firstNameController.text.trim(),
+                  lastName:    lastNameController.text.trim(),
+                  email:       emailController.text.trim(),
+                  password:    passwordController.text.trim().isNotEmpty
                       ? passwordController.text.trim()
                       : null,
-                  role:     selectedRole,
-                  position: selectedPosition ?? '',
-                  status:   selectedStatus,
+                  role:        selectedRole,
+                  position:    selectedPosition ?? '',
+                  institution: institutionController.text.trim(),
+                  status:      selectedStatus,
                 );
 
                 if (success) {
                   setState(() {
-                    user['full_name'] = fullNameController.text.trim();
-                    user['email']     = emailController.text.trim();
-                    user['role']      = selectedRole;
-                    user['position']  = selectedPosition ?? '';
-                    user['status']    = selectedStatus;
+                    user['first_name']  = firstNameController.text.trim();
+                    user['last_name']   = lastNameController.text.trim();
+                    user['email']       = emailController.text.trim();
+                    user['role']        = selectedRole;
+                    user['position']    = selectedPosition ?? '';
+                    user['institution'] = institutionController.text.trim();
+                    user['status']      = selectedStatus;
                   });
                   if (context.mounted) Navigator.pop(context);
                   if (mounted) {
@@ -908,7 +937,7 @@ class _UserScreenState extends State<UserScreen> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Position list — mirrors RegisterScreen._positions exactly
+// Position list
 // ─────────────────────────────────────────────────────────────────────────────
 
 const List<String> _kPositions = [

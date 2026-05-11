@@ -1031,7 +1031,7 @@ class _TicketSidebarState extends State<TicketSidebar> {
           const SizedBox(height: 8),
 
           SizedBox(
-            height: 200,
+            height: 400,
             child: Scrollbar(
               controller: _descController,
               thumbVisibility: true,

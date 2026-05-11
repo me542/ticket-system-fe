@@ -25,24 +25,26 @@ class ApiUser {
   // ================= CREATE =================
   static Future<bool> createUser({
     required String username,
-    required String fullname,
+    required String firstName,
+    required String lastName,
     required String email,
     required String password,
     required String role,
     required String position,
+    required String institution,
   }) async {
     final url = Uri.parse('$baseUrl/register');
 
-
     final body = jsonEncode({
-      'username': username,
-      'full_name': fullname,
-      'email': email,
-      'password': password,
-      'position': position,
-      'role': role,
+      'username':    username,
+      'first_name':  firstName,
+      'last_name':   lastName,
+      'email':       email,
+      'password':    password,
+      'position':    position,
+      'institution': institution,
+      'role':        role,
     });
-
 
     try {
       final response = await http.post(
@@ -57,29 +59,30 @@ class ApiUser {
     }
   }
 
-
   // ================= UPDATE =================
   static Future<bool> updateUser({
     required int id,
-    required String fullname,
+    required String firstName,
+    required String lastName,
     required String email,
     String? password,
     required String role,
     required String position,
+    required String institution,
     required String status,
   }) async {
     final url = Uri.parse('$baseUrl/update/profile/$id');
 
-
     final body = jsonEncode({
-      'full_name': fullname,
-      'email': email,
+      'first_name':  firstName,
+      'last_name':   lastName,
+      'email':       email,
       if (password != null && password.isNotEmpty) 'password': password,
-      'role': role,
-      'position': position,
-      'status': status,
+      'role':        role,
+      'position':    position,
+      'institution': institution,
+      'status':      status,
     });
-
 
     try {
       final response = await http.put(
@@ -93,17 +96,14 @@ class ApiUser {
       return false;
     }
   }
-
 
   // ================= DISABLE =================
   static Future<bool> disableUser({required int id}) async {
     final url = Uri.parse('$baseUrl/update/profile/$id');
 
-
     final body = jsonEncode({
       'status': 'inactive',
     });
-
 
     try {
       final response = await http.put(
@@ -117,7 +117,6 @@ class ApiUser {
       return false;
     }
   }
-
 
   // ================= ENABLE =================
   static Future<bool> enableUser({required int id}) async {
