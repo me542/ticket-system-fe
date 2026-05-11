@@ -13,21 +13,25 @@ class RegisterScreen extends StatefulWidget {
 
 
 class _RegisterScreenState extends State<RegisterScreen> {
-  final _nameController = TextEditingController();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
+  final _nameController        = TextEditingController();
+  final _lastNameController    = TextEditingController();
+  final _emailController       = TextEditingController();
+  final _passwordController    = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  final _usernameController = TextEditingController();
-  final _positionController = TextEditingController();
+  final _usernameController    = TextEditingController();
+  final _positionController    = TextEditingController();
+  final _institutionController = TextEditingController();
 
-  bool _obscurePassword = true;
+  bool _obscurePassword        = true;
   bool _obscureConfirmPassword = true;
 
-  String? nameError;
+  String? firstNameError;
+  String? lastNameError;
   String? emailError;
   String? passwordError;
   String? confirmPasswordError;
   String? positionError;
+  String? institutionError;
 
   // ================= POSITION LIST =================
   static const List<String> _positions = [
@@ -97,6 +101,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Row 1: Username | Email
         Row(
           children: [
             Expanded(child: _field("Username", _usernameController, null)),
@@ -107,11 +112,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
         const SizedBox(height: 15),
 
+        // Row 2: First Name | Last Name
         Row(
           children: [
-            Expanded(child: _field("Full Name", _nameController, nameError)),
+            Expanded(child: _field("First Name", _nameController, firstNameError)),
             const SizedBox(width: 15),
+            Expanded(child: _field("Last Name", _lastNameController, lastNameError)),
+          ],
+        ),
+
+        const SizedBox(height: 15),
+
+        // Row 3: Position | Institution
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
             Expanded(child: _positionField()),
+            const SizedBox(width: 15),
+            Expanded(child: _field("Institution", _institutionController, institutionError)),
           ],
         ),
 
@@ -181,7 +199,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         Autocomplete<String>(
           optionsBuilder: (TextEditingValue textEditingValue) {
             if (textEditingValue.text.isEmpty) {
-              return _positions; // show all when field is empty
+              return _positions;
             }
             return _positions.where((pos) =>
                 pos.toLowerCase().contains(
@@ -194,7 +212,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
             });
           },
           fieldViewBuilder: (context, fieldController, focusNode, onSubmitted) {
-            // Pre-fill if a position was already chosen
             if (_positionController.text.isNotEmpty &&
                 fieldController.text.isEmpty) {
               fieldController.text = _positionController.text;
@@ -255,7 +272,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
           },
         ),
 
-        // Show error below the autocomplete field
         if (positionError != null)
           Padding(
             padding: const EdgeInsets.only(top: 6, left: 12),
@@ -416,7 +432,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   // ================= REGISTER HANDLER =================
   void _handleRegister() async {
     setState(() {
-      nameError = _nameController.text.isEmpty ? "Name is required" : null;
+      firstNameError = _nameController.text.isEmpty ? "First name is required" : null;
+      lastNameError  = _lastNameController.text.isEmpty ? "Last name is required" : null;
 
       if (_emailController.text.isEmpty) {
         emailError = "Email is required";
@@ -430,6 +447,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ? "Please select a position"
           : null;
 
+      institutionError = _institutionController.text.isEmpty
+          ? "Institution is required"
+          : null;
+
       passwordError = _validatePassword(_passwordController.text);
 
       if (_confirmPasswordController.text.isEmpty) {
@@ -441,18 +462,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
       }
     });
 
-    if (nameError == null &&
+    if (firstNameError == null &&
+        lastNameError == null &&
         emailError == null &&
         positionError == null &&
+        institutionError == null &&
         passwordError == null &&
         confirmPasswordError == null) {
       try {
         await ApiRegistration.registerUser(
-          username: _usernameController.text,
-          email: _emailController.text,
-          fullName: _nameController.text,
-          position: _positionController.text,
-          password: _passwordController.text,
+          username:    _usernameController.text,
+          email:       _emailController.text,
+          firstName:   _nameController.text,
+          lastName:    _lastNameController.text,
+          position:    _positionController.text,
+          institution: _institutionController.text,
+          password:    _passwordController.text,
         );
 
         if (!mounted) return;
@@ -678,5 +703,4 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ),
     );
   }
-
 }

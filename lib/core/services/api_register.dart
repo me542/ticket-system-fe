@@ -9,8 +9,10 @@ class ApiRegistration {
   static Future<Map<String, dynamic>> registerUser({
     required String username,
     required String email,
-    required String fullName,
+    required String firstName,
+    required String lastName,
     required String position,
+    required String institution,
     required String password,
   }) async {
     final url = Uri.parse("$baseUrl/register");
@@ -22,11 +24,13 @@ class ApiRegistration {
         "Content-Type": "application/json",
       },
       body: jsonEncode({
-        "username": username,
-        "email": email,
-        "full_name": fullName,
-        "position": position,
-        "password": password,
+        "username":    username,
+        "email":       email,
+        "first_name":  firstName,
+        "last_name":   lastName,
+        "position":    position,
+        "institution": institution,
+        "password":    password,
       }),
     );
 
