@@ -112,6 +112,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
     'CARD MBA Pioneer',
   ];
 
+  // ================= USERNAME GENERATOR =================
+  /// Combines first + last name into a lowercase username.
+  /// e.g. "Juan" + "Dela Cruz" → "juandelacruz"
+  void _updateUsername() {
+    final first = _nameController.text.trim().toLowerCase().replaceAll(' ', ' ');
+    final last  = _lastNameController.text.trim().toLowerCase().replaceAll(' ', ' ');
+    _usernameController.text = '$first$last';
+  }
+
   // ================= PASSWORD RULES =================
   bool get _hasMinLength   => _passwordController.text.length >= 8;
   bool get _hasUppercase   => _passwordController.text.contains(RegExp(r'[A-Z]'));
@@ -134,34 +143,31 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Row 1: Username | Email
+        // Row 1: First Name | Last Name
         Row(
           children: [
-            Expanded(
-              child: IgnorePointer(
-                child: _field(
-                  "Username",
-                  _usernameController,
-                  null,
-                  readOnly: true,
-                ),
-              ),
-            ),
+            Expanded(child: _firstNameField()),
             const SizedBox(width: 15),
-            Expanded(
-              child: _emailField(),
-            ),
+            Expanded(child: _lastNameField()),
           ],
         ),
 
         const SizedBox(height: 15),
 
-        // Row 2: First Name | Last Name
+        // Row 2: Username (read-only) | Email
         Row(
           children: [
-            Expanded(child: _field("First Name", _nameController, firstNameError)),
+            Expanded(
+              child: _field(
+                "Username",
+                _usernameController,
+                null,
+                readOnly: true,
+                hint: "Auto-generated",
+              ),
+            ),
             const SizedBox(width: 15),
-            Expanded(child: _field("Last Name", _lastNameController, lastNameError)),
+            Expanded(child: _emailField()),
           ],
         ),
 
@@ -204,12 +210,65 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
+  // ================= FIRST NAME FIELD =================
+  Widget _firstNameField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          "First Name",
+          style: TextStyle(
+            color: Color(0xFF374151),
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 5),
+        TextField(
+          controller: _nameController,
+          style: const TextStyle(color: Color(0xFF111827)),
+          onChanged: (_) {
+            _updateUsername();
+            if (firstNameError != null) setState(() => firstNameError = null);
+          },
+          decoration: _inputDecoration("First Name", firstNameError),
+        ),
+      ],
+    );
+  }
+
+  // ================= LAST NAME FIELD =================
+  Widget _lastNameField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          "Last Name",
+          style: TextStyle(
+            color: Color(0xFF374151),
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 5),
+        TextField(
+          controller: _lastNameController,
+          style: const TextStyle(color: Color(0xFF111827)),
+          onChanged: (_) {
+            _updateUsername();
+            if (lastNameError != null) setState(() => lastNameError = null);
+          },
+          decoration: _inputDecoration("Last Name", lastNameError),
+        ),
+      ],
+    );
+  }
+
   // ================= FIELD BUILDER =================
   Widget _field(
       String label,
       TextEditingController controller,
       String? error, {
         bool readOnly = false,
+        String? hint,
       }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -225,11 +284,36 @@ class _RegisterScreenState extends State<RegisterScreen> {
         TextField(
           controller: controller,
           readOnly: readOnly,
-          enabled: !readOnly, // disables focus + cursor
+          enabled: !readOnly,
           style: TextStyle(
-            color: readOnly ? const Color(0xFF9CA3AF) : const Color(0xFF111827),
+            color: readOnly ? const Color(0xFF6B7280) : const Color(0xFF111827),
           ),
-          decoration: _inputDecoration(label, error),
+          decoration: _inputDecoration(hint ?? label, error),
+        ),
+      ],
+    );
+  }
+
+  // ================= EMAIL FIELD =================
+  Widget _emailField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          "Email",
+          style: TextStyle(
+            color: Color(0xFF374151),
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 5),
+        TextField(
+          controller: _emailController,
+          style: const TextStyle(color: Color(0xFF111827)),
+          onChanged: (_) {
+            if (emailError != null) setState(() => emailError = null);
+          },
+          decoration: _inputDecoration("Email", emailError),
         ),
       ],
     );
@@ -285,7 +369,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
             );
           },
-          optionsViewBuilder: (context, onSelected, options) => _optionsView(options, onSelected),
+          optionsViewBuilder: (context, onSelected, options) =>
+              _optionsView(options, onSelected),
         ),
 
         if (positionError != null)
@@ -350,7 +435,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
             );
           },
-          optionsViewBuilder: (context, onSelected, options) => _optionsView(options, onSelected),
+          optionsViewBuilder: (context, onSelected, options) =>
+              _optionsView(options, onSelected),
         ),
 
         if (institutionError != null)
@@ -433,7 +519,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
             "Password",
             passwordError,
             suffix: IconButton(
-              onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+              onPressed: () =>
+                  setState(() => _obscurePassword = !_obscurePassword),
               icon: Icon(
                 _obscurePassword ? Icons.visibility_off : Icons.visibility,
                 color: const Color(0xFF268A15),
@@ -469,7 +556,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
         children: [
           Icon(icon, size: 14, color: color),
           const SizedBox(width: 6),
-          Text(label, style: TextStyle(fontSize: 12, color: color, height: 1.4)),
+          Text(label,
+              style: TextStyle(fontSize: 12, color: color, height: 1.4)),
         ],
       ),
     );
@@ -497,10 +585,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
             "Confirm Password",
             confirmPasswordError,
             suffix: GestureDetector(
-              onTap: () => setState(() =>
-              _obscureConfirmPassword = !_obscureConfirmPassword),
+              onTap: () => setState(
+                    () => _obscureConfirmPassword = !_obscureConfirmPassword,
+              ),
               child: Icon(
-                _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
+                _obscureConfirmPassword
+                    ? Icons.visibility_off
+                    : Icons.visibility,
                 color: const Color(0xFF268A15),
               ),
             ),
@@ -511,7 +602,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   // ================= DECORATION =================
-  InputDecoration _inputDecoration(String hint, String? error, {Widget? suffix}) {
+  InputDecoration _inputDecoration(String hint, String? error,
+      {Widget? suffix}) {
     final isError = error != null;
 
     return InputDecoration(
@@ -553,8 +645,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
   // ================= REGISTER HANDLER =================
   void _handleRegister() async {
     setState(() {
-      firstNameError = _nameController.text.isEmpty ? "First name is required" : null;
-      lastNameError  = _lastNameController.text.isEmpty ? "Last name is required" : null;
+      firstNameError =
+      _nameController.text.isEmpty ? "First name is required" : null;
+      lastNameError =
+      _lastNameController.text.isEmpty ? "Last name is required" : null;
 
       if (_emailController.text.isEmpty) {
         emailError = "Email is required";
@@ -622,7 +716,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
       barrierDismissible: false,
       builder: (dialogContext) {
         return Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape:
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 400),
             child: Padding(
@@ -630,11 +725,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.check_circle, color: Color(0xFF268A15), size: 60),
+                  const Icon(Icons.check_circle,
+                      color: Color(0xFF268A15), size: 60),
                   const SizedBox(height: 15),
                   const Text(
                     "Registration Successful",
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    style:
+                    TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 10),
                   const Text(
@@ -649,7 +746,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         Navigator.of(dialogContext).pop();
                         Navigator.pushAndRemoveUntil(
                           context,
-                          MaterialPageRoute(builder: (context) => LoginScreen()),
+                          MaterialPageRoute(
+                              builder: (context) => LoginScreen()),
                               (route) => false,
                         );
                       },
@@ -669,48 +767,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  Widget _emailField() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          "Email",
-          style: TextStyle(
-            color: Color(0xFF374151),
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        const SizedBox(height: 5),
-
-        TextField(
-          controller: _emailController,
-          style: const TextStyle(color: Color(0xFF111827)),
-          onChanged: (value) {
-            // Auto generate username from email
-            if (value.contains('@')) {
-              final username = value.split('@').first;
-              _usernameController.text = username;
-            } else {
-              _usernameController.text = value;
-            }
-
-            setState(() {
-              emailError = null;
-            });
-          },
-          decoration: _inputDecoration("Email", emailError),
-        ),
-      ],
-    );
-  }
-
   // ================= ERROR DIALOG =================
   void _showErrorDialog(String message) {
     showDialog(
       context: context,
       builder: (context) {
         return Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape:
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 300),
             child: Padding(
@@ -722,7 +786,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   const SizedBox(height: 15),
                   const Text(
                     "Registration Failed",
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    style:
+                    TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 10),
                   Text(message, textAlign: TextAlign.center),
@@ -811,7 +876,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: const Color(0xFFE5E7EB)),
+                            border:
+                            Border.all(color: const Color(0xFFE5E7EB)),
                             boxShadow: [
                               BoxShadow(
                                 color: Colors.black.withOpacity(0.05),
@@ -826,7 +892,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               Row(
                                 children: [
                                   IconButton(
-                                    onPressed: () => Navigator.pop(context),
+                                    onPressed: () =>
+                                        Navigator.pop(context),
                                     icon: const Icon(
                                       Icons.arrow_back,
                                       color: Color(0xFF111827),
