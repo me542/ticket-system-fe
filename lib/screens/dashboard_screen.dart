@@ -877,7 +877,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         const Spacer(),
         // ── Scrollable filter pills ───────────────────────
         Container(
-          height: 32,
+          height: 42,
           padding: const EdgeInsets.symmetric(horizontal: 10),
           decoration: BoxDecoration(
             color: AppTheme.surface,
