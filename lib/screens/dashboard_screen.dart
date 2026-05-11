@@ -741,28 +741,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
       Expanded(child: StatsCard(
         title: 'Total Tickets',
         count: s['total'] ?? 0,
-        subtitle: _isPrivileged ? 'All time records' : 'Your tickets',
+        subtitle: _isPrivileged ? '' : 'Your tickets',
         accentColor: AppTheme.accent,
       )),
       const SizedBox(width: 16),
       Expanded(child: StatsCard(
         title: 'For Review',
         count: s['forTotal'] ?? 0,
-        subtitle: 'status',
+        subtitle: '',
         accentColor: AppTheme.statusAssessment,
       )),
       const SizedBox(width: 16),
       Expanded(child: StatsCard(
         title: 'In Progress',
         count: s['inProgress'] ?? 0,
-        subtitle: 'being worked on',
+        subtitle: '',
         accentColor: AppTheme.statusProgress,
       )),
       const SizedBox(width: 16),
       Expanded(child: StatsCard(
         title: 'Resolved',
         count: s['resolved'] ?? 0,
-        subtitle: 'completed',
+        subtitle: '',
         accentColor: AppTheme.statusResolved,
       )),
     ]);

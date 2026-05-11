@@ -137,7 +137,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         // Row 1: Username | Email
         Row(
           children: [
-            Expanded(child: _field("Username", _usernameController, null)),
+            Expanded(child: _field("user.name", _usernameController, null)),
             const SizedBox(width: 15),
             Expanded(child: _field("Email", _emailController, emailError)),
           ],

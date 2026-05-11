@@ -771,7 +771,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Username',
+                        'Username or email',
                         style: TextStyle(
                           color: Color(0xFF8A92A3),
                           fontSize: 12,

@@ -55,7 +55,7 @@ class AppSidebar extends StatelessWidget {
                               ),
                             ),
                             Text(
-                              'Bakawan Ticketing System',
+                              'BAKAWAN Ticketing System',
                               style: TextStyle(
                                 color: AppTheme.textSecondary,
                                 fontSize: 7,
