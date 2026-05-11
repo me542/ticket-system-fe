@@ -924,7 +924,7 @@ class _TicketSidebarState extends State<TicketSidebar> {
               ),
               const SizedBox(width: 8),
               Text(
-                'SR #${ticket.id}',
+                '${ticket.id}',
                 style: const TextStyle(
                   color: Colors.orange,
                   fontWeight: FontWeight.w700,

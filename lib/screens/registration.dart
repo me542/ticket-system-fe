@@ -79,6 +79,39 @@ class _RegisterScreenState extends State<RegisterScreen> {
     'Senior Finance Officer OIC',
   ];
 
+  // ================= INSTITUTION LIST =================
+  static const List<String> _institutions = [
+    'MHI Healthcare Inc.',
+    'CMIT',
+    'FDSAP',
+    'Bakawan Data Analytics',
+    'EMPC',
+    'CARD Bank',
+    'CARD SME Bank',
+    'CARD RBI',
+    'CARD Inc.',
+    'Padayon Microfinance',
+    'Astro',
+    'Laguna Fresh',
+    'CARD MRI International Partnership Project Institution',
+    'CARD MRI Holdings Company',
+    'CARD MBA',
+    'Bente Production',
+    'Hijos Tours',
+    'CARD Publishing House',
+    'CARD Indogrosir Inc.',
+    'LIKHA NI INAY',
+    'OTTO KONEK',
+    'CARD Pioneer Microinsurance Inc.',
+    'CARD Mutually Reinforcing Institutions',
+    'CARD Engagement Services Inc.',
+    'CARD MRI Development Institute Inc.',
+    'CARD-PCPD',
+    'BotiCARD Pharmacy',
+    'CaMIA (CARD MRI Insurance Agency)',
+    'CARD MBA Pioneer',
+  ];
+
   // ================= PASSWORD RULES =================
   bool get _hasMinLength   => _passwordController.text.length >= 8;
   bool get _hasUppercase   => _passwordController.text.contains(RegExp(r'[A-Z]'));
@@ -129,7 +162,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           children: [
             Expanded(child: _positionField()),
             const SizedBox(width: 15),
-            Expanded(child: _field("Institution", _institutionController, institutionError)),
+            Expanded(child: _institutionField()),
           ],
         ),
 
@@ -198,9 +231,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
         Autocomplete<String>(
           optionsBuilder: (TextEditingValue textEditingValue) {
-            if (textEditingValue.text.isEmpty) {
-              return _positions;
-            }
+            if (textEditingValue.text.isEmpty) return _positions;
             return _positions.where((pos) =>
                 pos.toLowerCase().contains(
                     textEditingValue.text.toLowerCase()));
@@ -216,7 +247,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 fieldController.text.isEmpty) {
               fieldController.text = _positionController.text;
             }
-
             return TextField(
               controller: fieldController,
               focusNode: focusNode,
@@ -235,41 +265,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
             );
           },
-          optionsViewBuilder: (context, onSelected, options) {
-            return Align(
-              alignment: Alignment.topLeft,
-              child: Material(
-                elevation: 6,
-                borderRadius: BorderRadius.circular(8),
-                color: Colors.white,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxHeight: 220),
-                  child: ListView.builder(
-                    padding: EdgeInsets.zero,
-                    shrinkWrap: true,
-                    itemCount: options.length,
-                    itemBuilder: (context, index) {
-                      final option = options.elementAt(index);
-                      return InkWell(
-                        onTap: () => onSelected(option),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 12),
-                          child: Text(
-                            option,
-                            style: const TextStyle(
-                              color: Color(0xFF111827),
-                              fontSize: 13,
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ),
-            );
-          },
+          optionsViewBuilder: (context, onSelected, options) => _optionsView(options, onSelected),
         ),
 
         if (positionError != null)
@@ -281,6 +277,111 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
           ),
       ],
+    );
+  }
+
+  // ================= INSTITUTION (AUTOCOMPLETE) =================
+  Widget _institutionField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          "Institution",
+          style: TextStyle(
+            color: Color(0xFF374151),
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 5),
+
+        Autocomplete<String>(
+          optionsBuilder: (TextEditingValue textEditingValue) {
+            if (textEditingValue.text.isEmpty) return _institutions;
+            return _institutions.where((inst) =>
+                inst.toLowerCase().contains(
+                    textEditingValue.text.toLowerCase()));
+          },
+          onSelected: (String selection) {
+            setState(() {
+              _institutionController.text = selection;
+              institutionError = null;
+            });
+          },
+          fieldViewBuilder: (context, fieldController, focusNode, onSubmitted) {
+            if (_institutionController.text.isNotEmpty &&
+                fieldController.text.isEmpty) {
+              fieldController.text = _institutionController.text;
+            }
+            return TextField(
+              controller: fieldController,
+              focusNode: focusNode,
+              style: const TextStyle(color: Color(0xFF111827)),
+              onChanged: (val) {
+                _institutionController.text = val;
+                if (institutionError != null) setState(() => institutionError = null);
+              },
+              decoration: _inputDecoration(
+                "Search institution…",
+                institutionError,
+                suffix: const Padding(
+                  padding: EdgeInsets.only(right: 8),
+                  child: Icon(Icons.arrow_drop_down, color: Color(0xFF6B7280)),
+                ),
+              ),
+            );
+          },
+          optionsViewBuilder: (context, onSelected, options) => _optionsView(options, onSelected),
+        ),
+
+        if (institutionError != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 6, left: 12),
+            child: Text(
+              institutionError!,
+              style: const TextStyle(color: Colors.red, fontSize: 12),
+            ),
+          ),
+      ],
+    );
+  }
+
+  // ================= SHARED OPTIONS VIEW =================
+  Widget _optionsView(
+      Iterable<String> options,
+      void Function(String) onSelected,
+      ) {
+    return Align(
+      alignment: Alignment.topLeft,
+      child: Material(
+        elevation: 6,
+        borderRadius: BorderRadius.circular(8),
+        color: Colors.white,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 220),
+          child: ListView.builder(
+            padding: EdgeInsets.zero,
+            shrinkWrap: true,
+            itemCount: options.length,
+            itemBuilder: (context, index) {
+              final option = options.elementAt(index);
+              return InkWell(
+                onTap: () => onSelected(option),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 12),
+                  child: Text(
+                    option,
+                    style: const TextStyle(
+                      color: Color(0xFF111827),
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ),
     );
   }
 
@@ -448,7 +549,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           : null;
 
       institutionError = _institutionController.text.isEmpty
-          ? "Institution is required"
+          ? "Please select an institution"
           : null;
 
       passwordError = _validatePassword(_passwordController.text);
