@@ -2,21 +2,22 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'api_login.dart';
 
-
 class ApiGetUser {
-  static const String baseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://idiyanale-be.bakawan-ai.com') + '/api/user/list/all/users';
-
+  static const String baseUrl =
+      String.fromEnvironment(
+        'API_BASE_URL',
+        defaultValue: 'http://idiyanale-be.bakawan-ai.com',
+      ) +
+          '/api/user/list/all/users';
 
   /// Fetch all users from backend
   static Future<List<Map<String, String>>> fetchUsers() async {
     try {
       final token = await ApiLogin.getToken();
 
-
       if (token == null || token.isEmpty) {
         return [];
       }
-
 
       final response = await http.get(
         Uri.parse(baseUrl),
@@ -26,42 +27,73 @@ class ApiGetUser {
         },
       );
 
-
       if (response.statusCode == 200) {
-        final Map<String, dynamic> jsonResponse = jsonDecode(response.body);
+        final Map<String, dynamic> jsonResponse =
+        jsonDecode(response.body);
+
         final List data = jsonResponse['data'] ?? [];
 
-
         return data.map<Map<String, String>>((user) {
-          final fullName =
-          ((user['full_name'] as String?)?.trim().isNotEmpty == true)
-              ? user['full_name']!.trim()
-              : (user['username'] ?? 'Unknown');
+          // ================= FIRST & LAST NAME =================
+          final firstName =
+              user['first_name']?.toString().trim() ?? '';
 
+          final lastName =
+              user['last_name']?.toString().trim() ?? '';
+
+          // ================= FULL NAME =================
+          final fullName =
+          ('$firstName $lastName').trim().isNotEmpty
+              ? ('$firstName $lastName').trim()
+              : (user['username']?.toString() ?? 'Unknown');
 
           return {
             'id': user['user_id']?.toString() ?? '',
+
+            // Individual fields
+            'first_name': firstName,
+            'last_name': lastName,
+
+            // Combined full name
             'full_name': fullName,
+
             'username': user['username']?.toString() ?? '',
             'email': user['email']?.toString() ?? '',
-            'position': (user['position'] as String?)?.trim().isNotEmpty == true
+
+            'position':
+            (user['position'] as String?)
+                ?.trim()
+                .isNotEmpty ==
+                true
                 ? user['position']!.trim()
-                : null,
-            'role': (user['role'] as String?)?.trim().isNotEmpty == true
+                : '',
+
+            'role':
+            (user['role'] as String?)
+                ?.trim()
+                .isNotEmpty ==
+                true
                 ? user['role']!.trim()
-                : null,
-            // ← ADDED: status field
-            'status': (user['status'] as String?)?.trim().isNotEmpty == true
+                : '',
+
+            'status':
+            (user['status'] as String?)
+                ?.trim()
+                .isNotEmpty ==
+                true
                 ? user['status']!.trim()
                 : 'active',
-            'created_at': user['CreatedAt']?.toString() ?? '',
-            'initials': fullName.isNotEmpty
-                ? fullName
-                .split(' ')
-                .map((e) => e[0].toUpperCase())
-                .take(2)
-                .join()
-                : '',
+
+            'created_at':
+            user['CreatedAt']?.toString() ?? '',
+
+            // ================= INITIALS =================
+            'initials': [
+              if (firstName.isNotEmpty)
+                firstName[0].toUpperCase(),
+              if (lastName.isNotEmpty)
+                lastName[0].toUpperCase(),
+            ].join(),
           };
         }).toList();
       } else {

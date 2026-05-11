@@ -828,11 +828,88 @@ class _UserScreenState extends State<UserScreen> {
                 ),
                 const SizedBox(height: 10),
 
-                // ── Institution ────────────────────────────
-                TextField(
-                  controller: institutionController,
-                  style: const TextStyle(color: AppTheme.textPrimary),
-                  decoration: const InputDecoration(labelText: 'Institution'),
+                // ── Institution (Autocomplete) ────────────────
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Institution',
+                      style: TextStyle(
+                        color: AppTheme.textSecondary,
+                        fontSize: 13,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Autocomplete<String>(
+                      optionsBuilder: (TextEditingValue val) {
+                        if (val.text.isEmpty) return _kInstitution;
+                        return _kInstitution.where((i) =>
+                            i.toLowerCase().contains(val.text.toLowerCase()));
+                      },
+                      initialValue: TextEditingValue(
+                        text: institutionController.text,
+                      ),
+                      onSelected: (String s) {
+                        institutionController.text = s;
+                      },
+                      fieldViewBuilder: (ctx, fieldCtrl, focus, onSubmit) {
+                        fieldCtrl.text = institutionController.text;
+
+                        return TextField(
+                          controller: fieldCtrl,
+                          focusNode: focus,
+                          style: const TextStyle(color: AppTheme.textPrimary),
+                          onChanged: (v) {
+                            institutionController.text = v;
+                          },
+                          decoration: const InputDecoration(
+                            labelText: 'Institution',
+                            hintText: 'Search institution…',
+                            suffixIcon: Icon(
+                              Icons.arrow_drop_down,
+                              color: AppTheme.textSecondary,
+                            ),
+                          ),
+                        );
+                      },
+                      optionsViewBuilder: (ctx, onSelected, options) => Align(
+                        alignment: Alignment.topLeft,
+                        child: Material(
+                          elevation: 6,
+                          borderRadius: BorderRadius.circular(8),
+                          color: AppTheme.surface,
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxHeight: 220),
+                            child: ListView.builder(
+                              padding: EdgeInsets.zero,
+                              shrinkWrap: true,
+                              itemCount: options.length,
+                              itemBuilder: (_, i) {
+                                final opt = options.elementAt(i);
+
+                                return InkWell(
+                                  onTap: () => onSelected(opt),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 12,
+                                    ),
+                                    child: Text(
+                                      opt,
+                                      style: const TextStyle(
+                                        color: AppTheme.textPrimary,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 10),
 
@@ -985,6 +1062,37 @@ const List<String> _kPositions = [
   'Senior Finance Officer OIC',
 ];
 
+const List<String> _kInstitution = [
+  'MHI Healthcare Inc.',
+  'CMIT',
+  'FDSAP',
+  'Bakawan Data Analytics',
+  'EMPC',
+  'CARD Bank',
+  'CARD SME Bank',
+  'CARD RBI',
+  'CARD Inc.',
+  'Padayon Microfinance',
+  'Astro',
+  'Laguna Fresh',
+  'CARD MRI International Partnership Project Institution',
+  'CARD MRI Holdings Company',
+  'CARD MBA',
+  'Bente Production',
+  'Hijos Tours',
+  'CARD Publishing House',
+  'CARD Indogrosir Inc.',
+  'LIKHA NI INAY',
+  'OTTO KONEK',
+  'CARD Pioneer Microinsurance Inc.',
+  'CARD Mutually Reinforcing Institutions',
+  'CARD Engagement Services Inc.',
+  'CARD MRI Development Institute Inc.',
+  'CARD-PCPD',
+  'BotiCARD Pharmacy',
+  'CaMIA (CARD MRI Insurance Agency)',
+  'CARD MBA Pioneer',
+];
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
