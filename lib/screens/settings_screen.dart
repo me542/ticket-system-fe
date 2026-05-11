@@ -12,12 +12,13 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-
   String _username = '';
-  String _fullName = '';
+  String _firstName = '';
+  String _lastName = '';
   String _email = '';
   String _role = '';
   String _position = '';
+  String _institution = '';
 
   Timer? _refreshTimer;
 
@@ -42,28 +43,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       final username = await ApiLogin.getUsername();
       final users = await ApiGetUser.fetchUsers();
+
       final currentUser = users.firstWhere(
             (user) => user['username'] == username,
         orElse: () => {},
       );
+
       setState(() {
         _username = username;
-        _fullName = currentUser['full_name'] ?? '';
-        _email = currentUser['email'] ?? username + '@example.com';
+
+        _firstName = currentUser['first_name'] ?? '';
+        _lastName = currentUser['last_name'] ?? '';
+
+        _email =
+            currentUser['email'] ?? '$username@example.com';
+
         _role = currentUser['role'] ?? 'User';
+
         _position = currentUser['position'] ?? '';
+
+        _institution = currentUser['institution'] ?? '';
       });
     } catch (e) {
       setState(() {
         _username = '';
-        _fullName = '';
+        _firstName = '';
+        _lastName = '';
         _email = '';
         _role = 'User';
         _position = '';
+        _institution = '';
       });
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -75,21 +87,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 24),
           decoration: const BoxDecoration(
             color: AppTheme.sidebarBg,
-            border: Border(bottom: BorderSide(color: AppTheme.border)),
+            border: Border(
+              bottom: BorderSide(color: AppTheme.border),
+            ),
           ),
           child: const Row(
             children: [
               Text(
                 'Settings',
                 style: TextStyle(
-                    color: AppTheme.textPrimary,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700),
+                  color: AppTheme.textPrimary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ],
           ),
         ),
-
 
         // Body
         Expanded(
@@ -100,30 +114,43 @@ class _SettingsScreenState extends State<SettingsScreen> {
               children: [
                 // Profile section
                 _section('Profile', [
-                  _settingRow('Full Name', trailing: _displayText(_fullName)),
-                  _settingRow('Username', trailing: _displayText(_username)),
-                  _settingRow('Email', trailing: _displayText(_email)),
-                  _settingRow('Role', trailing: _displayText(_role)),
-                  _settingRow('Position', trailing: _displayText(_position)),
-                ]),
-                const SizedBox(height: 20),
+                  _settingRow(
+                    'First Name',
+                    trailing: _displayText(_firstName),
+                  ),
 
-                // ElevatedButton(
-                //   onPressed: () {
-                //   },
-                //   style: ElevatedButton.styleFrom(
-                //     backgroundColor: AppTheme.accent,
-                //     foregroundColor: Colors.white,
-                //     padding:
-                //     const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                //     shape: RoundedRectangleBorder(
-                //         borderRadius: BorderRadius.circular(8)),
-                //   ),
-                //   child: const Text(
-                //     'Save Changes',
-                //     style: TextStyle(fontWeight: FontWeight.w600),
-                //   ),
-                // ),
+                  _settingRow(
+                    'Last Name',
+                    trailing: _displayText(_lastName),
+                  ),
+
+                  _settingRow(
+                    'Username',
+                    trailing: _displayText(_username),
+                  ),
+
+                  _settingRow(
+                    'Email',
+                    trailing: _displayText(_email),
+                  ),
+
+                  _settingRow(
+                    'Institution',
+                    trailing: _displayText(_institution),
+                  ),
+
+                  _settingRow(
+                    'Role',
+                    trailing: _displayText(_role),
+                  ),
+
+                  _settingRow(
+                    'Position',
+                    trailing: _displayText(_position),
+                  ),
+                ]),
+
+                const SizedBox(height: 20),
               ],
             ),
           ),
@@ -131,7 +158,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ],
     );
   }
-
 
   // Section container
   Widget _section(String title, List<Widget> children) {
@@ -145,13 +171,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+            padding:
+            const EdgeInsets.fromLTRB(16, 14, 16, 10),
             child: Text(
               title,
               style: const TextStyle(
-                  color: AppTheme.textPrimary,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700),
+                color: AppTheme.textPrimary,
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
           ...children,
@@ -161,35 +189,56 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   // Individual setting row
-  Widget _settingRow(String label, {required Widget trailing}) {
+  Widget _settingRow(
+      String label, {
+        required Widget trailing,
+      }) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final isSmall = constraints.maxWidth < 500;
 
         return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 12,
+          ),
           decoration: const BoxDecoration(
-            border: Border(top: BorderSide(color: AppTheme.border, width: 0.5)),
+            border: Border(
+              top: BorderSide(
+                color: AppTheme.border,
+                width: 0.5,
+              ),
+            ),
           ),
           child: isSmall
-          // 📱 SMALL SCREEN (stacked)
               ? Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment:
+            CrossAxisAlignment.start,
             children: [
-              Text(label,
-                  style: const TextStyle(
-                      color: AppTheme.textSecondary, fontSize: 13)),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: AppTheme.textSecondary,
+                  fontSize: 13,
+                ),
+              ),
               const SizedBox(height: 6),
-              Align(alignment: Alignment.centerLeft, child: trailing),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: trailing,
+              ),
             ],
           )
-          // 💻 LARGE SCREEN (row)
               : Row(
             children: [
               Expanded(
-                child: Text(label,
-                    style: const TextStyle(
-                        color: AppTheme.textSecondary, fontSize: 13)),
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                    color: AppTheme.textSecondary,
+                    fontSize: 13,
+                  ),
+                ),
               ),
               trailing,
             ],
@@ -202,7 +251,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   // Display text for read-only fields
   Widget _displayText(String text) {
     return SizedBox(
-      width: 200, // limit width
+      width: 220,
       child: Text(
         text,
         overflow: TextOverflow.ellipsis,
