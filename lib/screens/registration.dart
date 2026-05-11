@@ -138,11 +138,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
         Row(
           children: [
             Expanded(
-              child: _field(
-                "Username",
-                _usernameController,
-                null,
-                readOnly: true,
+              child: IgnorePointer(
+                child: _field(
+                  "Username",
+                  _usernameController,
+                  null,
+                  readOnly: true,
+                ),
               ),
             ),
             const SizedBox(width: 15),
@@ -223,7 +225,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
         TextField(
           controller: controller,
           readOnly: readOnly,
-          style: const TextStyle(color: Color(0xFF111827)),
+          enabled: !readOnly, // disables focus + cursor
+          style: TextStyle(
+            color: readOnly ? const Color(0xFF9CA3AF) : const Color(0xFF111827),
+          ),
           decoration: _inputDecoration(label, error),
         ),
       ],

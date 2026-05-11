@@ -781,7 +781,6 @@ class _UserScreenState extends State<UserScreen> {
                             setStateDialog(() => selectedPosition = v);
                           },
                           decoration: const InputDecoration(
-                            labelText: 'Position',
                             hintText: 'Search position…',
                             suffixIcon: Icon(
                               Icons.arrow_drop_down,
@@ -863,7 +862,6 @@ class _UserScreenState extends State<UserScreen> {
                             institutionController.text = v;
                           },
                           decoration: const InputDecoration(
-                            labelText: 'Institution',
                             hintText: 'Search institution…',
                             suffixIcon: Icon(
                               Icons.arrow_drop_down,
