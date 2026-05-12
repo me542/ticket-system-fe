@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:ui';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import '../core/services/api_attachment.dart';
 import '../core/services/api_file.dart';
@@ -915,23 +916,43 @@ class _TicketSidebarState extends State<TicketSidebar> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const Icon(
-                Icons.confirmation_number,
-                color: Colors.orange,
-                size: 18,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                '${ticket.id}',
-                style: const TextStyle(
-                  color: Colors.orange,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13,
+          Tooltip(
+            message: 'Tap to copy SR number',
+            child: MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: () {
+                  Clipboard.setData(ClipboardData(text: ticket.id));
+                  _showSnackbar('SR number copied!',
+                      color: Colors.orange.shade700);
+                },
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.confirmation_number,
+                      color: Colors.orange,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '${ticket.id}',
+                      style: const TextStyle(
+                        color: Colors.orange,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    const Icon(
+                      Icons.copy_outlined,
+                      color: Colors.orange,
+                      size: 12,
+                    ),
+                  ],
                 ),
               ),
-            ],
+            ),
           ),
           const SizedBox(height: 6),
           Text(
@@ -1023,11 +1044,55 @@ class _TicketSidebarState extends State<TicketSidebar> {
       'body',
     ], fallback: widget.ticket?.description ?? '');
 
+    final descText = desc.isEmpty ? 'No description provided.' : desc;
+
     return _card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _sectionLabel('Description'),
+          Row(
+            children: [
+              Expanded(child: _sectionLabel('Description')),
+              Tooltip(
+                message: 'Copy description',
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: GestureDetector(
+                    onTap: () {
+                      Clipboard.setData(ClipboardData(text: descText));
+                      _showSnackbar('Description copied!',
+                          color: Colors.teal.shade700);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.teal.withOpacity(0.10),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                            color: Colors.teal.withOpacity(0.4)),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.copy_outlined,
+                              size: 13, color: Colors.teal),
+                          SizedBox(width: 4),
+                          Text(
+                            'Copy',
+                            style: TextStyle(
+                                color: Colors.teal,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 8),
 
           SizedBox(
@@ -1040,8 +1105,8 @@ class _TicketSidebarState extends State<TicketSidebar> {
               child: SingleChildScrollView(
                 controller: _descController,
                 padding: const EdgeInsets.only(right: 12),
-                child: Text(
-                  desc.isEmpty ? 'No description provided.' : desc,
+                child: SelectableText(
+                  descText,
                   style: const TextStyle(
                     color: AppTheme.textSecondary,
                     fontSize: 13,
@@ -2401,28 +2466,35 @@ class _TicketSidebarState extends State<TicketSidebar> {
                   ),
 
                 // Bubble
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 13,
-                    vertical: 9,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isMe
-                        ? const Color(0xFF1A6FD4) // solid blue — "me"
-                        : const Color(0xFF1E2A38), // dark card — others
-                    borderRadius: BorderRadius.only(
-                      topLeft: const Radius.circular(16),
-                      topRight: const Radius.circular(16),
-                      bottomLeft: Radius.circular(isMe ? 16 : 3),
-                      bottomRight: Radius.circular(isMe ? 3 : 16),
+                GestureDetector(
+                  onLongPress: () {
+                    Clipboard.setData(ClipboardData(text: message));
+                    _showSnackbar('Message copied!',
+                        color: Colors.blueGrey.shade700);
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 13,
+                      vertical: 9,
                     ),
-                  ),
-                  child: Text(
-                    message,
-                    style: TextStyle(
-                      color: isMe ? Colors.white : Colors.white,
-                      fontSize: 13,
-                      height: 1.45,
+                    decoration: BoxDecoration(
+                      color: isMe
+                          ? const Color(0xFF1A6FD4) // solid blue — "me"
+                          : const Color(0xFF1E2A38), // dark card — others
+                      borderRadius: BorderRadius.only(
+                        topLeft: const Radius.circular(16),
+                        topRight: const Radius.circular(16),
+                        bottomLeft: Radius.circular(isMe ? 16 : 3),
+                        bottomRight: Radius.circular(isMe ? 3 : 16),
+                      ),
+                    ),
+                    child: SelectableText(
+                      message,
+                      style: TextStyle(
+                        color: isMe ? Colors.white : Colors.white,
+                        fontSize: 13,
+                        height: 1.45,
+                      ),
                     ),
                   ),
                 ),
