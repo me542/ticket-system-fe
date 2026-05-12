@@ -145,11 +145,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
         const SizedBox(height: 15),
 
+        // Row 2: email | username
         Row(
           children: [
-            Expanded(child: _usernameField()),
-            const SizedBox(width: 15),
             Expanded(child: _emailField()),
+            const SizedBox(width: 15),
+            Expanded(child: _usernameField()),
           ],
         ),
 
@@ -207,11 +208,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
         const SizedBox(height: 5),
         TextField(
           controller: _usernameController,
+          readOnly: true,
           style: const TextStyle(color: Color(0xFF111827)),
-          onChanged: (_) {
-            setState(() {});
-          },
-          decoration: _inputDecoration("Enter username", null),
+          decoration: _inputDecoration(
+            "Auto-generated username",
+            null,
+          ),
         ),
       ],
     );
@@ -293,8 +295,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
         TextField(
           controller: _emailController,
           style: const TextStyle(color: Color(0xFF111827)),
-          onChanged: (_) {
-            if (emailError != null) setState(() => emailError = null);
+          onChanged: (value) {
+            // Remove email error
+            if (emailError != null) {
+              setState(() => emailError = null);
+            }
+
+            // Auto generate username from email
+            if (value.contains('@')) {
+              final username = value.split('@').first;
+
+              setState(() {
+                _usernameController.text = username;
+              });
+            } else {
+              setState(() {
+                _usernameController.text = value;
+              });
+            }
           },
           decoration: _inputDecoration("Email", emailError),
         ),
