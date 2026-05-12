@@ -681,22 +681,6 @@ class _UserScreenState extends State<UserScreen> {
     final passwordController   = TextEditingController();
     final institutionController= TextEditingController(text: user['institution']);
 
-    // ── Auto-generate username from first + last name ──────
-    String buildUsername(String first, String last) {
-      final f = first.trim().toLowerCase();
-      final l = last.trim().toLowerCase();
-      if (f.isEmpty && l.isEmpty) return '';
-      if (l.isEmpty) return f;
-      return '$f $l';
-    }
-
-    final usernameController = TextEditingController(
-      text: buildUsername(
-        user['first_name'] ?? '',
-        user['last_name']  ?? '',
-      ),
-    );
-
     String? selectedPosition = (user['position'] ?? '').isNotEmpty
         ? user['position']
         : null;
@@ -730,10 +714,6 @@ class _UserScreenState extends State<UserScreen> {
                         controller: firstNameController,
                         style: const TextStyle(color: AppTheme.textPrimary),
                         decoration: const InputDecoration(labelText: 'First Name'),
-                        onChanged: (v) {
-                          usernameController.text =
-                              buildUsername(v, lastNameController.text);
-                        },
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -742,33 +722,11 @@ class _UserScreenState extends State<UserScreen> {
                         controller: lastNameController,
                         style: const TextStyle(color: AppTheme.textPrimary),
                         decoration: const InputDecoration(labelText: 'Last Name'),
-                        onChanged: (v) {
-                          usernameController.text =
-                              buildUsername(firstNameController.text, v);
-                        },
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 10),
-
-                // ── Username (read-only, auto-generated) ───
-                TextField(
-                  controller: usernameController,
-                  readOnly: true,
-                  style: const TextStyle(color: AppTheme.textMuted),
-                  decoration: InputDecoration(
-                    labelText: 'Username',
-                    hintText: 'Auto-generated',
-                    filled: true,
-                    fillColor: AppTheme.sidebarBg,
-                    suffixIcon: const Tooltip(
-                      message: 'Auto-generated from first + last name',
-                      child: Icon(Icons.info_outline,
-                          size: 16, color: AppTheme.textMuted),
-                    ),
-                  ),
-                ),
 
                 // ── Email ──────────────────────────────────
                 TextField(
@@ -1002,7 +960,6 @@ class _UserScreenState extends State<UserScreen> {
 
                 final success = await ApiUser.updateUser(
                   id:          id,
-                  username:    usernameController.text.trim(),
                   firstName:   firstNameController.text.trim(),
                   lastName:    lastNameController.text.trim(),
                   email:       emailController.text.trim(),
@@ -1017,7 +974,6 @@ class _UserScreenState extends State<UserScreen> {
 
                 if (success) {
                   setState(() {
-                    user['username']    = usernameController.text.trim();
                     user['first_name']  = firstNameController.text.trim();
                     user['last_name']   = lastNameController.text.trim();
                     user['email']       = emailController.text.trim();

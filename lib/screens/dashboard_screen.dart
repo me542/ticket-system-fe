@@ -122,6 +122,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  /// Builds "Firstname Lastname" from API fields, falling back to username.
+  String _fullName(Map<String, dynamic> e) {
+    final first = (e['firstname'] ?? '').toString().trim();
+    final last  = (e['lastname']  ?? '').toString().trim();
+    if (first.isNotEmpty || last.isNotEmpty) {
+      return '$first $last'.trim();
+    }
+    return (e['username'] ?? 'Unknown').toString();
+  }
+
+  /// Returns initials: first letter of firstname + first letter of lastname.
+  String _nameInitials(Map<String, dynamic> e) {
+    final first = (e['firstname'] ?? '').toString().trim();
+    final last  = (e['lastname']  ?? '').toString().trim();
+    final f = first.isNotEmpty ? first[0].toUpperCase() : '';
+    final l = last.isNotEmpty  ? last[0].toUpperCase()  : '';
+    final initials = '$f$l';
+    return initials.isNotEmpty ? initials : (e['username'] ?? 'U').toString().substring(0, 1).toUpperCase();
+  }
+
   // ── Filter & Search ───────────────────────────────────────
   String _selectedFilter = 'All';
 
@@ -326,8 +346,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         status:            mapStatus(rawSt),  // enum for logic
         rawStatus:         rawSt,             // real label for display
         priority:          priority,
-        submitter:         e['username'] ?? 'Unknown',
-        submitterInitials: (e['username'] ?? 'U').substring(0, 1).toUpperCase(),
+        submitter:         _fullName(e),
+        submitterInitials: _nameInitials(e),
         createdAt:         DateTime.tryParse(e['created_at'] ?? '') ?? DateTime.now(),
         description:       e['description'] ?? '',
       );

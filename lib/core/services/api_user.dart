@@ -62,7 +62,6 @@ class ApiUser {
   // ================= UPDATE =================
   static Future<bool> updateUser({
     required int id,
-    required String username,
     required String firstName,
     required String lastName,
     required String email,
@@ -75,7 +74,6 @@ class ApiUser {
     final url = Uri.parse('$baseUrl/update/profile/$id');
 
     final body = jsonEncode({
-      'username':    username,
       'first_name':  firstName,
       'last_name':   lastName,
       'email':       email,

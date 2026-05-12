@@ -112,21 +112,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     'CARD MBA Pioneer',
   ];
 
-  // ================= USERNAME GENERATOR =================
-  /// Combines first + last name into a lowercase username.
-  /// e.g. "Juan" + "Dela Cruz" → "juandelacruz"
-  void _updateUsername() {
-    final first = _nameController.text.trim().toLowerCase();
-    final last  = _lastNameController.text.trim().toLowerCase();
-    if (first.isEmpty && last.isEmpty) {
-      _usernameController.text = '';
-    } else if (last.isEmpty) {
-      _usernameController.text = first;
-    } else {
-      _usernameController.text = '$first $last';
-    }
-  }
-
   // ================= PASSWORD RULES =================
   bool get _hasMinLength   => _passwordController.text.length >= 8;
   bool get _hasUppercase   => _passwordController.text.contains(RegExp(r'[A-Z]'));
@@ -160,18 +145,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
         const SizedBox(height: 15),
 
-        // Row 2: Username (read-only) | Email
         Row(
           children: [
-            Expanded(
-              child: _field(
-                "Username",
-                _usernameController,
-                null,
-                readOnly: true,
-                hint: "Auto-generated",
-              ),
-            ),
+            Expanded(child: _usernameField()),
             const SizedBox(width: 15),
             Expanded(child: _emailField()),
           ],
@@ -216,6 +192,31 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
+  // ================= USERNAME FIELD =================
+  Widget _usernameField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          "Username",
+          style: TextStyle(
+            color: Color(0xFF374151),
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 5),
+        TextField(
+          controller: _usernameController,
+          style: const TextStyle(color: Color(0xFF111827)),
+          onChanged: (_) {
+            setState(() {});
+          },
+          decoration: _inputDecoration("Enter username", null),
+        ),
+      ],
+    );
+  }
+
   // ================= FIRST NAME FIELD =================
   Widget _firstNameField() {
     return Column(
@@ -233,16 +234,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
           controller: _nameController,
           style: const TextStyle(color: Color(0xFF111827)),
           onChanged: (_) {
-            _updateUsername();
-            if (firstNameError != null) setState(() => firstNameError = null);
+            if (firstNameError != null) {
+              setState(() => firstNameError = null);
+            }
           },
-          decoration: _inputDecoration("First Name", firstNameError),
+          decoration: _inputDecoration(
+            "First Name",
+            firstNameError,
+          ),
         ),
       ],
     );
   }
 
-  // ================= LAST NAME FIELD =================
+// ================= LAST NAME FIELD =================
   Widget _lastNameField() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -259,42 +264,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
           controller: _lastNameController,
           style: const TextStyle(color: Color(0xFF111827)),
           onChanged: (_) {
-            _updateUsername();
-            if (lastNameError != null) setState(() => lastNameError = null);
+            if (lastNameError != null) {
+              setState(() => lastNameError = null);
+            }
           },
-          decoration: _inputDecoration("Last Name", lastNameError),
-        ),
-      ],
-    );
-  }
-
-  // ================= FIELD BUILDER =================
-  Widget _field(
-      String label,
-      TextEditingController controller,
-      String? error, {
-        bool readOnly = false,
-        String? hint,
-      }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            color: Color(0xFF374151),
-            fontWeight: FontWeight.w500,
+          decoration: _inputDecoration(
+            "Last Name",
+            lastNameError,
           ),
-        ),
-        const SizedBox(height: 5),
-        TextField(
-          controller: controller,
-          readOnly: readOnly,
-          enabled: !readOnly,
-          style: TextStyle(
-            color: readOnly ? const Color(0xFF6B7280) : const Color(0xFF111827),
-          ),
-          decoration: _inputDecoration(hint ?? label, error),
         ),
       ],
     );
