@@ -60,12 +60,8 @@ class ApiGetUser {
             'username': user['username']?.toString() ?? '',
             'email': user['email']?.toString() ?? '',
 
-            'institution':
-            (user['institution'] as String?)
-                ?.trim()
-                .isNotEmpty ==
-                true
-                ? user['institution']!.trim()
+            'institution': (user['institution']?.toString().trim().isNotEmpty ?? false)
+                ? user['institution'].toString().trim()
                 : '',
 
             'position':
