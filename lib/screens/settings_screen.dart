@@ -94,7 +94,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: const Row(
             children: [
               Text(
-                'Settings',
+                'Profile',
                 style: TextStyle(
                   color: AppTheme.textPrimary,
                   fontSize: 18,
@@ -113,7 +113,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Profile section
-                _section('Profile', [
+                _section('Personal Information', [
                   _settingRow(
                     'First Name',
                     trailing: _displayText(_firstName),

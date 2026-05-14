@@ -201,18 +201,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
         const Text(
           "Username",
           style: TextStyle(
-            color: Color(0xFF374151),
+            color: Color(0xFF111827),
             fontWeight: FontWeight.w500,
           ),
         ),
         const SizedBox(height: 5),
         TextField(
           controller: _usernameController,
-          readOnly: true,
-          style: const TextStyle(color: Color(0xFF111827)),
+          enabled: false,
+          style: const TextStyle(
+            color: Color(0xFF111827),
+          ),
           decoration: _inputDecoration(
             "Auto-generated username",
             null,
+          ).copyWith(
+            disabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Colors.grey),
+            ),
           ),
         ),
       ],

@@ -199,7 +199,7 @@ class _MainShellState extends State<MainShell> {
       case 'template':
         return const TemplateScreen();
 
-      case 'settings':
+      case 'profile':
         return const SettingsScreen();
 
       default:

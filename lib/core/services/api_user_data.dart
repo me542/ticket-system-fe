@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'api_login.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiGetUser {
 
@@ -101,5 +102,12 @@ class ApiGetUser {
     } catch (e, stack) {
       return [];
     }
+  }
+}
+
+class ApiUserData {
+  static Future<String?> getUsername() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('username');
   }
 }

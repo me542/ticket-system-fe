@@ -156,9 +156,9 @@ class AppSidebar extends StatelessWidget {
                       ),
 
                       _navItem(
-                        icon: Icons.settings_outlined,
-                        label: 'Settings',
-                        route: 'settings',
+                        icon: Icons.person_2_rounded,
+                        label: 'Profile',
+                        route: 'profile',
                       ),
 
                       const SizedBox(height: 20),

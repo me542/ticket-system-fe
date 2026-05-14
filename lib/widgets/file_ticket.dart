@@ -6,7 +6,7 @@ import '../core/services/api_login.dart';
 import '../core/services/api_user_data.dart';
 import '../core/services/api_category.dart';
 import '../data/light_theme.dart';
-
+import 'package:shared_preferences/shared_preferences.dart';
 
 class CreateTicketSidebar extends StatefulWidget {
   final VoidCallback onClose;
@@ -93,28 +93,35 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
   // ── loaders ───────────────────────────────────────────────────────────────
   Future<void> _loadUsers() async {
     final users = await ApiGetUser.fetchUsers();
+
+    // Get current logged in username
+    final currentUser = await ApiUserData.getUsername();
+
     if (!mounted) return;
-    for (final u in users) {
-      //
-    }
 
-    // Filter endorsers — role field is now always a non-null String
-    final endorserUsers = users
-        .where((u) => (u['role'] ?? '').toLowerCase() == 'endorser')
-        .toList();
+    // Only users with role = endorser
+    final endorserUsers = users.where((u) {
+      final role = (u['role'] ?? '').toLowerCase();
+      final username = (u['username'] ?? '').trim().toLowerCase();
 
-    // Show full_name in dropdown; fall back to username
+      // Prevent self-endorsement
+      final isCurrentUser =
+          username == (currentUser ?? '').trim().toLowerCase();
+
+      return role == 'endorser' && !isCurrentUser;
+    }).toList();
+
     final endorserNames = endorserUsers
-        .map((u) {
-      final display = u['username'] ?? '';
-      return display;
-    })
+        .map((u) => u['username'] ?? '')
         .where((s) => s.isNotEmpty)
         .toList();
 
     setState(() {
       _endorsers = endorserNames;
-      if (endorserNames.isNotEmpty) _endorser = endorserNames.first;
+
+      // Auto select first available endorser
+      _endorser =
+      endorserNames.isNotEmpty ? endorserNames.first : null;
     });
   }
 

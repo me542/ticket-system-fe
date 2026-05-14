@@ -432,11 +432,38 @@ class _LoginScreenState extends State<LoginScreen> {
   void _showNewPasswordDialog(String token) {
     final passwordController = TextEditingController();
     final confirmController = TextEditingController();
+
     bool obscurePassword = true;
     bool obscureConfirm = true;
+
     String? passwordError;
     String? confirmError;
 
+    // Password rules
+    bool _hasMinLength = false;
+    bool _hasUppercase = false;
+    bool _hasLowercase = false;
+    bool _hasNumber = false;
+    bool _hasSpecialChar = false;
+
+    void checkPassword(String password) {
+      _hasMinLength = password.length >= 8;
+      _hasUppercase = RegExp(r'[A-Z]').hasMatch(password);
+      _hasLowercase = RegExp(r'[a-z]').hasMatch(password);
+      _hasNumber = RegExp(r'[0-9]').hasMatch(password);
+      _hasSpecialChar =
+          RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(password);
+    }
+
+    String? _validatePassword(String password) {
+      if (password.isEmpty) return "Password is required";
+      if (!_hasMinLength) return "Must be at least 8 characters";
+      if (!_hasUppercase) return "Must contain an uppercase letter";
+      if (!_hasLowercase) return "Must contain a lowercase letter";
+      if (!_hasNumber) return "Must contain a number";
+      if (!_hasSpecialChar) return "Must contain a special character";
+      return null;
+    }
 
     void showNotification(String message, {Color color = Colors.green}) {
       Flushbar(
@@ -446,7 +473,6 @@ class _LoginScreenState extends State<LoginScreen> {
         flushbarPosition: FlushbarPosition.TOP,
       ).show(context);
     }
-
 
     showDialog(
       context: context,
@@ -459,7 +485,10 @@ class _LoginScreenState extends State<LoginScreen> {
             decoration: BoxDecoration(
               color: const Color(0xFF1A1F2E),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFF2A3142), width: 1),
+              border: Border.all(
+                color: const Color(0xFF2A3142),
+                width: 1,
+              ),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -473,13 +502,18 @@ class _LoginScreenState extends State<LoginScreen> {
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Enter your new password.',
-                  style: TextStyle(color: Color(0xFF8A92A3), fontSize: 14),
-                ),
+
                 const SizedBox(height: 16),
 
+                const Text(
+                  'Enter your new password.',
+                  style: TextStyle(
+                    color: Color(0xFF8A92A3),
+                    fontSize: 14,
+                  ),
+                ),
+
+                const SizedBox(height: 16),
 
                 // New Password Field
                 TextField(
@@ -488,7 +522,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
                     hintText: 'New password',
-                    hintStyle: const TextStyle(color: Color(0xFF4A5268)),
+                    hintStyle:
+                    const TextStyle(color: Color(0xFF4A5268)),
                     prefixIcon: const Icon(
                       Icons.lock_outlined,
                       color: Color(0xFF268A15),
@@ -538,23 +573,50 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   onChanged: (value) {
                     setStateDialog(() {
+                      checkPassword(value);
                       passwordError = null;
                     });
                   },
                 ),
+
                 if (passwordError != null) ...[
                   const SizedBox(height: 8),
                   Center(
                     child: Text(
                       passwordError!,
-                      style: const TextStyle(color: Colors.red, fontSize: 13),
+                      style: const TextStyle(
+                        color: Colors.red,
+                        fontSize: 13,
+                      ),
                     ),
                   ),
                 ],
 
+                const SizedBox(height: 12),
+
+                // Password Rules UI
+                _buildRule(
+                  "At least 8 characters",
+                  _hasMinLength,
+                ),
+                _buildRule(
+                  "Contains uppercase letter",
+                  _hasUppercase,
+                ),
+                _buildRule(
+                  "Contains lowercase letter",
+                  _hasLowercase,
+                ),
+                _buildRule(
+                  "Contains number",
+                  _hasNumber,
+                ),
+                _buildRule(
+                  "Contains special character",
+                  _hasSpecialChar,
+                ),
 
                 const SizedBox(height: 16),
-
 
                 // Confirm Password Field
                 TextField(
@@ -563,7 +625,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
                     hintText: 'Confirm password',
-                    hintStyle: const TextStyle(color: Color(0xFF4A5268)),
+                    hintStyle:
+                    const TextStyle(color: Color(0xFF4A5268)),
                     prefixIcon: const Icon(
                       Icons.lock_outlined,
                       color: Color(0xFF268A15),
@@ -617,74 +680,92 @@ class _LoginScreenState extends State<LoginScreen> {
                     });
                   },
                 ),
+
                 if (confirmError != null) ...[
                   const SizedBox(height: 8),
                   Center(
                     child: Text(
                       confirmError!,
-                      style: const TextStyle(color: Colors.red, fontSize: 13),
+                      style: const TextStyle(
+                        color: Colors.red,
+                        fontSize: 13,
+                      ),
                     ),
                   ),
                 ],
 
-
                 const SizedBox(height: 24),
+
                 SizedBox(
                   width: double.infinity,
                   height: 48,
                   child: ElevatedButton(
                     onPressed: () async {
-                      final newPassword = passwordController.text.trim();
-                      final confirmPassword = confirmController.text.trim();
+                      final newPassword =
+                      passwordController.text.trim();
 
+                      final confirmPassword =
+                      confirmController.text.trim();
 
-                      // Validate passwords
-                      if (newPassword.isEmpty) {
-                        setStateDialog(() {
-                          passwordError = 'Please enter a new password';
-                        });
-                        return;
-                      }
+                      setStateDialog(() {
+                        checkPassword(newPassword);
+                        passwordError =
+                            _validatePassword(newPassword);
+                      });
+
+                      if (passwordError != null) return;
+
                       if (confirmPassword.isEmpty) {
                         setStateDialog(() {
-                          confirmError = 'Please confirm your password';
+                          confirmError =
+                          'Please confirm your password';
                         });
                         return;
                       }
+
                       if (newPassword != confirmPassword) {
                         setStateDialog(() {
-                          confirmError = 'Passwords do not match';
+                          confirmError =
+                          'Passwords do not match';
                         });
                         return;
                       }
 
-
-                      final res = await ApiForgotPassword.resetPassword(
+                      final res =
+                      await ApiForgotPassword.resetPassword(
                         token: token,
                         newPassword: newPassword,
                       );
 
-
                       if (res['success']) {
                         Navigator.pop(context);
-                        showNotification('Password reset successful');
+
+                        showNotification(
+                          'Password reset successful',
+                        );
                       } else {
                         showNotification(
-                          res['error'] ?? 'Failed to reset password',
+                          res['error'] ??
+                              'Failed to reset password',
                           color: Colors.red,
                         );
                       }
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF268A15),
+                      backgroundColor:
+                      const Color(0xFF268A15),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius:
+                        BorderRadius.circular(8),
                       ),
                       elevation: 0,
                     ),
                     child: const Text(
                       'Set Password',
-                      style: TextStyle(color: Colors.white, fontSize: 16),
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                      ),
                     ),
                   ),
                 ),
@@ -692,6 +773,32 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+// Password Rule Widget
+  Widget _buildRule(String text, bool passed) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        children: [
+          Icon(
+            passed ? Icons.check_circle : Icons.cancel,
+            size: 16,
+            color: passed ? Colors.green : Colors.red,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            text,
+            style: TextStyle(
+              color: passed
+                  ? Colors.green
+                  : const Color(0xFF8A92A3),
+              fontSize: 12,
+            ),
+          ),
+        ],
       ),
     );
   }
