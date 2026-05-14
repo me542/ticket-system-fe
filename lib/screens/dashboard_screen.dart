@@ -340,7 +340,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         submitterInitials: (e['username'] ?? 'U').substring(0, 1).toUpperCase(),
         createdAt:         DateTime.tryParse(e['created_at'] ?? '') ?? DateTime.now(),
         description:       e['description'] ?? '',
-        resolver:          e['resolver'] ?? '',
+        resolver:          e['assignee'] ?? '',
       );
     }).toList();
 

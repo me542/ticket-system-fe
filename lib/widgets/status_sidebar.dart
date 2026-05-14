@@ -652,7 +652,9 @@ class _TicketSidebarState extends State<TicketSidebar> {
 
   Widget _buildHeader(Ticket ticket) {
     // Cancel is only shown to the ticket creator while still active
-    final canCancel = _isCreator && !_isResolved && !_isCancelled;
+    final canCancel = (_isCreator || _isAdmin)
+        && !_isResolved && !_isCancelled;
+
     final canHold = (_isCreator || _isAdmin || isMyTicket)
         && _isAssigned && !_isResolved && !_isCancelled && !hold;
 
@@ -2312,7 +2314,6 @@ class _TicketSidebarState extends State<TicketSidebar> {
   }
 
   // ─── remarks section ───────────────────────────────────────────────────────
-
   Widget _buildReplySection() {
     final ticketId = widget.ticket?.id ?? '';
 
