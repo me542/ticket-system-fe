@@ -65,7 +65,7 @@ class ApiGetUser {
                 ?.trim()
                 .isNotEmpty ==
                 true
-                ? user['institution']!.trim()
+                ? user['institution']!.trim
                 : '',
 
             'position':

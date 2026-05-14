@@ -584,6 +584,7 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
                     onChanged: (v) => setState(() => _endorser = v),
                   ),
                 ),
+                const SizedBox(height: 10),
 
                 // ── ORGANIZATION ──
                 _fieldCard(

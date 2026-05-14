@@ -8,8 +8,10 @@ import 'api_login.dart';
 
 class ApiTicket {
   static const String baseUrl =
-      String.fromEnvironment('API_BASE_URL',
-          defaultValue: 'http://idiyanale-be.bakawan-ai.com') +
+      String.fromEnvironment(
+        'API_BASE_URL',
+        defaultValue: 'http://localhost:8080',
+      ) +
           '/api/user';
 
   /// Maps file extension → MIME type (must match backend allowedTypes exactly)

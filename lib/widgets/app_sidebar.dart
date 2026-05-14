@@ -58,7 +58,7 @@ class AppSidebar extends StatelessWidget {
                               'BAKAWAN Ticketing System',
                               style: TextStyle(
                                 color: AppTheme.textSecondary,
-                                fontSize: 7,
+                                fontSize: 6,
                                 letterSpacing: 1.0,
                               ),
                             ),

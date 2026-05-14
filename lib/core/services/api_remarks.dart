@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 import 'api_login.dart';
 
 class ApiRemarks {
-  static const String _baseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://idiyanale-be.bakawan-ai.com') + '/api/user';
+  static const String _baseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://localhost:8080') + '/api/user';
 
   // ─── Fetch all remarks for a ticket ──────────────────────────────────────
 

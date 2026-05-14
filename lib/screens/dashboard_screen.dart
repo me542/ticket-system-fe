@@ -122,26 +122,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  /// Builds "Firstname Lastname" from API fields, falling back to username.
-  String _fullName(Map<String, dynamic> e) {
-    final first = (e['firstname'] ?? '').toString().trim();
-    final last  = (e['lastname']  ?? '').toString().trim();
-    if (first.isNotEmpty || last.isNotEmpty) {
-      return '$first $last'.trim();
-    }
-    return (e['username'] ?? 'Unknown').toString();
-  }
-
-  /// Returns initials: first letter of firstname + first letter of lastname.
-  String _nameInitials(Map<String, dynamic> e) {
-    final first = (e['firstname'] ?? '').toString().trim();
-    final last  = (e['lastname']  ?? '').toString().trim();
-    final f = first.isNotEmpty ? first[0].toUpperCase() : '';
-    final l = last.isNotEmpty  ? last[0].toUpperCase()  : '';
-    final initials = '$f$l';
-    return initials.isNotEmpty ? initials : (e['username'] ?? 'U').toString().substring(0, 1).toUpperCase();
-  }
-
   // ── Filter & Search ───────────────────────────────────────
   String _selectedFilter = 'All';
 
@@ -231,12 +211,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return {
       'total':          visible.length,
       'forTotal':       forTotal,
-      'forAssessment':  countRaw('forassessment'),
-      'forEndorsement': countRaw('forendorsement'),
-      'forApproval':    countRaw('forapproval'),
-      'forAssignment':  countRaw('forassignment'),
+      'forAssessment':  countRaw('ForAssessment'),
+      'forEndorsement': countRaw('ForEndorsement'),
+      'forApproval':    countRaw('ForApproval'),
+      'forAssignment':  countRaw('ForAssignment'),
       'inProgress':     visible.where((t) => t.status == TicketStatus.inProgress).length,
-      'resolved':       visible.where((t) => t.status == TicketStatus.resolved).length,
+      'Resolved':       visible.where((t) => t.status == TicketStatus.resolved).length,
     };
   }
 
@@ -346,10 +326,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
         status:            mapStatus(rawSt),  // enum for logic
         rawStatus:         rawSt,             // real label for display
         priority:          priority,
-        submitter:         _fullName(e),
-        submitterInitials: _nameInitials(e),
+        submitter:         e['username'] ?? 'Unknown',
+        submitterInitials: (e['username'] ?? 'U').substring(0, 1).toUpperCase(),
         createdAt:         DateTime.tryParse(e['created_at'] ?? '') ?? DateTime.now(),
         description:       e['description'] ?? '',
+        resolver:          e['resolver'] ?? '',
       );
     }).toList();
 
@@ -582,25 +563,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
               const SizedBox(width: 16),
 
-              CompositedTransformTarget(
-                link: _notificationLink,
-                child: Stack(children: [
-                  IconButton(
-                    icon: const Icon(Icons.notifications_outlined,
-                        color: AppTheme.textSecondary),
-                    onPressed: _toggleNotificationPanel,
-                    tooltip: 'Recent Activity',
-                  ),
-                  if (_hasNewActivity)
-                    const Positioned(
-                      right: 8, top: 8,
-                      child: CircleAvatar(
-                        radius: 4,
-                        backgroundColor: AppTheme.statusCancelled,
-                      ),
-                    ),
-                ]),
-              ),
+              // CompositedTransformTarget(
+              //   link: _notificationLink,
+              //   child: Stack(children: [
+              //     IconButton(
+              //       icon: const Icon(Icons.notifications_outlined,
+              //           color: AppTheme.textSecondary),
+              //       onPressed: _toggleNotificationPanel,
+              //       tooltip: 'Recent Activity',
+              //     ),
+              //     if (_hasNewActivity)
+              //       const Positioned(
+              //         right: 8, top: 8,
+              //         child: CircleAvatar(
+              //           radius: 4,
+              //           backgroundColor: AppTheme.statusCancelled,
+              //         ),
+              //       ),
+              //   ]),
+              // ),
 
               if (_isPrivileged)
                 IconButton(
@@ -761,28 +742,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
       Expanded(child: StatsCard(
         title: 'Total Tickets',
         count: s['total'] ?? 0,
-        subtitle: _isPrivileged ? '' : 'Your tickets',
+        //subtitle: _isPrivileged ? '' : 'Your tickets',
         accentColor: AppTheme.accent,
       )),
       const SizedBox(width: 16),
       Expanded(child: StatsCard(
         title: 'For Review',
         count: s['forTotal'] ?? 0,
-        subtitle: '',
+        //subtitle: 'status',
         accentColor: AppTheme.statusAssessment,
       )),
       const SizedBox(width: 16),
       Expanded(child: StatsCard(
         title: 'In Progress',
         count: s['inProgress'] ?? 0,
-        subtitle: '',
+        //subtitle: 'being worked on',
         accentColor: AppTheme.statusProgress,
       )),
       const SizedBox(width: 16),
       Expanded(child: StatsCard(
         title: 'Resolved',
         count: s['resolved'] ?? 0,
-        subtitle: '',
+        //subtitle: 'completed',
         accentColor: AppTheme.statusResolved,
       )),
     ]);
@@ -813,7 +794,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   // ── Tickets table ─────────────────────────────────────────
   Widget _buildTicketsTable(List<Ticket> tickets) {
-    final visible = tickets.toList();
+    final visible = tickets.take(8).toList();
 
     return Container(
       decoration: BoxDecoration(
@@ -834,6 +815,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Expanded(flex: 2, child: _TableHeader('PRIORITY')),
               SizedBox(width: 12),
               Expanded(flex: 2, child: _TableHeader('SUBMITTER')),
+              SizedBox(width: 12),
+              Expanded(flex: 2, child: _TableHeader('RESOLVER')),
+
             ]),
           ),
           visible.isEmpty
@@ -854,18 +838,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ]),
             ),
           )
-              : SizedBox(
-            height: 400, // adjust height as needed
-            child: SingleChildScrollView(
-              child: Column(
-                children: visible.map<Widget>((t) {
-                  return GestureDetector(
-                    onTap: () => _openTicket(t),
-                    child: TicketRow(ticket: t),
-                  );
-                }).toList(),
-              ),
-            ),
+              : Column(
+            children: visible.take(6).map<Widget>((t) {
+              return GestureDetector(
+                onTap: () => _openTicket(t),
+                child: TicketRow(ticket: t),
+              );
+            }).toList(),
           ),
         ],
       ),
@@ -887,49 +866,63 @@ class _DashboardScreenState extends State<DashboardScreen> {
               fontSize: 15,
               fontWeight: FontWeight.w700),
         ),
-        const SizedBox(width: 8),
-        Text(
-          _searchQuery.isNotEmpty || _selectedFilter != 'All'
-              ? '$showing of $total'
-              : '$total total',
-          style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
-        ),
         const Spacer(),
-        // ── Scrollable filter pills ───────────────────────
+
         Container(
-          height: 42,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
+          height: 32,
           decoration: BoxDecoration(
             color: AppTheme.surface,
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: BorderRadius.circular(8),
             border: Border.all(color: AppTheme.border),
           ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: _selectedFilter,
-              dropdownColor: AppTheme.surface,
-              icon: const Icon(Icons.keyboard_arrow_down,
-                  size: 16, color: AppTheme.textSecondary),
-              style: const TextStyle(
-                color: AppTheme.textPrimary,
-                fontSize: 12,
-              ),
-              items: _filters.map((f) {
-                return DropdownMenuItem(
-                  value: f,
-                  child: Text(f),
-                );
-              }).toList(),
-              onChanged: (value) {
-                if (value != null) {
-                  setState(() => _selectedFilter = value);
-                }
-              },
+          child: IconButton(
+            padding: EdgeInsets.zero,
+            icon: const Icon(
+              Icons.refresh,
+              size: 18,
+              color: AppTheme.textSecondary,
             ),
+            tooltip: "Refresh",
+            onPressed: () async {
+              // Refresh function here
+              await _loadTickets(); // example
+              await fetchDashboardData();
+            },
           ),
         ),
-
-
+        // ── Scrollable filter pills ───────────────────────
+        // Container(
+        //   height: 32,
+        //   padding: const EdgeInsets.symmetric(horizontal: 10),
+        //   decoration: BoxDecoration(
+        //     color: AppTheme.surface,
+        //     borderRadius: BorderRadius.circular(6),
+        //     border: Border.all(color: AppTheme.border),
+        //   ),
+        //   child: DropdownButtonHideUnderline(
+        //     child: DropdownButton<String>(
+        //       value: _selectedFilter,
+        //       dropdownColor: AppTheme.surface,
+        //       icon: const Icon(Icons.keyboard_arrow_down,
+        //           size: 16, color: AppTheme.textSecondary),
+        //       style: const TextStyle(
+        //         color: AppTheme.textPrimary,
+        //         fontSize: 12,
+        //       ),
+        //       items: _filters.map((f) {
+        //         return DropdownMenuItem(
+        //           value: f,
+        //           child: Text(f),
+        //         );
+        //       }).toList(),
+        //       onChanged: (value) {
+        //         if (value != null) {
+        //           setState(() => _selectedFilter = value);
+        //         }
+        //       },
+        //     ),
+        //   ),
+        // ),
       ]),
     );
   }
@@ -1035,6 +1028,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
     );
   }
+
+  Future<void> fetchDashboardData() async {}
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

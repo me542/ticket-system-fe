@@ -194,6 +194,41 @@ class TicketRow extends StatelessWidget {
               ],
             ),
           ),
+          const SizedBox(width: 12),
+
+// Resolver
+          Expanded(
+            flex: 2,
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 14,
+                  backgroundColor: Colors.blueGrey,
+                  child: Text(
+                    ticket.resolver.isNotEmpty
+                        ? ticket.resolver.substring(0, 1).toUpperCase()
+                        : '-',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    ticket.resolver.isNotEmpty ? ticket.resolver : 'Unassigned',
+                    style: const TextStyle(
+                      color: AppTheme.textPrimary,
+                      fontSize: 12,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

@@ -3,7 +3,8 @@ import 'dart:convert';
 import 'dart:ui';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:flutter/services.dart';
+//import 'package:http/http.dart' as http;
 import '../core/services/api_attachment.dart';
 import '../core/services/api_file.dart';
 import '../core/services/api_login.dart';
@@ -507,7 +508,7 @@ class _TicketSidebarState extends State<TicketSidebar> {
     return null;
   }
 
-  String _field(List<String> keys, {String fallback = '—'}) {
+  String _field(List<String> keys, {String fallback = ''}) {
     if (_detail == null) return fallback;
     final v = _pick(_detail!, keys);
     return v?.toString() ?? fallback;
@@ -646,7 +647,7 @@ class _TicketSidebarState extends State<TicketSidebar> {
         children: [
           Expanded(
             child: const Text(
-              'Ticket Detail',
+              'Ticket Details',
               style: TextStyle(
                 color: AppTheme.textPrimary,
                 fontSize: 17,
@@ -911,38 +912,44 @@ class _TicketSidebarState extends State<TicketSidebar> {
 
   Widget _buildSubjectCard(Ticket ticket) {
     final subject = _field(['subject', 'title'], fallback: ticket.title);
+
     return _card(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(
-                Icons.confirmation_number,
-                color: Colors.orange,
-                size: 18,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                '${ticket.id}',
-                style: const TextStyle(
-                  color: Colors.orange,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13,
+      child: SelectionArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(
+                  Icons.confirmation_number,
+                  color: Color(0xFF268A15),
+                  size: 18,
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            subject,
-            style: const TextStyle(
-              color: AppTheme.textPrimary,
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
+                const SizedBox(width: 8),
+
+                Text(
+                  ticket.id,
+                  style: const TextStyle(
+                    color: Color(0xFF268A15),
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
             ),
-          ),
-        ],
+
+            const SizedBox(height: 6),
+
+            Text(
+              subject,
+              style: const TextStyle(
+                color: AppTheme.textPrimary,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -951,35 +958,61 @@ class _TicketSidebarState extends State<TicketSidebar> {
 
   Widget _buildDetailsCard(Ticket ticket) {
     final category = _field(['category'], fallback: ticket.categoryLabel);
+    final subcategory = _field([
+      'subcategory',
+      'sub_category',
+      'subCategory',
+      'subcat',
+      'sub_type',
+    ], fallback: '');
+
     final submitter = _field([
       'username',
       'submitter',
       'created_by',
     ], fallback: ticket.submitter);
+
     final institution = _field(['institution', 'organization', 'company']);
     final ticketType = _field(['tickettype', 'ticket_type', 'type']);
+
     final createdRaw = _field([
       'CreatedAt',
       'created_at',
       'createdAt',
       'date_created',
     ]);
+
     final createdAt = _parseDate(createdRaw) ?? ticket.createdAt;
+
     final createdStr =
         '${createdAt.year}-${_p(createdAt.month)}-${_p(createdAt.day)}'
         '  ${_p(createdAt.hour)}:${_p(createdAt.minute)}:${_p(createdAt.second)}';
 
     return _card(
-      child: Column(
-        children: [
-          _detailRow(Icons.category_outlined, 'Category', category),
-          _detailRow(Icons.person_outline, 'Submitter', submitter),
-          if (institution != '—')
-            _detailRow(Icons.business_outlined, 'Organization', institution),
-          if (ticketType != '—')
-            _detailRow(Icons.label_outline, 'Type', ticketType),
-          _detailRow(Icons.access_time, 'Created', createdStr),
-        ],
+      child: SelectionArea(
+        child: Column(
+          children: [
+            _detailRow(Icons.category_outlined, 'Category', category),
+
+            // 👇 added subcategory right below category
+            if (subcategory.isNotEmpty && subcategory != '—')
+              _detailRow(
+                Icons.subdirectory_arrow_right,
+                'Subcategory',
+                subcategory,
+              ),
+
+            _detailRow(Icons.person_outline, 'Submitter', submitter),
+
+            if (institution != '—')
+              _detailRow(Icons.business_outlined, 'Organization', institution),
+
+            if (ticketType != '—')
+              _detailRow(Icons.label_outline, 'Type', ticketType),
+
+            _detailRow(Icons.access_time, 'Created', createdStr),
+          ],
+        ),
       ),
     );
   }
@@ -992,9 +1025,10 @@ class _TicketSidebarState extends State<TicketSidebar> {
         children: [
           Icon(icon, size: 14, color: AppTheme.textMuted),
           const SizedBox(width: 8),
+
           SizedBox(
             width: 90,
-            child: Text(
+            child: SelectableText(
               label,
               style: const TextStyle(
                 color: AppTheme.textMuted,
@@ -1003,10 +1037,14 @@ class _TicketSidebarState extends State<TicketSidebar> {
               ),
             ),
           ),
+
           Expanded(
-            child: Text(
+            child: SelectableText(
               value,
-              style: const TextStyle(color: AppTheme.textPrimary, fontSize: 12),
+              style: const TextStyle(
+                color: AppTheme.textPrimary,
+                fontSize: 12,
+              ),
             ),
           ),
         ],
@@ -1022,6 +1060,8 @@ class _TicketSidebarState extends State<TicketSidebar> {
       'details',
       'body',
     ], fallback: widget.ticket?.description ?? '');
+
+    final descText = desc.isEmpty ? 'No description provided.' : desc;
 
     return _card(
       child: Column(
@@ -1040,8 +1080,8 @@ class _TicketSidebarState extends State<TicketSidebar> {
               child: SingleChildScrollView(
                 controller: _descController,
                 padding: const EdgeInsets.only(right: 12),
-                child: Text(
-                  desc.isEmpty ? 'No description provided.' : desc,
+                child: SelectableText(
+                  descText,
                   style: const TextStyle(
                     color: AppTheme.textSecondary,
                     fontSize: 13,
@@ -1884,12 +1924,12 @@ class _TicketSidebarState extends State<TicketSidebar> {
               onTap: () => _confirmAndAct('grab', ticket.id),
             ),
             const SizedBox(width: 12),
-            _actionBtn(
-              label: 'Reject',
-              icon: Icons.cancel_outlined,
-              color: Colors.redAccent,
-              onTap: () => _handleAction('reject', ticket.id),
-            ),
+            // _actionBtn(
+            //   label: 'Reject',
+            //   icon: Icons.cancel_outlined,
+            //   color: Colors.redAccent,
+            //   onTap: () => _handleAction('reject', ticket.id),
+            // ),
           ],
         );
       }
@@ -2401,28 +2441,35 @@ class _TicketSidebarState extends State<TicketSidebar> {
                   ),
 
                 // Bubble
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 13,
-                    vertical: 9,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isMe
-                        ? const Color(0xFF1A6FD4) // solid blue — "me"
-                        : const Color(0xFF1E2A38), // dark card — others
-                    borderRadius: BorderRadius.only(
-                      topLeft: const Radius.circular(16),
-                      topRight: const Radius.circular(16),
-                      bottomLeft: Radius.circular(isMe ? 16 : 3),
-                      bottomRight: Radius.circular(isMe ? 3 : 16),
+                GestureDetector(
+                  onLongPress: () {
+                    Clipboard.setData(ClipboardData(text: message));
+                    _showSnackbar('Message copied!',
+                        color: Colors.blueGrey.shade700);
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 13,
+                      vertical: 9,
                     ),
-                  ),
-                  child: Text(
-                    message,
-                    style: TextStyle(
-                      color: isMe ? Colors.white : Colors.white,
-                      fontSize: 13,
-                      height: 1.45,
+                    decoration: BoxDecoration(
+                      color: isMe
+                          ? const Color(0xFF1A6FD4) // solid blue — "me"
+                          : const Color(0xFF1E2A38), // dark card — others
+                      borderRadius: BorderRadius.only(
+                        topLeft: const Radius.circular(16),
+                        topRight: const Radius.circular(16),
+                        bottomLeft: Radius.circular(isMe ? 16 : 3),
+                        bottomRight: Radius.circular(isMe ? 3 : 16),
+                      ),
+                    ),
+                    child: SelectableText(
+                      message,
+                      style: TextStyle(
+                        color: isMe ? Colors.white : Colors.white,
+                        fontSize: 13,
+                        height: 1.45,
+                      ),
                     ),
                   ),
                 ),

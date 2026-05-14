@@ -2,8 +2,12 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class ApiForgotPassword {
-  static const String baseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://idiyanale-be.bakawan-ai.com') + '/api';
-  // replace with your PC IP if testing on a real device
+  static const String baseUrl =
+      String.fromEnvironment(
+        'API_BASE_URL',
+        defaultValue: 'http://localhost:8080',
+      ) +
+          '/api';
 
   // -----------------------------
   // STEP 1: Request OTP

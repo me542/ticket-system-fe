@@ -17,6 +17,7 @@ class Ticket {
   final String submitterInitials;
   final DateTime createdAt;
   final String description;
+  final String resolver;
 
   const Ticket({
     required this.id,
@@ -29,6 +30,8 @@ class Ticket {
     required this.submitterInitials,
     required this.createdAt,
     required this.description,
+    required this.resolver,
+
   });
 
   String get categoryLabel => categoryName;
@@ -68,7 +71,7 @@ class Ticket {
       submitter:         json['submitter'] ?? '',
       submitterInitials: json['submitterInitials'] ?? '',
       createdAt:         DateTime.tryParse(json['createdAt'] ?? '') ?? DateTime.now(),
-      description:       json['description'] ?? '',
+      description:       json['description'] ?? '', resolver: '',
     );
   }
 }

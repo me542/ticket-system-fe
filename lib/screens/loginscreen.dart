@@ -740,7 +740,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
 
               const Text(
-                'Bakawan Ticketing System',
+                'BAKAWAN Ticketing System',
                 style: TextStyle(
                   color: Color(0xFF8A92A3),
                   fontSize: 16,

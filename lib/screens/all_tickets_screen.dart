@@ -292,7 +292,7 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
           submitter:         username,
           submitterInitials: username.isNotEmpty ? username[0].toUpperCase() : '?',
           createdAt:         DateTime.tryParse(item['created_at'] ?? '') ?? DateTime.now(),
-          description:       item['description'] ?? '',
+          description:       item['description'] ?? '', resolver: '',
         );
       }).toList();
     } catch (e) {
@@ -641,7 +641,37 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
                   ? 'Download filtered tickets (${_filteredRaw.length})'
                   : 'Download all tickets (${_rawData.length})',
               child: ElevatedButton.icon(
-                onPressed: _isExporting ? null : _exportExcel,
+                onPressed: _isExporting
+                    ? null
+                    : () async {
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (context) {
+                      return AlertDialog(
+                        title: const Text('Confirm Download'),
+                        content: Text(
+                          hasFilters
+                              ? 'Download ${_filteredRaw.length} filtered tickets?'
+                              : 'Download all ${_rawData.length} tickets?',
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            child: const Text('Cancel'),
+                          ),
+                          ElevatedButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            child: const Text('Download'),
+                          ),
+                        ],
+                      );
+                    },
+                  );
+
+                  if (confirm == true) {
+                    _exportExcel();
+                  }
+                },
                 icon: _isExporting
                     ? const SizedBox(
                     width: 14, height: 14,
@@ -970,7 +1000,7 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
                         createdAt: DateTime.tryParse(
                             r['created_at'] ?? '') ??
                             DateTime.now(),
-                        description: r['description'] ?? '', rawStatus: '',
+                        description: r['description'] ?? '', rawStatus: '', resolver: '',
                       ),
                     );
 

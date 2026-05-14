@@ -4,14 +4,14 @@ import '../data/light_theme.dart';
 class StatsCard extends StatelessWidget {
   final String title;
   final int count;
-  final String subtitle;
+  //final String subtitle;
   final Color accentColor;
 
   const StatsCard({
     super.key,
     required this.title,
     required this.count,
-    required this.subtitle,
+    //required this.subtitle,
     required this.accentColor,
   });
 
@@ -50,14 +50,14 @@ class StatsCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 6),
-            Text(
-              subtitle,
-              style: TextStyle(
-                color: accentColor,
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
+            // Text(
+            //   subtitle,
+            //   style: TextStyle(
+            //     color: accentColor,
+            //     fontSize: 12,
+            //     fontWeight: FontWeight.w500,
+            //   ),
+            // ),
           ],
         ),
       ),

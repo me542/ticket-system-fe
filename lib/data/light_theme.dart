@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 
 class AppTheme {
   // ───────────────── LIGHT BACKGROUND ─────────────────
-  static const Color background = Color(0xFFEDEFF3);         // Slightly darker
-  static const Color surface = Color(0xFFF5F6FA);            // "Cards"
-  static const Color surfaceElevated = Color(0xFFE2E8F0);    // Even more contrast for "elevated" surfaces
-  static const Color border = Color(0xFFD1D5DB);             // Soften the border
+  static const Color background = Color(0xFFEDEFF3);
+  static const Color surface = Color(0xFFF5F6FA);
+  static const Color surfaceElevated = Color(0xFFE2E8F0);
+  static const Color border = Color(0xFFD1D5DB);
 
   // ───────────────── TEXT ─────────────────
   static const Color textPrimary = Color(0xFF0F172A);
@@ -36,31 +36,49 @@ class AppTheme {
   static const Color catDatabase = Color(0xFF14B8A6);
   static const Color catEndpoint = Color(0xFFF472B6);
 
-
-
-
   // ───────────────── SIDEBAR ─────────────────
-  static const Color sidebarBg = Color(0xFFF2F3F7);          // Soft tint for sidebar
+  static const Color sidebarBg = Color(0xFFF2F3F7);
   static const Color sidebarActive = Color(0xFFE2E8F0);
+
+  // ───────────────── GLOBAL FONT FALLBACK ─────────────────
+  static const List<String> _fontFallback = [
+    'Roboto',
+    'SF Pro Display',
+    'SF Pro Text',
+    'Segoe UI',
+    'Noto Sans',
+    'Arial',
+  ];
 
   // ───────────────── THEME ─────────────────
   static ThemeData get lightTheme {
     return ThemeData(
       brightness: Brightness.light,
       scaffoldBackgroundColor: background,
-      canvasColor: sidebarBg,                     // For sidebar + drawer panel
-      cardColor: surface,                         // Card-style widgets
-      dividerColor: border,                       // Borders/dividers
-      colorScheme: ColorScheme.light(
+      canvasColor: sidebarBg,
+      cardColor: surface,
+      dividerColor: border,
+
+      // ✅ IMPORTANT: global font fallback for ALL widgets
+      fontFamilyFallback: _fontFallback,
+
+      colorScheme: const ColorScheme.light(
         primary: accent,
         surface: surface,
         background: background,
         onBackground: textPrimary,
       ),
-      fontFamily: 'Roboto',
+
       textTheme: const TextTheme(
-        bodyLarge: TextStyle(color: textPrimary),
-        bodyMedium: TextStyle(color: textSecondary),
+        bodyLarge: TextStyle(
+          color: textPrimary,
+        ),
+        bodyMedium: TextStyle(
+          color: textSecondary,
+        ),
+        bodySmall: TextStyle(
+          color: textMuted,
+        ),
       ),
     );
   }

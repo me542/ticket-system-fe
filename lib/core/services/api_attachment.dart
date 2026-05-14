@@ -36,10 +36,12 @@ class AttachmentNetworkException extends AttachmentException {
 }
 
 class ApiAttachment {
-  static const String _baseUrl = String.fromEnvironment(
-    'API_BASE_URL',
-    defaultValue: 'http://idiyanale-be.bakawan-ai.com',
-  ) + '/api/user';
+  static const String _baseUrl =
+      String.fromEnvironment(
+        'API_BASE_URL',
+        defaultValue: 'http://localhost:8080',
+      ) +
+          '/api/user';
 
   // ── Auth headers ────────────────────────────────────────────────────────────
 
