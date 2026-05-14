@@ -144,4 +144,19 @@ class ApiUpdateTicket {
       String token, String ticketId) async {
     return _patch("$baseUrl/ticket/unhold/$ticketId", token);
   }
+  // // ================================
+  // // ✅ REASSIGN ENDORSER (PATCH)
+  // // ================================
+  // static Future<Map<String, dynamic>> reassignEndorser(
+  //     String token, String ticketId) async {
+  //   return _patch("$baseUrl/ticket/reassign-endorser/$ticketId", token);
+  // }
+// ================================
+// ✅ CLOSE TICKET (submitter only)
+// ================================
+  static Future<Map<String, dynamic>> closeTicket(
+      String token, String ticketId) async {
+    return _put("$baseUrl/ticket/close/$ticketId", token);
+  }
+
 }

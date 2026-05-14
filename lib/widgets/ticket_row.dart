@@ -17,6 +17,8 @@ class TicketRow extends StatelessWidget {
         return AppTheme.statusResolved;
       case TicketStatus.cancelled:
         return AppTheme.statusCancelled;
+      case TicketStatus.closed:
+        return Colors.indigo;         // ← closed = indigo
     }
   }
 
@@ -79,7 +81,7 @@ class TicketRow extends StatelessWidget {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  '${ticket.categoryLabel}',
+                  ticket.categoryLabel,
                   style: const TextStyle(
                     color: AppTheme.textSecondary,
                     fontSize: 11,
@@ -102,14 +104,18 @@ class TicketRow extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Container(
-                    width: 6,
-                    height: 6,
-                    decoration: BoxDecoration(
-                      color: _statusColor,
-                      shape: BoxShape.circle,
+                  // Closed gets a lock icon instead of a dot
+                  if (ticket.status == TicketStatus.closed)
+                    Icon(Icons.lock, size: 8, color: _statusColor)
+                  else
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: _statusColor,
+                        shape: BoxShape.circle,
+                      ),
                     ),
-                  ),
                   const SizedBox(width: 6),
                   Text(
                     ticket.statusLabel,
@@ -163,7 +169,7 @@ class TicketRow extends StatelessWidget {
 
           const SizedBox(width: 12),
 
-          // Assignee
+          // Submitter
           Expanded(
             flex: 2,
             child: Row(
@@ -196,7 +202,7 @@ class TicketRow extends StatelessWidget {
           ),
           const SizedBox(width: 12),
 
-// Resolver
+          // Resolver
           Expanded(
             flex: 2,
             child: Row(

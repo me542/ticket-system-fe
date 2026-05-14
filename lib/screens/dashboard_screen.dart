@@ -121,13 +121,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
       case ActivityType.resolved:  return 'resolved';
       case ActivityType.cancelled: return 'cancelled';
       case ActivityType.assigned:  return 'assigned';
+      case ActivityType.closed:    return 'closed';   // ← added
     }
   }
 
   // ── Filter & Search ───────────────────────────────────────
   String _selectedFilter = 'All';
 
-  /// Filter pills — the "For X" labels must match exactly what the API returns.
+  /// Filter pills — includes Closed now
   final List<String> _filters = [
     'All',
     'For Assessment',
@@ -136,6 +137,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     'For Assignment',
     'In Progress',
     'Resolved',
+    'Closed',       // ← added
     'Cancelled',
   ];
 
@@ -177,6 +179,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       list = _roleFilteredTickets
           .where((t) => t.status == TicketStatus.cancelled)
           .toList();
+    } else if (_selectedFilter == 'Closed') {           // ← added
+      list = _roleFilteredTickets
+          .where((t) => t.status == TicketStatus.closed)
+          .toList();
     } else {
       // "For Assessment" / "For Endorsement" / "For Approval" / "For Assignment"
       // Match the rawStatus directly (case-insensitive)
@@ -213,12 +219,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return {
       'total':          visible.length,
       'forTotal':       forTotal,
-      'forAssessment':  countRaw('ForAssessment'),
-      'forEndorsement': countRaw('ForEndorsement'),
-      'forApproval':    countRaw('ForApproval'),
-      'forAssignment':  countRaw('ForAssignment'),
+      'forAssessment':  countRaw('forassessment'),
+      'forEndorsement': countRaw('forendorsement'),
+      'forApproval':    countRaw('forapproval'),
+      'forAssignment':  countRaw('forassignment'),
       'inProgress':     visible.where((t) => t.status == TicketStatus.inProgress).length,
-      'Resolved':       visible.where((t) => t.status == TicketStatus.resolved).length,
+      'resolved':       visible.where((t) => t.status == TicketStatus.resolved).length,
+      'closed':         visible.where((t) => t.status == TicketStatus.closed).length,  // ← added
     };
   }
 
@@ -292,6 +299,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       case ActivityType.resolved:  return AppTheme.statusResolved;
       case ActivityType.cancelled: return AppTheme.statusCancelled;
       case ActivityType.assigned:  return const Color(0xFF8B5CF6);
+      case ActivityType.closed:    return Colors.indigo;   // ← added
     }
   }
 
@@ -325,8 +333,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         id:                e['ticket_id'] ?? '',
         title:             e['subject'] ?? '',
         categoryName:      e['category'] ?? 'Uncategorized',
-        status:            mapStatus(rawSt),  // enum for logic
-        rawStatus:         rawSt,             // real label for display
+        status:            mapStatus(rawSt),
+        rawStatus:         rawSt,
         priority:          priority,
         submitter:         e['username'] ?? 'Unknown',
         submitterInitials: (e['username'] ?? 'U').substring(0, 1).toUpperCase(),
@@ -350,17 +358,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       if (t.status == TicketStatus.inProgress ||
           t.status == TicketStatus.resolved   ||
-          t.status == TicketStatus.cancelled) {
-        final actType = t.status == TicketStatus.inProgress
-            ? ActivityType.moved
-            : t.status == TicketStatus.resolved
-            ? ActivityType.resolved
-            : ActivityType.cancelled;
-        final actionWord = t.status == TicketStatus.inProgress
-            ? 'moved to In Progress'
-            : t.status == TicketStatus.resolved
-            ? 'resolved'
-            : 'cancelled';
+          t.status == TicketStatus.cancelled  ||
+          t.status == TicketStatus.closed) {         // ← added closed
+        ActivityType actType;
+        String actionWord;
+
+        if (t.status == TicketStatus.inProgress) {
+          actType    = ActivityType.moved;
+          actionWord = 'moved to In Progress';
+        } else if (t.status == TicketStatus.resolved) {
+          actType    = ActivityType.resolved;
+          actionWord = 'resolved';
+        } else if (t.status == TicketStatus.closed) { // ← added closed
+          actType    = ActivityType.closed;
+          actionWord = 'closed';
+        } else {
+          actType    = ActivityType.cancelled;
+          actionWord = 'cancelled';
+        }
+
         activities.add(ActivityItem(
           ticketId:    t.id,
           ticketTitle: t.title,
@@ -409,7 +425,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       backgroundColor: AppTheme.sidebarBg,
       body: Stack(
         children: [
-          // 🟦 MAIN CONTENT (THIS IS WHAT GETS BLURRED)
+          // 🟦 MAIN CONTENT
           ClipRect(
             child: BackdropFilter(
               filter: ImageFilter.blur(
@@ -417,7 +433,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 sigmaY: isOverlayOpen ? 6 : 0,
               ),
               child: AbsorbPointer(
-                absorbing: isOverlayOpen, // disables interaction when sidebar open
+                absorbing: isOverlayOpen,
                 child: Column(
                   children: [
                     _buildTopBar(context),
@@ -577,7 +593,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
               const SizedBox(width: 16),
 
-              // Search box
               if (isNarrow)
                 SizedBox(
                   width: 260,
@@ -590,26 +605,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
 
               const SizedBox(width: 16),
-
-              // CompositedTransformTarget(
-              //   link: _notificationLink,
-              //   child: Stack(children: [
-              //     IconButton(
-              //       icon: const Icon(Icons.notifications_outlined,
-              //           color: AppTheme.textSecondary),
-              //       onPressed: _toggleNotificationPanel,
-              //       tooltip: 'Recent Activity',
-              //     ),
-              //     if (_hasNewActivity)
-              //       const Positioned(
-              //         right: 8, top: 8,
-              //         child: CircleAvatar(
-              //           radius: 4,
-              //           backgroundColor: AppTheme.statusCancelled,
-              //         ),
-              //       ),
-              //   ]),
-              // ),
 
               if (_isPrivileged)
                 IconButton(
@@ -661,7 +656,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-// Extract search box into its own method
   Widget _buildSearchBox() {
     return Container(
       height: 36,
@@ -763,36 +757,39 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  // ── Stats row — keeps original 4-card layout ──────────────
+  // ── Stats row ─────────────────────────────────────────────
   Widget _buildStatsRow() {
     final s = _visibleStats;
     return Row(children: [
       Expanded(child: StatsCard(
         title: 'Total Tickets',
         count: s['total'] ?? 0,
-        //subtitle: _isPrivileged ? '' : 'Your tickets',
         accentColor: AppTheme.accent,
       )),
       const SizedBox(width: 16),
       Expanded(child: StatsCard(
         title: 'For Review',
         count: s['forTotal'] ?? 0,
-        //subtitle: 'status',
         accentColor: AppTheme.statusAssessment,
       )),
       const SizedBox(width: 16),
       Expanded(child: StatsCard(
         title: 'In Progress',
         count: s['inProgress'] ?? 0,
-        //subtitle: 'being worked on',
         accentColor: AppTheme.statusProgress,
       )),
       const SizedBox(width: 16),
       Expanded(child: StatsCard(
         title: 'Resolved',
         count: s['resolved'] ?? 0,
-        //subtitle: 'completed',
         accentColor: AppTheme.statusResolved,
+      )),
+      const SizedBox(width: 16),
+      // ── NEW: Closed stat card ────────────────────────────
+      Expanded(child: StatsCard(
+        title: 'Closed',
+        count: s['closed'] ?? 0,
+        accentColor: Colors.indigo,
       )),
     ]);
   }
@@ -845,7 +842,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Expanded(flex: 2, child: _TableHeader('SUBMITTER')),
               SizedBox(width: 12),
               Expanded(flex: 2, child: _TableHeader('RESOLVER')),
-
             ]),
           ),
           visible.isEmpty
@@ -881,9 +877,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   // ── Tickets header ────────────────────────────────────────
   Widget _buildTicketsHeader() {
-    final total   = _roleFilteredTickets.length;
-    final showing = _filteredTickets.length;
-
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       child: Row(children: [
@@ -912,45 +905,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             tooltip: "Refresh",
             onPressed: () async {
-              // Refresh function here
-              await _loadTickets(); // example
+              await _loadTickets();
               await fetchDashboardData();
             },
           ),
         ),
-        // ── Scrollable filter pills ───────────────────────
-        // Container(
-        //   height: 32,
-        //   padding: const EdgeInsets.symmetric(horizontal: 10),
-        //   decoration: BoxDecoration(
-        //     color: AppTheme.surface,
-        //     borderRadius: BorderRadius.circular(6),
-        //     border: Border.all(color: AppTheme.border),
-        //   ),
-        //   child: DropdownButtonHideUnderline(
-        //     child: DropdownButton<String>(
-        //       value: _selectedFilter,
-        //       dropdownColor: AppTheme.surface,
-        //       icon: const Icon(Icons.keyboard_arrow_down,
-        //           size: 16, color: AppTheme.textSecondary),
-        //       style: const TextStyle(
-        //         color: AppTheme.textPrimary,
-        //         fontSize: 12,
-        //       ),
-        //       items: _filters.map((f) {
-        //         return DropdownMenuItem(
-        //           value: f,
-        //           child: Text(f),
-        //         );
-        //       }).toList(),
-        //       onChanged: (value) {
-        //         if (value != null) {
-        //           setState(() => _selectedFilter = value);
-        //         }
-        //       },
-        //     ),
-        //   ),
-        // ),
       ]),
     );
   }
@@ -1061,7 +1020,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Supporting widgets — unchanged from original
+// Supporting widgets
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _NotificationDropdown extends StatelessWidget {
@@ -1242,6 +1201,7 @@ class _ActivityTile extends StatelessWidget {
       case ActivityType.resolved:  return 'resolved';
       case ActivityType.cancelled: return 'cancelled';
       case ActivityType.assigned:  return 'assigned';
+      case ActivityType.closed:    return 'closed';   // ← added
     }
   }
 

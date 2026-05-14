@@ -84,8 +84,7 @@ class ApiGetUser {
                 ? user['status']!.trim()
                 : 'active',
 
-            'created_at':
-            user['CreatedAt']?.toString() ?? '',
+            'created_at': user['created_at']?.toString() ?? '',
 
             // ================= INITIALS =================
             'initials': [
