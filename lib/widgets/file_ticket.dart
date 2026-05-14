@@ -397,7 +397,7 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
     return Material(
       elevation: 20,
       child: Container(
-        width: 1250,
+        width: 1100,
         color: AppTheme.sidebarBg,
         child: Column(
           children: [

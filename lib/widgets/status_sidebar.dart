@@ -4,7 +4,7 @@ import 'dart:ui';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-//import 'package:http/http.dart' as http;
+import 'package:http/http.dart' as http;
 import '../core/services/api_attachment.dart';
 import '../core/services/api_file.dart';
 import '../core/services/api_login.dart';
@@ -508,7 +508,7 @@ class _TicketSidebarState extends State<TicketSidebar> {
     return null;
   }
 
-  String _field(List<String> keys, {String fallback = ''}) {
+  String _field(List<String> keys, {String fallback = '—'}) {
     if (_detail == null) return fallback;
     final v = _pick(_detail!, keys);
     return v?.toString() ?? fallback;
@@ -609,7 +609,7 @@ class _TicketSidebarState extends State<TicketSidebar> {
     return Material(
       elevation: 20,
       child: Container(
-        width: 1250,
+        width: 1100,
         color: AppTheme.sidebarBg,
         child: Column(
           children: [
@@ -920,12 +920,12 @@ class _TicketSidebarState extends State<TicketSidebar> {
           children: [
             Row(
               children: [
-                const Icon(
-                  Icons.confirmation_number,
-                  color: Color(0xFF268A15),
-                  size: 18,
-                ),
-                const SizedBox(width: 8),
+                // const Icon(
+                //   Icons.confirmation_number,
+                //   color: Color(0xFF268A15),
+                //   size: 18,
+                // ),
+                // const SizedBox(width: 8),
 
                 Text(
                   ticket.id,
@@ -1028,7 +1028,7 @@ class _TicketSidebarState extends State<TicketSidebar> {
 
           SizedBox(
             width: 90,
-            child: SelectableText(
+            child: Text(
               label,
               style: const TextStyle(
                 color: AppTheme.textMuted,
@@ -1039,7 +1039,7 @@ class _TicketSidebarState extends State<TicketSidebar> {
           ),
 
           Expanded(
-            child: SelectableText(
+            child: Text(
               value,
               style: const TextStyle(
                 color: AppTheme.textPrimary,
@@ -1064,34 +1064,36 @@ class _TicketSidebarState extends State<TicketSidebar> {
     final descText = desc.isEmpty ? 'No description provided.' : desc;
 
     return _card(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _sectionLabel('Description'),
-          const SizedBox(height: 8),
+      child: SelectionArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _sectionLabel('Description'),
+            const SizedBox(height: 8),
 
-          SizedBox(
-            height: 400,
-            child: Scrollbar(
-              controller: _descController,
-              thumbVisibility: true,
-              thickness: 4,
-              radius: const Radius.circular(4),
-              child: SingleChildScrollView(
+            SizedBox(
+              height: 400,
+              child: RawScrollbar(
                 controller: _descController,
-                padding: const EdgeInsets.only(right: 12),
-                child: SelectableText(
-                  descText,
-                  style: const TextStyle(
-                    color: AppTheme.textSecondary,
-                    fontSize: 13,
-                    height: 1.55,
+                thumbVisibility: true,
+                thickness: 0,
+                radius: const Radius.circular(4),
+                child: SingleChildScrollView(
+                  controller: _descController,
+                  padding: const EdgeInsets.only(right: 90),
+                  child: Text(
+                    descText,
+                    style: const TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontSize: 13,
+                      height: 1.55,
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

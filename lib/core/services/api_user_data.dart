@@ -3,12 +3,8 @@ import 'package:http/http.dart' as http;
 import 'api_login.dart';
 
 class ApiGetUser {
-  static const String baseUrl =
-      String.fromEnvironment(
-        'API_BASE_URL',
-        defaultValue: 'http://idiyanale-be.bakawan-ai.com',
-      ) +
-          '/api/user/list/all/users';
+
+  static const String baseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://localhost:8080') + '/api/user/list/all/users';
 
   /// Fetch all users from backend
   static Future<List<Map<String, String>>> fetchUsers() async {
@@ -60,12 +56,8 @@ class ApiGetUser {
             'username': user['username']?.toString() ?? '',
             'email': user['email']?.toString() ?? '',
 
-            'institution':
-            (user['institution'] as String?)
-                ?.trim()
-                .isNotEmpty ==
-                true
-                ? user['institution']!.trim
+            'institution': (user['institution']?.toString().trim().isNotEmpty ?? false)
+                ? user['institution'].toString().trim()
                 : '',
 
             'position':

@@ -42,6 +42,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   String _currentUserRole  = '';
   bool   _userLoaded       = false;
 
+
   static const _privilegedRoles = {'admin', 'endorser', 'approver', 'resolver'};
 
   bool get _isPrivileged =>
@@ -56,6 +57,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _selectedTicket = ticket;
     _isSidebarOpen  = true;
   });
+
 
   void _closeSidebar() => setState(() => _isSidebarOpen = false);
 
@@ -395,69 +397,95 @@ class _DashboardScreenState extends State<DashboardScreen> {
       );
     }
 
-    final filtered  = _filteredTickets;
+    final filtered = _filteredTickets;
     final catCounts = _visibleCategoryCount;
-    final maxCat    = catCounts.values.isEmpty
+    final maxCat = catCounts.values.isEmpty
         ? 0
         : catCounts.values.reduce((a, b) => a > b ? a : b);
 
-    return Stack(
-      children: [
-        Column(
-          children: [
-            _buildTopBar(context),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
+    final bool isOverlayOpen = _isSidebarOpen || _isCreateOpen;
+
+    return Scaffold(
+      backgroundColor: AppTheme.sidebarBg,
+      body: Stack(
+        children: [
+          // 🟦 MAIN CONTENT (THIS IS WHAT GETS BLURRED)
+          ClipRect(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(
+                sigmaX: isOverlayOpen ? 6 : 0,
+                sigmaY: isOverlayOpen ? 6 : 0,
+              ),
+              child: AbsorbPointer(
+                absorbing: isOverlayOpen, // disables interaction when sidebar open
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (!_isPrivileged) _buildUserBanner(),
-                    if (!_isPrivileged) const SizedBox(height: 16),
-                    _buildStatsRow(),
-                    const SizedBox(height: 24),
-                    _buildMainContent(filtered, catCounts, maxCat),
+                    _buildTopBar(context),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (!_isPrivileged) _buildUserBanner(),
+                            if (!_isPrivileged) const SizedBox(height: 16),
+                            _buildStatsRow(),
+                            const SizedBox(height: 24),
+                            _buildMainContent(filtered, catCounts, maxCat),
+                          ],
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
             ),
-          ],
-        ),
-
-        if (_isSidebarOpen || _isCreateOpen)
-          GestureDetector(
-            onTap: () => setState(() {
-              _isSidebarOpen = false;
-              _isCreateOpen  = false;
-            }),
-            child: Container(color: Colors.black54),
           ),
 
-        AnimatedPositioned(
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeInOut,
-          top: 0, bottom: 0,
-          right: _isSidebarOpen ? 0 : -1250,
-          child: TicketSidebar(
-            ticket: _selectedTicket,
-            onClose: _closeSidebar,
-          ),
-        ),
+          // 🌑 DARK OVERLAY
+          if (isOverlayOpen)
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  _isSidebarOpen = false;
+                  _isCreateOpen = false;
+                });
+              },
+              child: Container(
+                color: Colors.black.withOpacity(0.25),
+              ),
+            ),
 
-        AnimatedPositioned(
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeInOut,
-          top: 0, bottom: 0,
-          right: _isCreateOpen ? 0 : -1250,
-          child: CreateTicketSidebar(
-            onClose: () => setState(() => _isCreateOpen = false),
-            onCreated: () {
-              _loadTickets();
-              setState(() => _isCreateOpen = false);
-            },
+          // 📌 SIDEBAR (TICKET DETAILS)
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+            top: 0,
+            bottom: 0,
+            right: _isSidebarOpen ? 0 : -1100,
+            child: TicketSidebar(
+              ticket: _selectedTicket,
+              onClose: _closeSidebar,
+            ),
           ),
-        ),
-      ],
+
+          // ➕ CREATE SIDEBAR
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+            top: 0,
+            bottom: 0,
+            right: _isCreateOpen ? 0 : -1100,
+            child: CreateTicketSidebar(
+              onClose: () => setState(() => _isCreateOpen = false),
+              onCreated: () {
+                _loadTickets();
+                setState(() => _isCreateOpen = false);
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 
