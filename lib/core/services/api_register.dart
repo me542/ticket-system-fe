@@ -6,6 +6,8 @@ class ApiRegistration {
   static const String baseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://idiyanale-be.bakawan-ai.com') + '/api/user';
 
 
+
+
   static Future<Map<String, dynamic>> registerUser({
     required String username,
     required String email,

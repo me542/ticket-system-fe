@@ -22,6 +22,8 @@ class ApiUser {
     return headers;
   }
 
+
+
   // ================= CREATE =================
   static Future<bool> createUser({
     required String username,

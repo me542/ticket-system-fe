@@ -42,6 +42,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   String _currentUserRole  = '';
   bool   _userLoaded       = false;
 
+
   static const _privilegedRoles = {'admin', 'endorser', 'approver', 'resolver'};
 
   bool get _isPrivileged =>
@@ -56,6 +57,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _selectedTicket = ticket;
     _isSidebarOpen  = true;
   });
+
 
   void _closeSidebar() => setState(() => _isSidebarOpen = false);
 
@@ -119,33 +121,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
       case ActivityType.resolved:  return 'resolved';
       case ActivityType.cancelled: return 'cancelled';
       case ActivityType.assigned:  return 'assigned';
+      case ActivityType.closed:    return 'closed';   // ← added
     }
-  }
-
-  /// Builds "Firstname Lastname" from API fields, falling back to username.
-  String _fullName(Map<String, dynamic> e) {
-    final first = (e['firstname'] ?? '').toString().trim();
-    final last  = (e['lastname']  ?? '').toString().trim();
-    if (first.isNotEmpty || last.isNotEmpty) {
-      return '$first $last'.trim();
-    }
-    return (e['username'] ?? 'Unknown').toString();
-  }
-
-  /// Returns initials: first letter of firstname + first letter of lastname.
-  String _nameInitials(Map<String, dynamic> e) {
-    final first = (e['firstname'] ?? '').toString().trim();
-    final last  = (e['lastname']  ?? '').toString().trim();
-    final f = first.isNotEmpty ? first[0].toUpperCase() : '';
-    final l = last.isNotEmpty  ? last[0].toUpperCase()  : '';
-    final initials = '$f$l';
-    return initials.isNotEmpty ? initials : (e['username'] ?? 'U').toString().substring(0, 1).toUpperCase();
   }
 
   // ── Filter & Search ───────────────────────────────────────
   String _selectedFilter = 'All';
 
-  /// Filter pills — the "For X" labels must match exactly what the API returns.
+  /// Filter pills — includes Closed now
   final List<String> _filters = [
     'All',
     'For Assessment',
@@ -154,6 +137,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     'For Assignment',
     'In Progress',
     'Resolved',
+    'Closed',       // ← added
     'Cancelled',
   ];
 
@@ -194,6 +178,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     } else if (_selectedFilter == 'Cancelled') {
       list = _roleFilteredTickets
           .where((t) => t.status == TicketStatus.cancelled)
+          .toList();
+    } else if (_selectedFilter == 'Closed') {           // ← added
+      list = _roleFilteredTickets
+          .where((t) => t.status == TicketStatus.closed)
           .toList();
     } else {
       // "For Assessment" / "For Endorsement" / "For Approval" / "For Assignment"
@@ -237,6 +225,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       'forAssignment':  countRaw('forassignment'),
       'inProgress':     visible.where((t) => t.status == TicketStatus.inProgress).length,
       'resolved':       visible.where((t) => t.status == TicketStatus.resolved).length,
+      'closed':         visible.where((t) => t.status == TicketStatus.closed).length,  // ← added
     };
   }
 
@@ -310,6 +299,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       case ActivityType.resolved:  return AppTheme.statusResolved;
       case ActivityType.cancelled: return AppTheme.statusCancelled;
       case ActivityType.assigned:  return const Color(0xFF8B5CF6);
+      case ActivityType.closed:    return Colors.indigo;   // ← added
     }
   }
 
@@ -343,13 +333,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
         id:                e['ticket_id'] ?? '',
         title:             e['subject'] ?? '',
         categoryName:      e['category'] ?? 'Uncategorized',
-        status:            mapStatus(rawSt),  // enum for logic
-        rawStatus:         rawSt,             // real label for display
+        status:            mapStatus(rawSt),
+        rawStatus:         rawSt,
         priority:          priority,
-        submitter:         _fullName(e),
-        submitterInitials: _nameInitials(e),
+        submitter:         e['username'] ?? 'Unknown',
+        submitterInitials: (e['username'] ?? 'U').substring(0, 1).toUpperCase(),
         createdAt:         DateTime.tryParse(e['created_at'] ?? '') ?? DateTime.now(),
         description:       e['description'] ?? '',
+        resolver:          e['assignee'] ?? '',
       );
     }).toList();
 
@@ -367,17 +358,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       if (t.status == TicketStatus.inProgress ||
           t.status == TicketStatus.resolved   ||
-          t.status == TicketStatus.cancelled) {
-        final actType = t.status == TicketStatus.inProgress
-            ? ActivityType.moved
-            : t.status == TicketStatus.resolved
-            ? ActivityType.resolved
-            : ActivityType.cancelled;
-        final actionWord = t.status == TicketStatus.inProgress
-            ? 'moved to In Progress'
-            : t.status == TicketStatus.resolved
-            ? 'resolved'
-            : 'cancelled';
+          t.status == TicketStatus.cancelled  ||
+          t.status == TicketStatus.closed) {         // ← added closed
+        ActivityType actType;
+        String actionWord;
+
+        if (t.status == TicketStatus.inProgress) {
+          actType    = ActivityType.moved;
+          actionWord = 'moved to In Progress';
+        } else if (t.status == TicketStatus.resolved) {
+          actType    = ActivityType.resolved;
+          actionWord = 'resolved';
+        } else if (t.status == TicketStatus.closed) { // ← added closed
+          actType    = ActivityType.closed;
+          actionWord = 'closed';
+        } else {
+          actType    = ActivityType.cancelled;
+          actionWord = 'cancelled';
+        }
+
         activities.add(ActivityItem(
           ticketId:    t.id,
           ticketTitle: t.title,
@@ -414,69 +413,95 @@ class _DashboardScreenState extends State<DashboardScreen> {
       );
     }
 
-    final filtered  = _filteredTickets;
+    final filtered = _filteredTickets;
     final catCounts = _visibleCategoryCount;
-    final maxCat    = catCounts.values.isEmpty
+    final maxCat = catCounts.values.isEmpty
         ? 0
         : catCounts.values.reduce((a, b) => a > b ? a : b);
 
-    return Stack(
-      children: [
-        Column(
-          children: [
-            _buildTopBar(context),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
+    final bool isOverlayOpen = _isSidebarOpen || _isCreateOpen;
+
+    return Scaffold(
+      backgroundColor: AppTheme.sidebarBg,
+      body: Stack(
+        children: [
+          // 🟦 MAIN CONTENT
+          ClipRect(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(
+                sigmaX: isOverlayOpen ? 6 : 0,
+                sigmaY: isOverlayOpen ? 6 : 0,
+              ),
+              child: AbsorbPointer(
+                absorbing: isOverlayOpen,
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (!_isPrivileged) _buildUserBanner(),
-                    if (!_isPrivileged) const SizedBox(height: 16),
-                    _buildStatsRow(),
-                    const SizedBox(height: 24),
-                    _buildMainContent(filtered, catCounts, maxCat),
+                    _buildTopBar(context),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (!_isPrivileged) _buildUserBanner(),
+                            if (!_isPrivileged) const SizedBox(height: 16),
+                            _buildStatsRow(),
+                            const SizedBox(height: 24),
+                            _buildMainContent(filtered, catCounts, maxCat),
+                          ],
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
             ),
-          ],
-        ),
-
-        if (_isSidebarOpen || _isCreateOpen)
-          GestureDetector(
-            onTap: () => setState(() {
-              _isSidebarOpen = false;
-              _isCreateOpen  = false;
-            }),
-            child: Container(color: Colors.black54),
           ),
 
-        AnimatedPositioned(
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeInOut,
-          top: 0, bottom: 0,
-          right: _isSidebarOpen ? 0 : -1250,
-          child: TicketSidebar(
-            ticket: _selectedTicket,
-            onClose: _closeSidebar,
-          ),
-        ),
+          // 🌑 DARK OVERLAY
+          if (isOverlayOpen)
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  _isSidebarOpen = false;
+                  _isCreateOpen = false;
+                });
+              },
+              child: Container(
+                color: Colors.black.withOpacity(0.25),
+              ),
+            ),
 
-        AnimatedPositioned(
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeInOut,
-          top: 0, bottom: 0,
-          right: _isCreateOpen ? 0 : -1250,
-          child: CreateTicketSidebar(
-            onClose: () => setState(() => _isCreateOpen = false),
-            onCreated: () {
-              _loadTickets();
-              setState(() => _isCreateOpen = false);
-            },
+          // 📌 SIDEBAR (TICKET DETAILS)
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+            top: 0,
+            bottom: 0,
+            right: _isSidebarOpen ? 0 : -1100,
+            child: TicketSidebar(
+              ticket: _selectedTicket,
+              onClose: _closeSidebar,
+            ),
           ),
-        ),
-      ],
+
+          // ➕ CREATE SIDEBAR
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+            top: 0,
+            bottom: 0,
+            right: _isCreateOpen ? 0 : -1100,
+            child: CreateTicketSidebar(
+              onClose: () => setState(() => _isCreateOpen = false),
+              onCreated: () {
+                _loadTickets();
+                setState(() => _isCreateOpen = false);
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -568,7 +593,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
               const SizedBox(width: 16),
 
-              // Search box
               if (isNarrow)
                 SizedBox(
                   width: 260,
@@ -581,26 +605,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
 
               const SizedBox(width: 16),
-
-              CompositedTransformTarget(
-                link: _notificationLink,
-                child: Stack(children: [
-                  IconButton(
-                    icon: const Icon(Icons.notifications_outlined,
-                        color: AppTheme.textSecondary),
-                    onPressed: _toggleNotificationPanel,
-                    tooltip: 'Recent Activity',
-                  ),
-                  if (_hasNewActivity)
-                    const Positioned(
-                      right: 8, top: 8,
-                      child: CircleAvatar(
-                        radius: 4,
-                        backgroundColor: AppTheme.statusCancelled,
-                      ),
-                    ),
-                ]),
-              ),
 
               if (_isPrivileged)
                 IconButton(
@@ -652,7 +656,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-// Extract search box into its own method
   Widget _buildSearchBox() {
     return Container(
       height: 36,
@@ -754,36 +757,39 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  // ── Stats row — keeps original 4-card layout ──────────────
+  // ── Stats row ─────────────────────────────────────────────
   Widget _buildStatsRow() {
     final s = _visibleStats;
     return Row(children: [
       Expanded(child: StatsCard(
         title: 'Total Tickets',
         count: s['total'] ?? 0,
-        subtitle: _isPrivileged ? '' : 'Your tickets',
         accentColor: AppTheme.accent,
       )),
       const SizedBox(width: 16),
       Expanded(child: StatsCard(
         title: 'For Review',
         count: s['forTotal'] ?? 0,
-        subtitle: '',
         accentColor: AppTheme.statusAssessment,
       )),
       const SizedBox(width: 16),
       Expanded(child: StatsCard(
         title: 'In Progress',
         count: s['inProgress'] ?? 0,
-        subtitle: '',
         accentColor: AppTheme.statusProgress,
       )),
       const SizedBox(width: 16),
       Expanded(child: StatsCard(
         title: 'Resolved',
         count: s['resolved'] ?? 0,
-        subtitle: '',
         accentColor: AppTheme.statusResolved,
+      )),
+      const SizedBox(width: 16),
+      // ── NEW: Closed stat card ────────────────────────────
+      Expanded(child: StatsCard(
+        title: 'Closed',
+        count: s['closed'] ?? 0,
+        accentColor: Colors.indigo,
       )),
     ]);
   }
@@ -813,7 +819,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   // ── Tickets table ─────────────────────────────────────────
   Widget _buildTicketsTable(List<Ticket> tickets) {
-    final visible = tickets.toList();
+    final visible = tickets.take(8).toList();
 
     return Container(
       decoration: BoxDecoration(
@@ -834,6 +840,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Expanded(flex: 2, child: _TableHeader('PRIORITY')),
               SizedBox(width: 12),
               Expanded(flex: 2, child: _TableHeader('SUBMITTER')),
+              SizedBox(width: 12),
+              Expanded(flex: 2, child: _TableHeader('RESOLVER')),
             ]),
           ),
           visible.isEmpty
@@ -854,18 +862,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ]),
             ),
           )
-              : SizedBox(
-            height: 400, // adjust height as needed
-            child: SingleChildScrollView(
-              child: Column(
-                children: visible.map<Widget>((t) {
-                  return GestureDetector(
-                    onTap: () => _openTicket(t),
-                    child: TicketRow(ticket: t),
-                  );
-                }).toList(),
-              ),
-            ),
+              : Column(
+            children: visible.take(6).map<Widget>((t) {
+              return GestureDetector(
+                onTap: () => _openTicket(t),
+                child: TicketRow(ticket: t),
+              );
+            }).toList(),
           ),
         ],
       ),
@@ -874,9 +877,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   // ── Tickets header ────────────────────────────────────────
   Widget _buildTicketsHeader() {
-    final total   = _roleFilteredTickets.length;
-    final showing = _filteredTickets.length;
-
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       child: Row(children: [
@@ -887,49 +887,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
               fontSize: 15,
               fontWeight: FontWeight.w700),
         ),
-        const SizedBox(width: 8),
-        Text(
-          _searchQuery.isNotEmpty || _selectedFilter != 'All'
-              ? '$showing of $total'
-              : '$total total',
-          style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
-        ),
         const Spacer(),
-        // ── Scrollable filter pills ───────────────────────
+
         Container(
-          height: 42,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
+          height: 32,
           decoration: BoxDecoration(
             color: AppTheme.surface,
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: BorderRadius.circular(8),
             border: Border.all(color: AppTheme.border),
           ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: _selectedFilter,
-              dropdownColor: AppTheme.surface,
-              icon: const Icon(Icons.keyboard_arrow_down,
-                  size: 16, color: AppTheme.textSecondary),
-              style: const TextStyle(
-                color: AppTheme.textPrimary,
-                fontSize: 12,
-              ),
-              items: _filters.map((f) {
-                return DropdownMenuItem(
-                  value: f,
-                  child: Text(f),
-                );
-              }).toList(),
-              onChanged: (value) {
-                if (value != null) {
-                  setState(() => _selectedFilter = value);
-                }
-              },
+          child: IconButton(
+            padding: EdgeInsets.zero,
+            icon: const Icon(
+              Icons.refresh,
+              size: 18,
+              color: AppTheme.textSecondary,
             ),
+            tooltip: "Refresh",
+            onPressed: () async {
+              await _loadTickets();
+              await fetchDashboardData();
+            },
           ),
         ),
-
-
       ]),
     );
   }
@@ -1035,10 +1015,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
     );
   }
+
+  Future<void> fetchDashboardData() async {}
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Supporting widgets — unchanged from original
+// Supporting widgets
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _NotificationDropdown extends StatelessWidget {
@@ -1219,6 +1201,7 @@ class _ActivityTile extends StatelessWidget {
       case ActivityType.resolved:  return 'resolved';
       case ActivityType.cancelled: return 'cancelled';
       case ActivityType.assigned:  return 'assigned';
+      case ActivityType.closed:    return 'closed';   // ← added
     }
   }
 

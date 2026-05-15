@@ -2,7 +2,6 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:ticket_system/screens/loginscreen.dart';
-
 import '../core/services/api_register.dart';
 
 
@@ -32,6 +31,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   String? confirmPasswordError;
   String? positionError;
   String? institutionError;
+  String? usernameError;
 
   // ================= POSITION LIST =================
   static const List<String> _positions = [
@@ -201,18 +201,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
         const Text(
           "Username",
           style: TextStyle(
-            color: Color(0xFF374151),
+            color: Color(0xFF111827),
             fontWeight: FontWeight.w500,
           ),
         ),
         const SizedBox(height: 5),
         TextField(
           controller: _usernameController,
-          readOnly: true,
-          style: const TextStyle(color: Color(0xFF111827)),
+          enabled: false,
+          style: const TextStyle(
+            color: Color(0xFF111827),
+          ),
           decoration: _inputDecoration(
             "Auto-generated username",
             null,
+          ).copyWith(
+            disabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Colors.grey),
+            ),
           ),
         ),
       ],
@@ -842,17 +849,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             fit: BoxFit.contain,
                           ),
                           const SizedBox(height: 20),
-                          const Text(
-                            'IDIYANALE',
-                            style: TextStyle(
-                              fontSize: 34,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF1A1A1A),
+                          ShaderMask(
+                            shaderCallback: (bounds) => const LinearGradient(
+                              colors: [Color(0xFFDAB76B), Color(0xFFA0813D)],
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                            ).createShader(bounds),
+                            child: const Text(
+                              'IDIYANALE',
+                              style: TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
                             ),
                           ),
                           const SizedBox(height: 10),
                           const Text(
-                            'Bakawan Ticketing System',
+                            'BAKAWAN Ticketing System',
                             style: TextStyle(
                               color: Color(0xFF6B7280),
                               fontSize: 16,

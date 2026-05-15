@@ -94,7 +94,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: const Row(
             children: [
               Text(
-                'Settings',
+                'Profile',
                 style: TextStyle(
                   color: AppTheme.textPrimary,
                   fontSize: 18,
@@ -112,45 +112,137 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Profile section
-                _section('Profile', [
-                  _settingRow(
-                    'First Name',
-                    trailing: _displayText(_firstName),
-                  ),
 
-                  _settingRow(
-                    'Last Name',
-                    trailing: _displayText(_lastName),
+                // PROFILE HEADER
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppTheme.border),
                   ),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 34,
+                        backgroundColor: AppTheme.accent,
+                        child: Text(
+                          _username.isNotEmpty
+                              ? _username[0].toUpperCase()
+                              : '?',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
 
-                  _settingRow(
-                    'Username',
-                    trailing: _displayText(_username),
-                  ),
+                      const SizedBox(width: 18),
 
-                  _settingRow(
-                    'Email',
-                    trailing: _displayText(_email),
-                  ),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment:
+                          CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '$_firstName $_lastName',
+                              style: const TextStyle(
+                                color: AppTheme.textPrimary,
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
 
-                  _settingRow(
-                    'Institution',
-                    trailing: _displayText(_institution),
-                  ),
+                            const SizedBox(height: 4),
 
-                  _settingRow(
-                    'Role',
-                    trailing: _displayText(_role),
-                  ),
+                            Text(
+                              _email,
+                              style: const TextStyle(
+                                color: AppTheme.textSecondary,
+                                fontSize: 13,
+                              ),
+                            ),
 
-                  _settingRow(
-                    'Position',
-                    trailing: _displayText(_position),
+                            const SizedBox(height: 8),
+
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppTheme.sidebarActive,
+                                borderRadius:
+                                BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                _role.toUpperCase(),
+                                style: const TextStyle(
+                                  color: AppTheme.accent,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                ]),
+                ),
 
                 const SizedBox(height: 20),
+
+                // INFO GRID
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isMobile =
+                        constraints.maxWidth < 700;
+
+                    return Wrap(
+                      spacing: 16,
+                      runSpacing: 16,
+                      children: [
+                        _infoCard(
+                          icon: Icons.person_outline,
+                          title: 'Username',
+                          value: _username,
+                          width: isMobile
+                              ? constraints.maxWidth
+                              : (constraints.maxWidth / 2) - 24,
+                        ),
+
+                        _infoCard(
+                          icon: Icons.badge_outlined,
+                          title: 'Position',
+                          value: _position,
+                          width: isMobile
+                              ? constraints.maxWidth
+                              : (constraints.maxWidth / 2) - 24,
+                        ),
+
+                        _infoCard(
+                          icon: Icons.business_outlined,
+                          title: 'Institution',
+                          value: _institution,
+                          width: isMobile
+                              ? constraints.maxWidth
+                              : (constraints.maxWidth / 2) - 24,
+                        ),
+
+                        _infoCard(
+                          icon: Icons.admin_panel_settings_outlined,
+                          title: 'Role',
+                          value: _role,
+                          width: isMobile
+                              ? constraints.maxWidth
+                              : (constraints.maxWidth / 2) - 24,
+                        ),
+                      ],
+                    );
+                  },
+                ),
               ],
             ),
           ),
@@ -264,4 +356,67 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     );
   }
+}
+
+Widget _infoCard({
+  required IconData icon,
+  required String title,
+  required String value,
+  required double width,
+}) {
+  return Container(
+    width: width,
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: AppTheme.surface,
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: AppTheme.border),
+    ),
+    child: Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: AppTheme.sidebarActive,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(
+            icon,
+            color: AppTheme.accent,
+            size: 20,
+          ),
+        ),
+
+        const SizedBox(width: 14),
+
+        Expanded(
+          child: Column(
+            crossAxisAlignment:
+            CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  color: AppTheme.textSecondary,
+                  fontSize: 12,
+                ),
+              ),
+
+              const SizedBox(height: 4),
+
+              Text(
+                value.isEmpty ? '-' : value,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppTheme.textPrimary,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
 }

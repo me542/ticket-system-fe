@@ -171,7 +171,7 @@ class _TicketSidebarState extends State<TicketSidebar> {
     }
 
     // ── Resolved / Cancelled → freeze at finish time ──────────────────────
-    if (_isResolved || _isCancelled) {
+    if (_isResolved || _isCancelled || _isclosed) {
       final endedRaw = _detail?['resolved_at']?.toString() ??
           _detail?['updated_at']?.toString() ??
           '';
@@ -281,6 +281,15 @@ class _TicketSidebarState extends State<TicketSidebar> {
         color = Colors.green;
         icon = Icons.thumb_up_alt_outlined;
         break;
+    // case 'reassign_endorser':
+    //   title = 'Reassign Endorsement';
+    //   message =
+    //   'Are you sure you want to reassign this ticket to yourself as endorser? '
+    //       'You will become the new assigned endorser.';
+    //   label = 'Yes, Reassign';
+    //   color = Colors.orange;
+    //   icon = Icons.swap_horiz_outlined;
+    //   break;
       case 'approve':
         title = 'Approve Ticket';
         message =
@@ -312,6 +321,15 @@ class _TicketSidebarState extends State<TicketSidebar> {
         label = 'Yes, Resolve';
         color = Colors.teal;
         icon = Icons.task_alt_outlined;
+        break;
+      case 'close':
+        title = 'Close Ticket';
+        message =
+        'Are you sure you want to close this ticket? '
+            'This confirms the issue has been resolved to your satisfaction.';
+        label = 'Yes, Close It';
+        color = Colors.indigo;
+        icon = Icons.lock_outline;
         break;
       case 'hold':
         title = 'Hold Ticket';
@@ -545,6 +563,8 @@ class _TicketSidebarState extends State<TicketSidebar> {
       case 'cancelled':
       case 'canceled':
         return 'cancelled';
+      case 'closed':
+        return 'closed';
       default:
         return _rawStatus.replaceAll(' ', '');
     }
@@ -556,6 +576,7 @@ class _TicketSidebarState extends State<TicketSidebar> {
   bool get _isAssigned => _normalizedStatus == 'assigned';
   bool get _isResolved => _normalizedStatus == 'resolved';
   bool get _isCancelled => _normalizedStatus == 'cancelled';
+  bool get _isclosed => _normalizedStatus == 'closed';
 
   // ─── who created this ticket ───────────────────────────────────────────────
 
@@ -609,7 +630,7 @@ class _TicketSidebarState extends State<TicketSidebar> {
     return Material(
       elevation: 20,
       child: Container(
-        width: 1250,
+        width: 1100,
         color: AppTheme.sidebarBg,
         child: Column(
           children: [
@@ -631,7 +652,9 @@ class _TicketSidebarState extends State<TicketSidebar> {
 
   Widget _buildHeader(Ticket ticket) {
     // Cancel is only shown to the ticket creator while still active
-    final canCancel = _isCreator && !_isResolved && !_isCancelled;
+    final canCancel = (_isCreator || _isAdmin)
+        && !_isResolved && !_isCancelled;
+
     final canHold = (_isCreator || _isAdmin || isMyTicket)
         && _isAssigned && !_isResolved && !_isCancelled && !hold;
 
@@ -647,7 +670,7 @@ class _TicketSidebarState extends State<TicketSidebar> {
         children: [
           Expanded(
             child: const Text(
-              'Ticket Detail',
+              'Ticket Details',
               style: TextStyle(
                 color: AppTheme.textPrimary,
                 fontSize: 17,
@@ -843,63 +866,109 @@ class _TicketSidebarState extends State<TicketSidebar> {
   );
 
   // ─── main content ──────────────────────────────────────────────────────────
-
   Widget _buildContent(Ticket ticket) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: SizedBox(
-        width: double.infinity,
-        child: Row(
+    return SelectionArea( // 👈 wrap everything
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: SizedBox(
+          width: double.infinity,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── LEFT COLUMN ──────────────────────────────────────────────
+              Expanded(
+                flex: 1,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        _chip(ticket.statusLabel, _statusColor),
+                        const SizedBox(width: 8),
+                        _chip(ticket.priorityLabel, _priorityColor),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    _buildSubjectCard(ticket),
+                    const SizedBox(height: 12),
+                    _buildDetailsCard(ticket),
+                    const SizedBox(height: 12),
+                    _buildDescriptionCard(),
+                    const SizedBox(height: 12),
+                    _buildAttachmentsCard(),
+                  ],
+                ),
+              ),
+
+              const SizedBox(width: 20),
+
+              // ── RIGHT COLUMN ─────────────────────────────────────────────
+              Expanded(
+                flex: 1,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      child: _buildProgressStepper(ticket),
+                    ),
+                    const SizedBox(height: 16),
+                    if (_grabStartTime != null) ...[
+                      _buildResolutionTimer(),
+                      const SizedBox(height: 12),
+                    ],
+                    _buildApprovalChain(),
+                    const SizedBox(height: 12),
+                    _buildActionButtons(ticket),
+                    const SizedBox(height: 16),
+                    _buildReplySection(),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ─── subject card ──────────────────────────────────────────────────────────
+  Widget _buildSubjectCard(Ticket ticket) {
+    final subject = _field(['subject', 'title'], fallback: ticket.title);
+
+    return _card(
+      child: SelectionArea(
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── LEFT COLUMN ──────────────────────────────────────────────
-            Expanded(
-              flex: 1,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      _chip(ticket.statusLabel, _statusColor),
-                      const SizedBox(width: 8),
-                      _chip(ticket.priorityLabel, _priorityColor),
-                    ],
+            Row(
+              children: [
+                // const Icon(
+                //   Icons.confirmation_number,
+                //   color: Color(0xFF268A15),
+                //   size: 18,
+                // ),
+                // const SizedBox(width: 8),
+
+                Text(
+                  ticket.id,
+                  style: const TextStyle(
+                    color: Color(0xFF268A15),
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
                   ),
-                  const SizedBox(height: 16),
-                  _buildSubjectCard(ticket),
-                  const SizedBox(height: 12),
-                  _buildDetailsCard(ticket),
-                  const SizedBox(height: 12),
-                  _buildDescriptionCard(),
-                  const SizedBox(height: 12),
-                  _buildAttachmentsCard(),
-                ],
-              ),
+                ),
+              ],
             ),
 
-            const SizedBox(width: 20),
+            const SizedBox(height: 6),
 
-            // ── RIGHT COLUMN ─────────────────────────────────────────────
-            Expanded(
-              flex: 1,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                    child: _buildProgressStepper(ticket),
-                  ),
-                  const SizedBox(height: 16),
-                  if (_grabStartTime != null) ...[
-                    _buildResolutionTimer(),
-                    const SizedBox(height: 12),
-                  ],
-                  _buildApprovalChain(),
-                  const SizedBox(height: 12),
-                  _buildActionButtons(ticket),
-                  const SizedBox(height: 16),
-                  _buildReplySection(),
-                ],
+            Text(
+              subject,
+              style: const TextStyle(
+                color: AppTheme.textPrimary,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ],
@@ -908,99 +977,64 @@ class _TicketSidebarState extends State<TicketSidebar> {
     );
   }
 
-  // ─── subject card ──────────────────────────────────────────────────────────
-
-  Widget _buildSubjectCard(Ticket ticket) {
-    final subject = _field(['subject', 'title'], fallback: ticket.title);
-    return _card(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Tooltip(
-            message: 'Tap to copy SR number',
-            child: MouseRegion(
-              cursor: SystemMouseCursors.click,
-              child: GestureDetector(
-                onTap: () {
-                  Clipboard.setData(ClipboardData(text: ticket.id));
-                  _showSnackbar('SR number copied!',
-                      color: Colors.orange.shade700);
-                },
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.confirmation_number,
-                      color: Colors.orange,
-                      size: 18,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '${ticket.id}',
-                      style: const TextStyle(
-                        color: Colors.orange,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    const Icon(
-                      Icons.copy_outlined,
-                      color: Colors.orange,
-                      size: 12,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            subject,
-            style: const TextStyle(
-              color: AppTheme.textPrimary,
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   // ─── details card ──────────────────────────────────────────────────────────
-
   Widget _buildDetailsCard(Ticket ticket) {
     final category = _field(['category'], fallback: ticket.categoryLabel);
+    final subcategory = _field([
+      'subcategory',
+      'sub_category',
+      'subCategory',
+      'subcat',
+      'sub_type',
+    ], fallback: '');
+
     final submitter = _field([
       'username',
       'submitter',
       'created_by',
     ], fallback: ticket.submitter);
+
     final institution = _field(['institution', 'organization', 'company']);
     final ticketType = _field(['tickettype', 'ticket_type', 'type']);
+
     final createdRaw = _field([
       'CreatedAt',
       'created_at',
       'createdAt',
       'date_created',
     ]);
+
     final createdAt = _parseDate(createdRaw) ?? ticket.createdAt;
+
     final createdStr =
         '${createdAt.year}-${_p(createdAt.month)}-${_p(createdAt.day)}'
         '  ${_p(createdAt.hour)}:${_p(createdAt.minute)}:${_p(createdAt.second)}';
 
     return _card(
-      child: Column(
-        children: [
-          _detailRow(Icons.category_outlined, 'Category', category),
-          _detailRow(Icons.person_outline, 'Submitter', submitter),
-          if (institution != '—')
-            _detailRow(Icons.business_outlined, 'Organization', institution),
-          if (ticketType != '—')
-            _detailRow(Icons.label_outline, 'Type', ticketType),
-          _detailRow(Icons.access_time, 'Created', createdStr),
-        ],
+      child: SelectionArea(
+        child: Column(
+          children: [
+            _detailRow(Icons.category_outlined, 'Category', category),
+
+            // 👇 added subcategory right below category
+            if (subcategory.isNotEmpty && subcategory != '—')
+              _detailRow(
+                Icons.subdirectory_arrow_right,
+                'Subcategory',
+                subcategory,
+              ),
+
+            _detailRow(Icons.person_outline, 'Submitter', submitter),
+
+            if (institution != '—')
+              _detailRow(Icons.business_outlined, 'Organization', institution),
+
+            if (ticketType != '—')
+              _detailRow(Icons.label_outline, 'Type', ticketType),
+
+            _detailRow(Icons.access_time, 'Created', createdStr),
+          ],
+        ),
       ),
     );
   }
@@ -1013,6 +1047,7 @@ class _TicketSidebarState extends State<TicketSidebar> {
         children: [
           Icon(icon, size: 14, color: AppTheme.textMuted),
           const SizedBox(width: 8),
+
           SizedBox(
             width: 90,
             child: Text(
@@ -1024,10 +1059,14 @@ class _TicketSidebarState extends State<TicketSidebar> {
               ),
             ),
           ),
+
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(color: AppTheme.textPrimary, fontSize: 12),
+              style: const TextStyle(
+                color: AppTheme.textPrimary,
+                fontSize: 12,
+              ),
             ),
           ),
         ],
@@ -1036,7 +1075,6 @@ class _TicketSidebarState extends State<TicketSidebar> {
   }
 
   // ─── description ───────────────────────────────────────────────────────────
-
   Widget _buildDescriptionCard() {
     final desc = _field([
       'description',
@@ -1047,76 +1085,36 @@ class _TicketSidebarState extends State<TicketSidebar> {
     final descText = desc.isEmpty ? 'No description provided.' : desc;
 
     return _card(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(child: _sectionLabel('Description')),
-              Tooltip(
-                message: 'Copy description',
-                child: MouseRegion(
-                  cursor: SystemMouseCursors.click,
-                  child: GestureDetector(
-                    onTap: () {
-                      Clipboard.setData(ClipboardData(text: descText));
-                      _showSnackbar('Description copied!',
-                          color: Colors.teal.shade700);
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.teal.withOpacity(0.10),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(
-                            color: Colors.teal.withOpacity(0.4)),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.copy_outlined,
-                              size: 13, color: Colors.teal),
-                          SizedBox(width: 4),
-                          Text(
-                            'Copy',
-                            style: TextStyle(
-                                color: Colors.teal,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600),
-                          ),
-                        ],
-                      ),
+      child: SelectionArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _sectionLabel('Description'),
+            const SizedBox(height: 8),
+
+            SizedBox(
+              height: 400,
+              child: RawScrollbar(
+                controller: _descController,
+                thumbVisibility: true,
+                thickness: 0,
+                radius: const Radius.circular(4),
+                child: SingleChildScrollView(
+                  controller: _descController,
+                  padding: const EdgeInsets.only(right: 90),
+                  child: Text(
+                    descText,
+                    style: const TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontSize: 13,
+                      height: 1.55,
                     ),
                   ),
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 8),
-
-          SizedBox(
-            height: 400,
-            child: Scrollbar(
-              controller: _descController,
-              thumbVisibility: true,
-              thickness: 4,
-              radius: const Radius.circular(4),
-              child: SingleChildScrollView(
-                controller: _descController,
-                padding: const EdgeInsets.only(right: 12),
-                child: SelectableText(
-                  descText,
-                  style: const TextStyle(
-                    color: AppTheme.textSecondary,
-                    fontSize: 13,
-                    height: 1.55,
-                  ),
-                ),
-              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1360,23 +1358,21 @@ class _TicketSidebarState extends State<TicketSidebar> {
       'Endorsed',
       'Approved',
       'Assigned',
-      'In Progress',
       'Resolved',
+      'Closed',
     ];
 
     int active = 0;
-    if (_isCancelled) {
-      active = 6; // last step (cancelled, steps[6])
-    } else if (_isEndorsed) {
-      active = 1;
-    } else if (_isApproved) {
-      active = 2;
+    if (_isclosed) {
+      active = 5;
+    } else if (_isResolved) {
+      active = 4;
     } else if (_isAssigned) {
       active = 3;
-    } else if (_isAssigned && _rawStatus.replaceAll(' ', '') == 'inprogress') {
-      active = 4;
-    } else if (_isResolved) {
-      active = 5;
+    } else if (_isApproved) {
+      active = 2;
+    } else if (_isEndorsed) {
+      active = 1;
     }
 
     return Column(
@@ -1387,32 +1383,50 @@ class _TicketSidebarState extends State<TicketSidebar> {
         Row(
           children: List.generate(steps.length, (i) {
             final cancelled = _isCancelled;
-            // When cancelled, all steps are "done", all are red, all show cancel icon
-            final done = cancelled ? true : i <= active;
-            final current = cancelled ? false : i == active;
+
             Color dotColor;
             Widget iconChild;
             Color labelColor;
             Color lineColor;
 
             if (cancelled) {
-              dotColor = Colors.redAccent;
-              iconChild = const Icon(Icons.cancel, color: Colors.white, size: 13); // or Icons.close
+              dotColor  = Colors.redAccent;
+              iconChild = const Icon(Icons.cancel, color: Colors.white, size: 13);
               labelColor = Colors.redAccent;
-              lineColor = Colors.redAccent;
-            } else if (done) {
-              dotColor = current ? Colors.green.shade600 : Colors.green;
-              iconChild = const Icon(Icons.check, color: Colors.white, size: 13);
-              labelColor = Colors.green;
-              lineColor = Colors.green;
+              lineColor  = Colors.redAccent;
+            } else if (_isclosed) {
+              // All steps filled in indigo when closed
+              final done    = i <= active;
+              final current = i == active;
+              dotColor  = Colors.indigo.shade400;
+              iconChild = i == 5
+                  ? const Icon(Icons.lock, color: Colors.white, size: 13)
+                  : const Icon(Icons.check, color: Colors.white, size: 13);
+              labelColor = Colors.indigo.shade300;
+              lineColor  = Colors.indigo.shade400;
+              if (!done) {
+                // Should not happen when closed (active==5), but guard anyway
+                dotColor   = Colors.grey.shade800;
+                iconChild  = Text('${i + 1}',
+                    style: const TextStyle(color: Colors.white, fontSize: 10));
+                labelColor = Colors.grey;
+                lineColor  = Colors.grey.shade800;
+              }
             } else {
-              dotColor = Colors.grey.shade800;
-              iconChild = Text(
-                '${i + 1}',
-                style: const TextStyle(color: Colors.white, fontSize: 10),
-              );
-              labelColor = Colors.grey;
-              lineColor = Colors.grey.shade800;
+              final done    = i <= active;
+              final current = i == active;
+              if (done) {
+                dotColor  = current ? Colors.green.shade600 : Colors.green;
+                iconChild = const Icon(Icons.check, color: Colors.white, size: 13);
+                labelColor = Colors.green;
+                lineColor  = Colors.green;
+              } else {
+                dotColor  = Colors.grey.shade800;
+                iconChild = Text('${i + 1}',
+                    style: const TextStyle(color: Colors.white, fontSize: 10));
+                labelColor = Colors.grey;
+                lineColor  = Colors.grey.shade800;
+              }
             }
 
             return Expanded(
@@ -1425,8 +1439,14 @@ class _TicketSidebarState extends State<TicketSidebar> {
                           child: Container(
                             height: 2,
                             color: cancelled
-                                ? lineColor
-                                : (i <= active ? lineColor : Colors.grey.shade800),
+                                ? Colors.redAccent
+                                : _isclosed
+                                ? (i <= active
+                                ? Colors.indigo.shade400
+                                : Colors.grey.shade800)
+                                : (i <= active
+                                ? Colors.green
+                                : Colors.grey.shade800),
                           ),
                         ),
                       CircleAvatar(
@@ -1439,8 +1459,14 @@ class _TicketSidebarState extends State<TicketSidebar> {
                           child: Container(
                             height: 2,
                             color: cancelled
-                                ? lineColor
-                                : (i < active ? lineColor : Colors.grey.shade800),
+                                ? Colors.redAccent
+                                : _isclosed
+                                ? (i < active
+                                ? Colors.indigo.shade400
+                                : Colors.grey.shade800)
+                                : (i < active
+                                ? Colors.green
+                                : Colors.grey.shade800),
                           ),
                         ),
                     ],
@@ -1452,14 +1478,16 @@ class _TicketSidebarState extends State<TicketSidebar> {
                     style: TextStyle(
                       fontSize: 9,
                       color: labelColor,
-                      fontWeight: current ? FontWeight.bold : FontWeight.normal,
+                      fontWeight: (i == active && !cancelled)
+                          ? FontWeight.bold
+                          : FontWeight.normal,
                     ),
                   ),
                 ],
               ),
             );
           }),
-        )
+        ),
       ],
     );
   }
@@ -1468,8 +1496,9 @@ class _TicketSidebarState extends State<TicketSidebar> {
 
   Widget _buildResolutionTimer() {
     // ← change this line:
-    final isRunning = _isAssigned && !_isResolved && !_isCancelled && !hold;
-    final isOnHold = hold && !_isResolved && !_isCancelled;
+    // AFTER
+    final isRunning = _isAssigned && !_isResolved && !_isCancelled && !_isclosed && !hold;
+    final isOnHold  = hold && !_isResolved && !_isCancelled && !_isclosed;
 
     final label = _formatElapsed(_elapsedSeconds);
     final color = isOnHold
@@ -1570,28 +1599,18 @@ class _TicketSidebarState extends State<TicketSidebar> {
   // Falls back to "No X assigned" if the field is empty.
 
   Widget _buildApprovalChain() {
-    // ── Pull names from API response ────────────────────────────────────────
-    // Adjust these key lists to match whatever your backend returns.
-    final endorserName = _field(['endorser', 'endorser_name', 'endorsed_by']);
-    final approverName = _field(['approver', 'approver_name', 'approved_by']);
-    final assigneeName = _field([
-      'assigned_to',
-      'assignee',
-      'resolver_name',
-      'resolver',
-    ]);
-    final resolverName = assigneeName; // same person resolves after grab
+    final endorserName  = _field(['endorser', 'endorser_name', 'endorsed_by']);
+    final approverName  = _field(['approver', 'approver_name', 'approved_by']);
+    final assigneeName  = _field(['assigned_to', 'assignee', 'resolver_name', 'resolver']);
+    final resolverName  = assigneeName;
+    final submitterName = _field(['username', 'submitter', 'created_by'],
+        fallback: widget.ticket?.submitter ?? '');
 
-    final endorseDone =
-        _isEndorsed ||
-            _isApproved ||
-            _isAssigned ||
-            _isResolved ||
-            _isCancelled;
-    final approveDone =
-        _isApproved || _isAssigned || _isResolved || _isCancelled;
-    final assignDone = _isAssigned || _isResolved || _isCancelled;
-    final resolveDone = _isResolved || _isCancelled;
+    final endorseDone = _isEndorsed || _isApproved || _isAssigned || _isResolved || _isclosed || _isCancelled;
+    final approveDone = _isApproved || _isAssigned || _isResolved || _isclosed || _isCancelled;
+    final assignDone  = _isAssigned || _isResolved || _isclosed || _isCancelled;
+    final resolveDone = _isResolved || _isclosed || _isCancelled;
+    final closedone   = _isclosed   || _isCancelled;
 
     return _card(
       child: Column(
@@ -1607,73 +1626,82 @@ class _TicketSidebarState extends State<TicketSidebar> {
             isDone: endorseDone,
             isActive: !endorseDone,
             isLocked: false,
-            statusText: _isCancelled
-                ? 'Cancelled'
+            statusText: _isCancelled ? 'Cancelled'
                 : (endorseDone ? 'Endorsed ✓' : 'Awaiting'),
-            statusColor: _isCancelled
-                ? Colors.redAccent
+            statusColor: _isCancelled ? Colors.redAccent
                 : (endorseDone ? Colors.green : Colors.orange),
           ),
 
           Divider(color: Colors.grey.shade800),
 
-// Step 2: Approver
+          // Step 2: Approver
           _chainRow(
             name: approverName != '—' ? approverName : 'No approver assigned',
             role: 'Approver',
             isDone: approveDone,
             isActive: endorseDone && !approveDone,
             isLocked: !endorseDone,
-            statusText: _isCancelled
-                ? 'Cancelled'
-                : (approveDone
-                ? 'Approved ✓'
+            statusText: _isCancelled ? 'Cancelled'
+                : (approveDone ? 'Approved ✓'
                 : (endorseDone ? 'Awaiting' : 'Locked')),
-            statusColor: _isCancelled
-                ? Colors.redAccent
-                : (approveDone
-                ? Colors.green
+            statusColor: _isCancelled ? Colors.redAccent
+                : (approveDone ? Colors.green
                 : (endorseDone ? Colors.orange : Colors.grey.shade600)),
           ),
 
           Divider(color: Colors.grey.shade800),
 
-// Step 3: Assignee
+          // Step 3: Assignee
           _chainRow(
             name: assigneeName != '—' ? assigneeName : 'No assignee yet',
             role: 'Assigned To',
             isDone: assignDone,
             isActive: approveDone && !assignDone,
             isLocked: !approveDone,
-            statusText: _isCancelled
-                ? 'Cancelled'
-                : (assignDone ? 'Assigned ✓' : (approveDone ? 'Awaiting' : 'Locked')),
-            statusColor: _isCancelled
-                ? Colors.redAccent
-                : (assignDone
-                ? Colors.green
+            statusText: _isCancelled ? 'Cancelled'
+                : (assignDone ? 'Assigned ✓'
+                : (approveDone ? 'Awaiting' : 'Locked')),
+            statusColor: _isCancelled ? Colors.redAccent
+                : (assignDone ? Colors.green
                 : (approveDone ? Colors.purple : Colors.grey.shade600)),
           ),
 
           Divider(color: Colors.grey.shade800),
 
-// Step 4: Resolver
+          // Step 4: Resolver
           _chainRow(
             name: resolverName != '—' ? resolverName : 'Awaiting assignee',
             role: 'Resolver',
             isDone: resolveDone,
             isActive: assignDone && !resolveDone,
             isLocked: !assignDone,
-            statusText: _isCancelled
-                ? 'Cancelled'
-                : (resolveDone
-                ? 'Resolved ✓'
+            statusText: _isCancelled ? 'Cancelled'
+                : (resolveDone ? 'Resolved ✓'
                 : (assignDone ? 'In Progress' : 'Locked')),
-            statusColor: _isCancelled
-                ? Colors.redAccent
-                : (resolveDone
-                ? Colors.teal
+            statusColor: _isCancelled ? Colors.redAccent
+                : (resolveDone ? Colors.teal
                 : (assignDone ? Colors.blue : Colors.grey.shade600)),
+          ),
+
+          Divider(color: Colors.grey.shade800),
+
+          // Step 5: Closer (submitter only)
+          _chainRow(
+            name: submitterName.isNotEmpty ? submitterName : 'Submitter',
+            role: 'Closer (Submitter)',
+            isDone: closedone,
+            isActive: resolveDone && !closedone,
+            isLocked: !resolveDone,
+            statusText: _isCancelled ? 'Cancelled'
+                : (closedone ? 'closed ✓'
+                : (resolveDone ? 'Awaiting Closure' : 'Locked')),
+            statusColor: _isCancelled ? Colors.redAccent
+                : (closedone ? Colors.indigo
+                : (resolveDone ? Colors.orange : Colors.grey.shade600)),
+            // Visual hint that this step belongs to the submitter
+            overrideAvatarColor: resolveDone && !closedone
+                ? Colors.indigo.shade400
+                : null,
           ),
         ],
       ),
@@ -1688,15 +1716,16 @@ class _TicketSidebarState extends State<TicketSidebar> {
     required bool isLocked,
     required String statusText,
     required Color statusColor,
+    Color? overrideAvatarColor,
   }) {
     // Derive initials from the actual name
     final initials = _initialsFrom(name);
 
-    final Color avatarColor = isDone
+    final Color avatarColor = overrideAvatarColor ?? (isDone
         ? Colors.green.shade700
         : isActive
         ? Colors.orange.shade700
-        : Colors.grey.shade800;
+        : Colors.grey.shade800);
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
@@ -1812,6 +1841,20 @@ class _TicketSidebarState extends State<TicketSidebar> {
       );
     }
 
+    // ── Closed — nobody gets any actions ─────────────────────────────────────
+    if (_isclosed) {
+      return _actionCard(
+        children: [
+          const Icon(Icons.lock, color: Colors.indigo, size: 18),
+          const SizedBox(width: 8),
+          const Text(
+            'This ticket has been closed.',
+            style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
+          ),
+        ],
+      );
+    }
+
     final endorseDone =
         _isEndorsed ||
             _isApproved ||
@@ -1847,25 +1890,60 @@ class _TicketSidebarState extends State<TicketSidebar> {
     // ── ENDORSER ─────────────────────────────────────────────────────────────
     if (isEndorser) {
       if (!endorseDone) {
+        // Pull whoever is currently assigned as endorser from the ticket detail
+        final assignedEndorser = _field([
+          'endorser',
+          'endorser_name',
+          'endorsed_by',
+          'assigned_endorser',
+        ]).toLowerCase().trim();
+
+        final isAssignedEndorser =
+            assignedEndorser.isNotEmpty &&
+                _currentUsername.isNotEmpty &&
+                assignedEndorser == _currentUsername;
+
+        // ── This user IS the assigned endorser → show Endorse + Reject ──────
+        if (isAssignedEndorser) {
+          return _actionCard(
+            debugLabel: 'endorser (assigned) · $_normalizedStatus',
+            children: [
+              _actionBtn(
+                label: 'Endorse',
+                icon: Icons.thumb_up_alt_outlined,
+                color: Colors.green,
+                onTap: () => _confirmAndAct('endorse', ticket.id),
+              ),
+              const SizedBox(width: 12),
+              _actionBtn(
+                label: 'Reject',
+                icon: Icons.thumb_down_alt_outlined,
+                color: Colors.redAccent,
+                onTap: () => _handleAction('reject', ticket.id),
+              ),
+            ],
+          );
+        }
+
+        // ── This user is a different endorser → show Reassign button ────────
         return _actionCard(
-          debugLabel: 'endorser · $_normalizedStatus',
+          debugLabel: 'endorser (not assigned) · $_normalizedStatus',
           children: [
-            _actionBtn(
-              label: 'Endorse',
-              icon: Icons.thumb_up_alt_outlined,
-              color: Colors.green,
-              onTap: () => _confirmAndAct('endorse', ticket.id),
+            const Icon(Icons.lock_outline, color: Colors.orange, size: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                assignedEndorser.isNotEmpty
+                    ? 'Assigned to: $assignedEndorser'
+                    : 'Assigned to another endorser.',
+                style: const TextStyle(color: AppTheme.textMuted, fontSize: 12),
+              ),
             ),
             const SizedBox(width: 12),
-            _actionBtn(
-              label: 'Reject',
-              icon: Icons.thumb_down_alt_outlined,
-              color: Colors.redAccent,
-              onTap: () => _handleAction('reject', ticket.id),
-            ),
           ],
         );
       }
+
       return _actionCard(
         children: [
           const Icon(Icons.check_circle_outline, color: Colors.green, size: 18),
@@ -1949,12 +2027,12 @@ class _TicketSidebarState extends State<TicketSidebar> {
               onTap: () => _confirmAndAct('grab', ticket.id),
             ),
             const SizedBox(width: 12),
-            _actionBtn(
-              label: 'Reject',
-              icon: Icons.cancel_outlined,
-              color: Colors.redAccent,
-              onTap: () => _handleAction('reject', ticket.id),
-            ),
+            // _actionBtn(
+            //   label: 'Reject',
+            //   icon: Icons.cancel_outlined,
+            //   color: Colors.redAccent,
+            //   onTap: () => _handleAction('reject', ticket.id),
+            // ),
           ],
         );
       }
@@ -2004,6 +2082,34 @@ class _TicketSidebarState extends State<TicketSidebar> {
           const SizedBox(width: 8),
           const Text(
             'Ticket has been resolved.',
+            style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
+          ),
+        ],
+      );
+    }
+
+    // ── SUBMITTER — close after resolved ─────────────────────────────────────
+    if (_isCreator && _isResolved && !_isclosed) {
+      return _actionCard(
+        debugLabel: 'submitter · can close',
+        children: [
+          _actionBtn(
+            label: 'Close Ticket',
+            icon: Icons.lock_outline,
+            color: Colors.indigo,
+            onTap: () => _confirmAndAct('close', ticket.id),
+          ),
+        ],
+      );
+    }
+
+    if (_isCreator && _isclosed) {
+      return _actionCard(
+        children: [
+          const Icon(Icons.lock, color: Colors.indigo, size: 18),
+          const SizedBox(width: 8),
+          const Text(
+            'You have closed this ticket.',
             style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
           ),
         ],
@@ -2122,6 +2228,13 @@ class _TicketSidebarState extends State<TicketSidebar> {
             color: Colors.green,
           );
           break;
+      // case 'reassign_endorser':
+      //   result = await ApiUpdateTicket.reassignEndorser(token, ticketId);
+      //   _showSnackbar(
+      //     result['message'] ?? 'Ticket reassigned to you ✓',
+      //     color: Colors.orange,
+      //   );
+      //   break;
         case 'approve':
           result = await ApiUpdateTicket.approveTicket(token, ticketId);
           _showSnackbar(
@@ -2155,6 +2268,13 @@ class _TicketSidebarState extends State<TicketSidebar> {
           _showSnackbar(
             result['message'] ?? 'Ticket resolved ✓',
             color: Colors.teal,
+          );
+          break;
+        case 'close':
+          result = await ApiUpdateTicket.closeTicket(token, ticketId);
+          _showSnackbar(
+            result['message'] ?? 'Ticket closed ✓',
+            color: Colors.indigo,
           );
           break;
         case 'cancel':
@@ -2192,7 +2312,6 @@ class _TicketSidebarState extends State<TicketSidebar> {
   }
 
   // ─── remarks section ───────────────────────────────────────────────────────
-
   Widget _buildReplySection() {
     final ticketId = widget.ticket?.id ?? '';
 
@@ -2299,7 +2418,7 @@ class _TicketSidebarState extends State<TicketSidebar> {
           Padding(
             padding: const EdgeInsets.all(10),
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Expanded(
                   child: TextField(
@@ -2341,11 +2460,13 @@ class _TicketSidebarState extends State<TicketSidebar> {
                     onSubmitted: (_) => _postRemark(ticketId),
                   ),
                 ),
+
                 const SizedBox(width: 8),
+
                 _postingRemark
                     ? const SizedBox(
-                  width: 36,
-                  height: 36,
+                  width: 38,
+                  height: 38,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
                     : GestureDetector(
@@ -2353,6 +2474,7 @@ class _TicketSidebarState extends State<TicketSidebar> {
                   child: Container(
                     width: 38,
                     height: 38,
+                    alignment: Alignment.center,
                     decoration: BoxDecoration(
                       color: Colors.blue,
                       borderRadius: BorderRadius.circular(8),
@@ -2366,7 +2488,7 @@ class _TicketSidebarState extends State<TicketSidebar> {
                 ),
               ],
             ),
-          ),
+          )
         ],
       ),
     );

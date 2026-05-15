@@ -1,4 +1,4 @@
-enum TicketStatus { forAssessment, inProgress, resolved, cancelled }
+enum TicketStatus { forAssessment, inProgress, resolved, cancelled, closed }
 enum TicketPriority { priority1, priority2, priority3, priority4 }
 
 class Ticket {
@@ -17,6 +17,7 @@ class Ticket {
   final String submitterInitials;
   final DateTime createdAt;
   final String description;
+  final String resolver;
 
   const Ticket({
     required this.id,
@@ -29,6 +30,7 @@ class Ticket {
     required this.submitterInitials,
     required this.createdAt,
     required this.description,
+    required this.resolver,
   });
 
   String get categoryLabel => categoryName;
@@ -44,6 +46,7 @@ class Ticket {
       case TicketStatus.inProgress:   return 'In Progress';
       case TicketStatus.resolved:     return 'Resolved';
       case TicketStatus.cancelled:    return 'Cancelled';
+      case TicketStatus.closed:       return 'Closed';
     }
   }
 
@@ -69,6 +72,7 @@ class Ticket {
       submitterInitials: json['submitterInitials'] ?? '',
       createdAt:         DateTime.tryParse(json['createdAt'] ?? '') ?? DateTime.now(),
       description:       json['description'] ?? '',
+      resolver:          json['resolver'] ?? '',
     );
   }
 }
@@ -98,7 +102,8 @@ class ActivityItem {
   }
 }
 
-enum ActivityType { submitted, moved, resolved, cancelled, assigned }
+// ── Added `closed` activity type ──────────────────────────────────────────────
+enum ActivityType { submitted, moved, resolved, cancelled, assigned, closed }
 
 
 // ─────────────────────────────────────────────
@@ -107,10 +112,11 @@ enum ActivityType { submitted, moved, resolved, cancelled, assigned }
 
 TicketStatus mapStatus(String status) {
   final s = status.toLowerCase().replaceAll(RegExp(r'[\s_\-]'), '');
-  if (s.startsWith('for'))  return TicketStatus.forAssessment;
-  if (s == 'inprogress')    return TicketStatus.inProgress;
-  if (s.contains('resolved')) return TicketStatus.resolved;
-  if (s.contains('cancel'))   return TicketStatus.cancelled;
+  if (s == 'closed')              return TicketStatus.closed;
+  if (s.startsWith('for'))        return TicketStatus.forAssessment;
+  if (s == 'inprogress')          return TicketStatus.inProgress;
+  if (s.contains('resolved'))     return TicketStatus.resolved;
+  if (s.contains('cancel'))       return TicketStatus.cancelled;
   return TicketStatus.forAssessment;
 }
 

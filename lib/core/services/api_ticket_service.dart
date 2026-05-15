@@ -6,6 +6,8 @@ import 'api_login.dart';
 class TicketService {
   static const String baseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://idiyanale-be.bakawan-ai.com') + '/api/user';
 
+
+
   // ─────────────────────────────────────────────
   // CREATE TICKET
   // ─────────────────────────────────────────────
@@ -55,6 +57,7 @@ class TicketService {
     }
   }
 
+
   // ─────────────────────────────────────────────
   // GET ALL TICKETS (FIXED)
   // ─────────────────────────────────────────────
@@ -66,6 +69,7 @@ class TicketService {
       }
 
       final uri = Uri.parse('$baseUrl/list/all/tickets');
+
 
       final res = await http.get(uri, headers: {
         'Authorization': 'Bearer $token',
@@ -91,6 +95,7 @@ class TicketService {
 
       return list.map<Map<String, dynamic>>((e) {
         final Map<String, dynamic> t = Map<String, dynamic>.from(e as Map);
+
         return {
           'ticket_id':          t['ticket_id']          ?? '',
           'subject':            t['subject']             ?? '',
@@ -103,12 +108,14 @@ class TicketService {
           'resolved_at':        t['resolved_at']         ?? '',
           'resolution_minutes': (t['resolution_minutes'] as num?)?.toDouble() ?? 0.0,
           'resolution_time':    t['resolution_time']?.toString() ?? '',
+          'resolver': t['resolver'] ?? '',
         };
       }).toList();
     } catch (e) {
       return [];
     }
   }
+
 
   // ─────────────────────────────────────────────
   // GET BY ID
@@ -166,6 +173,7 @@ class TicketService {
           'status':     e['status']     ?? '',
           'description':e['description']?? '',
           'created_at': e['created_at'] ?? '',
+          'resolver':   e['resolver']   ?? '',
         };
       }).toList();
     } catch (e) {

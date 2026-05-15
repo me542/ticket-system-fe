@@ -12,6 +12,8 @@ class ApiTicket {
           defaultValue: 'http://idiyanale-be.bakawan-ai.com') +
           '/api/user';
 
+
+
   /// Maps file extension → MIME type (must match backend allowedTypes exactly)
   static MediaType _mimeType(String? extension) {
     switch (extension?.toLowerCase()) {

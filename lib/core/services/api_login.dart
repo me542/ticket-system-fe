@@ -8,6 +8,7 @@ import 'api_user_data.dart';
 class ApiLogin {
   static const String loginUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://idiyanale-be.bakawan-ai.com') + '/api/user/login';
 
+
   static String? _token;
   static String? _username;
   static String? _role;
