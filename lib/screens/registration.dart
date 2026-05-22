@@ -1,7 +1,9 @@
 import 'dart:ui';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:ticket_system/screens/loginscreen.dart';
+import '../core/services/api_get_insti&positition.dart';
 import '../core/services/api_register.dart';
 
 
@@ -10,18 +12,17 @@ class RegisterScreen extends StatefulWidget {
   _RegisterScreenState createState() => _RegisterScreenState();
 }
 
-
 class _RegisterScreenState extends State<RegisterScreen> {
-  final _nameController        = TextEditingController();
-  final _lastNameController    = TextEditingController();
-  final _emailController       = TextEditingController();
-  final _passwordController    = TextEditingController();
+  final _nameController = TextEditingController();
+  final _lastNameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  final _usernameController    = TextEditingController();
-  final _positionController    = TextEditingController();
+  final _usernameController = TextEditingController();
+  final _positionController = TextEditingController();
   final _institutionController = TextEditingController();
 
-  bool _obscurePassword        = true;
+  bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
 
   String? firstNameError;
@@ -33,108 +34,143 @@ class _RegisterScreenState extends State<RegisterScreen> {
   String? institutionError;
   String? usernameError;
 
-  // ================= POSITION LIST =================
-  static const List<String> _positions = [
-    'Analytics Engineer - OIC',
-    'Application Analyst 2',
-    'Application Developer',
-    'Application Developer 1 - OIC',
-    'Business Intelligence Analyst - OIC',
-    'Business Intelligence Lead OIC',
-    'Business Relationship Manager - OIC',
-    'Chief Data Officer - OIC',
-    'Chief Data Scientist - OIC',
-    'Chief Operating Officer - OIC',
-    'Cloud Engineer - OIC',
-    'Cloud Operations Administrator - OIC',
-    'Cloud Operations Support',
-    'Compliance',
-    'Compliance Officer',
-    'Data Scientist OIC',
-    'DDFA- OIC',
-    'Developer',
-    'Developer 1',
-    'Developer 1 - OIC',
-    'Developer 2 - OIC',
-    'Finance Assistant',
-    'Information Security Officer - OIC',
-    'Junior Analytics Developer',
-    'Junior Analytics Engineer',
-    'Junior Data Engineer',
-    'Machine Learning Engineer OIC',
-    'Product Specialist',
-    'Product Specialist 1',
-    'Product Specialist 1 - OIC',
-    'Product Specialist Head OIC',
-    'Project Manager - OIC',
-    'Quality Assurance Analyst',
-    'Quality Assurance Analyst 1',
-    'Quality Assurance Manager',
-    'Report Specialist I',
-    'Report Specialist II',
-    'Report Specialist II - OIC',
-    'Report Specialist III',
-    'Report Specialist III - OIC',
-    'Risk Management Officer - OIC',
-    'Senior Finance Officer OIC',
-  ];
+  // ─────────────────────────────────────────────
+  // API DATA
+  // ─────────────────────────────────────────────
+  List<String> _positions = [];
+  List<String> _institutions = [];
 
-  // ================= INSTITUTION LIST =================
-  static const List<String> _institutions = [
-    'MHI Healthcare Inc.',
-    'CMIT',
-    'FDSAP',
-    'Bakawan Data Analytics',
-    'EMPC',
-    'CARD Bank',
-    'CARD SME Bank',
-    'CARD RBI',
-    'CARD Inc.',
-    'Padayon Microfinance',
-    'Astro',
-    'Laguna Fresh',
-    'CARD MRI International Partnership Project Institution',
-    'CARD MRI Holdings Company',
-    'CARD MBA',
-    'Bente Production',
-    'Hijos Tours',
-    'CARD Publishing House',
-    'CARD Indogrosir Inc.',
-    'LIKHA NI INAY',
-    'OTTO KONEK',
-    'CARD Pioneer Microinsurance Inc.',
-    'CARD Mutually Reinforcing Institutions',
-    'CARD Engagement Services Inc.',
-    'CARD MRI Development Institute Inc.',
-    'CARD-PCPD',
-    'BotiCARD Pharmacy',
-    'CaMIA (CARD MRI Insurance Agency)',
-    'CARD MBA Pioneer',
-  ];
+  bool _isLoadingData = true;
+  String? _loadError;
 
-  // ================= PASSWORD RULES =================
-  bool get _hasMinLength   => _passwordController.text.length >= 8;
-  bool get _hasUppercase   => _passwordController.text.contains(RegExp(r'[A-Z]'));
-  bool get _hasLowercase   => _passwordController.text.contains(RegExp(r'[a-z]'));
-  bool get _hasNumber      => _passwordController.text.contains(RegExp(r'[0-9]'));
-  bool get _hasSpecialChar => _passwordController.text.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\\/`~;]'));
+  @override
+  void initState() {
+    super.initState();
+    _loadDropdownData();
+  }
+
+  Future<void> _loadDropdownData() async {
+    setState(() {
+      _isLoadingData = true;
+      _loadError = null;
+    });
+
+    try {
+      // ✅ Uses new public API — no token required
+      final results = await Future.wait([
+        ApiGetInstiAndPosition.getPositions(),
+        ApiGetInstiAndPosition.getInstitutions(),
+      ]);
+
+      final positionsData = results[0];
+      final institutionsData = results[1];
+
+      setState(() {
+        _positions = positionsData
+            .map((e) => e['name']?.toString() ?? '')
+            .where((name) => name.isNotEmpty)
+            .toList();
+
+        _institutions = institutionsData
+            .map((e) => e['name']?.toString() ?? '')
+            .where((name) => name.isNotEmpty)
+            .toList();
+
+        _isLoadingData = false;
+      });
+    } catch (e, stack) {
+      debugPrint('❌ _loadDropdownData error: $e');
+      debugPrint(stack.toString());
+
+      setState(() {
+        _isLoadingData = false;
+        _loadError = e.toString();
+      });
+    }
+  }
+
+  // ─────────────────────────────────────────────
+  // PASSWORD RULES
+  // ─────────────────────────────────────────────
+  bool get _hasMinLength => _passwordController.text.length >= 8;
+  bool get _hasUppercase => _passwordController.text.contains(RegExp(r'[A-Z]'));
+  bool get _hasLowercase => _passwordController.text.contains(RegExp(r'[a-z]'));
+  bool get _hasNumber => _passwordController.text.contains(RegExp(r'[0-9]'));
+  bool get _hasSpecialChar => _passwordController.text
+      .contains(RegExp(r'[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\/`~;]'));
 
   String? _validatePassword(String password) {
-    if (password.isEmpty) return "Password is required";
-    if (!_hasMinLength)   return "Must be at least 8 characters";
-    if (!_hasUppercase)   return "Must contain an uppercase letter";
-    if (!_hasLowercase)   return "Must contain a lowercase letter";
-    if (!_hasNumber)      return "Must contain a number";
-    if (!_hasSpecialChar) return "Must contain a special character";
+    if (password.isEmpty) return 'Password is required';
+    if (!_hasMinLength) return 'Must be at least 8 characters';
+    if (!_hasUppercase) return 'Must contain an uppercase letter';
+    if (!_hasLowercase) return 'Must contain a lowercase letter';
+    if (!_hasNumber) return 'Must contain a number';
+    if (!_hasSpecialChar) return 'Must contain a special character';
     return null;
   }
 
-  // ================= FORM =================
+  // ─────────────────────────────────────────────
+  // FORM
+  // ─────────────────────────────────────────────
   Widget _buildForm() {
+    if (_isLoadingData) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 12),
+              Text(
+                'Loading positions & institutions…',
+                style: TextStyle(color: Color(0xFF6B7280)),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_loadError != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.cloud_off, size: 48, color: Colors.red),
+              const SizedBox(height: 12),
+              const Text(
+                'Could not load positions & institutions.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                _loadError!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Color(0xFF6B7280), fontSize: 12),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: _loadDropdownData,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Retry'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF268A15),
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Row 1: First Name | Last Name
         Row(
           children: [
             Expanded(child: _firstNameField()),
@@ -145,7 +181,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
         const SizedBox(height: 15),
 
-        // Row 2: email | username
         Row(
           children: [
             Expanded(child: _emailField()),
@@ -156,7 +191,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
         const SizedBox(height: 15),
 
-        // Row 3: Position | Institution
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -169,7 +203,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
         const SizedBox(height: 15),
 
         _passwordField(),
+
         const SizedBox(height: 15),
+
         _confirmPasswordField(),
 
         const SizedBox(height: 25),
@@ -186,36 +222,30 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
-            child: const Text("Register"),
+            child: const Text('Register'),
           ),
         ),
       ],
     );
   }
 
-  // ================= USERNAME FIELD =================
+  // ─────────────────────────────────────────────
+  // USERNAME
+  // ─────────────────────────────────────────────
   Widget _usernameField() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          "Username",
-          style: TextStyle(
-            color: Color(0xFF111827),
-            fontWeight: FontWeight.w500,
-          ),
+          'Username',
+          style: TextStyle(color: Color(0xFF111827), fontWeight: FontWeight.w500),
         ),
         const SizedBox(height: 5),
         TextField(
           controller: _usernameController,
           enabled: false,
-          style: const TextStyle(
-            color: Color(0xFF111827),
-          ),
-          decoration: _inputDecoration(
-            "Auto-generated username",
-            null,
-          ).copyWith(
+          style: const TextStyle(color: Color(0xFF111827)),
+          decoration: _inputDecoration('Auto-generated username', null).copyWith(
             disabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: const BorderSide(color: Colors.grey),
@@ -226,141 +256,113 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  // ================= FIRST NAME FIELD =================
+  // ─────────────────────────────────────────────
+  // FIRST NAME
+  // ─────────────────────────────────────────────
   Widget _firstNameField() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          "First Name",
-          style: TextStyle(
-            color: Color(0xFF374151),
-            fontWeight: FontWeight.w500,
-          ),
+          'First Name',
+          style: TextStyle(color: Color(0xFF374151), fontWeight: FontWeight.w500),
         ),
         const SizedBox(height: 5),
         TextField(
           controller: _nameController,
           style: const TextStyle(color: Color(0xFF111827)),
           onChanged: (_) {
-            if (firstNameError != null) {
-              setState(() => firstNameError = null);
-            }
+            if (firstNameError != null) setState(() => firstNameError = null);
           },
-          decoration: _inputDecoration(
-            "First Name",
-            firstNameError,
-          ),
+          decoration: _inputDecoration('First Name', firstNameError),
         ),
       ],
     );
   }
 
-// ================= LAST NAME FIELD =================
+  // ─────────────────────────────────────────────
+  // LAST NAME
+  // ─────────────────────────────────────────────
   Widget _lastNameField() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          "Last Name",
-          style: TextStyle(
-            color: Color(0xFF374151),
-            fontWeight: FontWeight.w500,
-          ),
+          'Last Name',
+          style: TextStyle(color: Color(0xFF374151), fontWeight: FontWeight.w500),
         ),
         const SizedBox(height: 5),
         TextField(
           controller: _lastNameController,
           style: const TextStyle(color: Color(0xFF111827)),
           onChanged: (_) {
-            if (lastNameError != null) {
-              setState(() => lastNameError = null);
-            }
+            if (lastNameError != null) setState(() => lastNameError = null);
           },
-          decoration: _inputDecoration(
-            "Last Name",
-            lastNameError,
-          ),
+          decoration: _inputDecoration('Last Name', lastNameError),
         ),
       ],
     );
   }
 
-  // ================= EMAIL FIELD =================
+  // ─────────────────────────────────────────────
+  // EMAIL
+  // ─────────────────────────────────────────────
   Widget _emailField() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          "Email",
-          style: TextStyle(
-            color: Color(0xFF374151),
-            fontWeight: FontWeight.w500,
-          ),
+          'Email',
+          style: TextStyle(color: Color(0xFF374151), fontWeight: FontWeight.w500),
         ),
         const SizedBox(height: 5),
         TextField(
           controller: _emailController,
           style: const TextStyle(color: Color(0xFF111827)),
           onChanged: (value) {
-            // Remove email error
-            if (emailError != null) {
-              setState(() => emailError = null);
-            }
-
-            // Auto generate username from email
-            if (value.contains('@')) {
-              final username = value.split('@').first;
-
-              setState(() {
-                _usernameController.text = username;
-              });
-            } else {
-              setState(() {
-                _usernameController.text = value;
-              });
-            }
+            if (emailError != null) setState(() => emailError = null);
+            setState(() {
+              _usernameController.text =
+              value.contains('@') ? value.split('@').first : value;
+            });
           },
-          decoration: _inputDecoration("Email", emailError),
+          decoration: _inputDecoration('Email', emailError),
         ),
       ],
     );
   }
 
-  // ================= POSITION (AUTOCOMPLETE) =================
+  // ─────────────────────────────────────────────
+  // POSITION
+  // ─────────────────────────────────────────────
   Widget _positionField() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          "Position",
-          style: TextStyle(
-            color: Color(0xFF374151),
-            fontWeight: FontWeight.w500,
-          ),
+          'Position',
+          style: TextStyle(color: Color(0xFF374151), fontWeight: FontWeight.w500),
         ),
         const SizedBox(height: 5),
-
         Autocomplete<String>(
-          optionsBuilder: (TextEditingValue textEditingValue) {
-            if (textEditingValue.text.isEmpty) return _positions;
-            return _positions.where((pos) =>
-                pos.toLowerCase().contains(
-                    textEditingValue.text.toLowerCase()));
+          optionsBuilder: (TextEditingValue tv) {
+            if (tv.text.isEmpty) return _positions;
+            return _positions.where(
+                  (p) => p.toLowerCase().contains(tv.text.toLowerCase()),
+            );
           },
-          onSelected: (String selection) {
+          onSelected: (String sel) {
             setState(() {
-              _positionController.text = selection;
+              _positionController.text = sel;
               positionError = null;
             });
           },
-          fieldViewBuilder: (context, fieldController, focusNode, onSubmitted) {
-            if (_positionController.text.isNotEmpty &&
-                fieldController.text.isEmpty) {
-              fieldController.text = _positionController.text;
+          fieldViewBuilder: (ctx, fieldCtrl, focusNode, onSubmitted) {
+            if (_positionController.text.isNotEmpty && fieldCtrl.text.isEmpty) {
+              fieldCtrl.text = _positionController.text;
             }
             return TextField(
-              controller: fieldController,
+              controller: fieldCtrl,
               focusNode: focusNode,
               style: const TextStyle(color: Color(0xFF111827)),
               onChanged: (val) {
@@ -368,7 +370,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 if (positionError != null) setState(() => positionError = null);
               },
               decoration: _inputDecoration(
-                "Search position…",
+                'Search position…',
                 positionError,
                 suffix: const Padding(
                   padding: EdgeInsets.only(right: 8),
@@ -377,10 +379,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
             );
           },
-          optionsViewBuilder: (context, onSelected, options) =>
-              _optionsView(options, onSelected),
+          optionsViewBuilder: (ctx, onSel, opts) => _optionsView(opts, onSel),
         ),
-
         if (positionError != null)
           Padding(
             padding: const EdgeInsets.only(top: 6, left: 12),
@@ -393,48 +393,48 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  // ================= INSTITUTION (AUTOCOMPLETE) =================
+  // ─────────────────────────────────────────────
+  // INSTITUTION
+  // ─────────────────────────────────────────────
   Widget _institutionField() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          "Institution",
-          style: TextStyle(
-            color: Color(0xFF374151),
-            fontWeight: FontWeight.w500,
-          ),
+          'Institution',
+          style: TextStyle(color: Color(0xFF374151), fontWeight: FontWeight.w500),
         ),
         const SizedBox(height: 5),
-
         Autocomplete<String>(
-          optionsBuilder: (TextEditingValue textEditingValue) {
-            if (textEditingValue.text.isEmpty) return _institutions;
-            return _institutions.where((inst) =>
-                inst.toLowerCase().contains(
-                    textEditingValue.text.toLowerCase()));
+          optionsBuilder: (TextEditingValue tv) {
+            if (tv.text.isEmpty) return _institutions;
+            return _institutions.where(
+                  (i) => i.toLowerCase().contains(tv.text.toLowerCase()),
+            );
           },
-          onSelected: (String selection) {
+          onSelected: (String sel) {
             setState(() {
-              _institutionController.text = selection;
+              _institutionController.text = sel;
               institutionError = null;
             });
           },
-          fieldViewBuilder: (context, fieldController, focusNode, onSubmitted) {
+          fieldViewBuilder: (ctx, fieldCtrl, focusNode, onSubmitted) {
             if (_institutionController.text.isNotEmpty &&
-                fieldController.text.isEmpty) {
-              fieldController.text = _institutionController.text;
+                fieldCtrl.text.isEmpty) {
+              fieldCtrl.text = _institutionController.text;
             }
             return TextField(
-              controller: fieldController,
+              controller: fieldCtrl,
               focusNode: focusNode,
               style: const TextStyle(color: Color(0xFF111827)),
               onChanged: (val) {
                 _institutionController.text = val;
-                if (institutionError != null) setState(() => institutionError = null);
+                if (institutionError != null) {
+                  setState(() => institutionError = null);
+                }
               },
               decoration: _inputDecoration(
-                "Search institution…",
+                'Search institution…',
                 institutionError,
                 suffix: const Padding(
                   padding: EdgeInsets.only(right: 8),
@@ -443,10 +443,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
             );
           },
-          optionsViewBuilder: (context, onSelected, options) =>
-              _optionsView(options, onSelected),
+          optionsViewBuilder: (ctx, onSel, opts) => _optionsView(opts, onSel),
         ),
-
         if (institutionError != null)
           Padding(
             padding: const EdgeInsets.only(top: 6, left: 12),
@@ -459,7 +457,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  // ================= SHARED OPTIONS VIEW =================
+  // ─────────────────────────────────────────────
+  // OPTIONS VIEW
+  // ─────────────────────────────────────────────
   Widget _optionsView(
       Iterable<String> options,
       void Function(String) onSelected,
@@ -482,7 +482,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 onTap: () => onSelected(option),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 12),
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   child: Text(
                     option,
                     style: const TextStyle(
@@ -499,7 +501,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  // ================= PASSWORD =================
+  // ─────────────────────────────────────────────
+  // PASSWORD FIELD
+  // ─────────────────────────────────────────────
   Widget _passwordField() {
     final showRules = _passwordController.text.isNotEmpty;
 
@@ -507,15 +511,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          "Password",
-          style: TextStyle(
-            color: Color(0xFF374151),
-            fontWeight: FontWeight.w500,
-          ),
+          'Password',
+          style: TextStyle(color: Color(0xFF374151), fontWeight: FontWeight.w500),
         ),
-
         const SizedBox(height: 5),
-
         TextField(
           controller: _passwordController,
           obscureText: _obscurePassword,
@@ -524,7 +523,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           style: const TextStyle(color: Color(0xFF111827)),
           onChanged: (_) => setState(() {}),
           decoration: _inputDecoration(
-            "Password",
+            'Password',
             passwordError,
             suffix: IconButton(
               onPressed: () =>
@@ -536,27 +535,28 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
           ),
         ),
-
         const SizedBox(height: 8),
-
-        _passwordRule("At least 8 characters",   _hasMinLength,   showRules),
-        _passwordRule("Uppercase letter (A–Z)",   _hasUppercase,   showRules),
-        _passwordRule("Lowercase letter (a–z)",   _hasLowercase,   showRules),
-        _passwordRule("Number (0–9)",              _hasNumber,      showRules),
-        _passwordRule("Special character (!@#…)", _hasSpecialChar, showRules),
+        _passwordRule('At least 8 characters', _hasMinLength, showRules),
+        _passwordRule('Uppercase letter (A–Z)', _hasUppercase, showRules),
+        _passwordRule('Lowercase letter (a–z)', _hasLowercase, showRules),
+        _passwordRule('Number (0–9)', _hasNumber, showRules),
+        _passwordRule('Special character (!@#…)', _hasSpecialChar, showRules),
       ],
     );
   }
 
-  // ================= PASSWORD RULE ROW =================
   Widget _passwordRule(String label, bool met, bool showRules) {
     final color = !showRules
         ? const Color(0xFF9CA3AF)
-        : met ? const Color(0xFF268A15) : Colors.red;
+        : met
+        ? const Color(0xFF268A15)
+        : Colors.red;
 
     final icon = !showRules
         ? Icons.radio_button_unchecked
-        : met ? Icons.check_circle : Icons.cancel;
+        : met
+        ? Icons.check_circle
+        : Icons.cancel;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 3),
@@ -564,33 +564,30 @@ class _RegisterScreenState extends State<RegisterScreen> {
         children: [
           Icon(icon, size: 14, color: color),
           const SizedBox(width: 6),
-          Text(label,
-              style: TextStyle(fontSize: 12, color: color, height: 1.4)),
+          Text(label, style: TextStyle(fontSize: 12, color: color, height: 1.4)),
         ],
       ),
     );
   }
 
-  // ================= CONFIRM PASSWORD =================
+  // ─────────────────────────────────────────────
+  // CONFIRM PASSWORD
+  // ─────────────────────────────────────────────
   Widget _confirmPasswordField() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          "Confirm Password",
-          style: TextStyle(
-            color: Color(0xFF374151),
-            fontWeight: FontWeight.w500,
-          ),
+          'Confirm Password',
+          style: TextStyle(color: Color(0xFF374151), fontWeight: FontWeight.w500),
         ),
         const SizedBox(height: 5),
-
         TextField(
           controller: _confirmPasswordController,
           obscureText: _obscureConfirmPassword,
           style: const TextStyle(color: Color(0xFF111827)),
           decoration: _inputDecoration(
-            "Confirm Password",
+            'Confirm Password',
             confirmPasswordError,
             suffix: GestureDetector(
               onTap: () => setState(
@@ -609,11 +606,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  // ================= DECORATION =================
-  InputDecoration _inputDecoration(String hint, String? error,
-      {Widget? suffix}) {
+  // ─────────────────────────────────────────────
+  // INPUT DECORATION
+  // ─────────────────────────────────────────────
+  InputDecoration _inputDecoration(
+      String hint,
+      String? error, {
+        Widget? suffix,
+      }) {
     final isError = error != null;
-
     return InputDecoration(
       hintText: hint,
       hintStyle: const TextStyle(color: Color(0xFF9CA3AF)),
@@ -645,41 +646,33 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  bool _isValidEmail(String email) {
-    final emailRegex = RegExp(r'^[\w\.-]+@[\w\.-]+\.\w+$');
-    return emailRegex.hasMatch(email);
-  }
+  bool _isValidEmail(String email) =>
+      RegExp(r'^[\w\.-]+@[\w\.-]+\.\w+$').hasMatch(email);
 
-  // ================= REGISTER HANDLER =================
+  // ─────────────────────────────────────────────
+  // REGISTER
+  // ─────────────────────────────────────────────
   void _handleRegister() async {
     setState(() {
-      firstNameError =
-      _nameController.text.isEmpty ? "First name is required" : null;
-      lastNameError =
-      _lastNameController.text.isEmpty ? "Last name is required" : null;
+      firstNameError = _nameController.text.isEmpty ? 'First name is required' : null;
+      lastNameError = _lastNameController.text.isEmpty ? 'Last name is required' : null;
 
       if (_emailController.text.isEmpty) {
-        emailError = "Email is required";
+        emailError = 'Email is required';
       } else if (!_isValidEmail(_emailController.text)) {
-        emailError = "Enter a valid email";
+        emailError = 'Enter a valid email';
       } else {
         emailError = null;
       }
 
-      positionError = _positionController.text.isEmpty
-          ? "Please select a position"
-          : null;
-
-      institutionError = _institutionController.text.isEmpty
-          ? "Please select an institution"
-          : null;
-
+      positionError = _positionController.text.isEmpty ? 'Please select a position' : null;
+      institutionError = _institutionController.text.isEmpty ? 'Please select an institution' : null;
       passwordError = _validatePassword(_passwordController.text);
 
       if (_confirmPasswordController.text.isEmpty) {
-        confirmPasswordError = "Please confirm your password";
+        confirmPasswordError = 'Please confirm your password';
       } else if (_confirmPasswordController.text != _passwordController.text) {
-        confirmPasswordError = "Passwords do not match";
+        confirmPasswordError = 'Passwords do not match';
       } else {
         confirmPasswordError = null;
       }
@@ -694,142 +687,139 @@ class _RegisterScreenState extends State<RegisterScreen> {
         confirmPasswordError == null) {
       try {
         await ApiRegistration.registerUser(
-          username:    _usernameController.text,
-          email:       _emailController.text,
-          firstName:   _nameController.text,
-          lastName:    _lastNameController.text,
-          position:    _positionController.text,
+          username: _usernameController.text,
+          email: _emailController.text,
+          firstName: _nameController.text,
+          lastName: _lastNameController.text,
+          position: _positionController.text,
           institution: _institutionController.text,
-          password:    _passwordController.text,
+          password: _passwordController.text,
         );
 
         if (!mounted) return;
         _showSuccessDialog();
       } catch (e) {
         if (!mounted) return;
-        final message = e.toString();
-        if (message.toLowerCase().contains("exist")) {
-          _showErrorDialog("User already exists");
+        final message = e.toString().toLowerCase();
+        if (message.contains('exist')) {
+          _showErrorDialog('User already exists');
         } else {
-          _showErrorDialog("Registration failed. Please try again.");
+          _showErrorDialog('Registration failed. Please try again.');
         }
       }
     }
   }
 
-  // ================= SUCCESS DIALOG =================
+  // ─────────────────────────────────────────────
+  // SUCCESS DIALOG
+  // ─────────────────────────────────────────────
   void _showSuccessDialog() {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (dialogContext) {
-        return Dialog(
-          shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 400),
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.check_circle,
-                      color: Color(0xFF268A15), size: 60),
-                  const SizedBox(height: 15),
-                  const Text(
-                    "Registration Successful",
-                    style:
-                    TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 10),
-                  const Text(
-                    "Your account has been created successfully. Wait for the Admin to approve your registration",
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 20),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.of(dialogContext).pop();
-                        Navigator.pushAndRemoveUntil(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) => LoginScreen()),
-                              (route) => false,
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        foregroundColor: Colors.white,
-                      ),
-                      child: const Text("Go to Login"),
+      builder: (dialogContext) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 400),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.check_circle, color: Color(0xFF268A15), size: 60),
+                const SizedBox(height: 15),
+                const Text(
+                  'Registration Successful',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'Your account has been created successfully. Wait for the Admin to approve your registration.',
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.of(dialogContext).pop();
+                      Navigator.pushAndRemoveUntil(
+                        context,
+                        MaterialPageRoute(builder: (_) => LoginScreen()),
+                            (route) => false,
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
                     ),
+                    child: const Text('Go to Login'),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 
-  // ================= ERROR DIALOG =================
+  // ─────────────────────────────────────────────
+  // ERROR DIALOG
+  // ─────────────────────────────────────────────
   void _showErrorDialog(String message) {
     showDialog(
       context: context,
-      builder: (context) {
-        return Dialog(
-          shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 300),
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.error, color: Colors.red, size: 60),
-                  const SizedBox(height: 15),
-                  const Text(
-                    "Registration Failed",
-                    style:
-                    TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(message, textAlign: TextAlign.center),
-                  const SizedBox(height: 20),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8)),
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 300),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.error, color: Colors.red, size: 60),
+                const SizedBox(height: 15),
+                const Text(
+                  'Registration Failed',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 10),
+                Text(message, textAlign: TextAlign.center),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Text("OK"),
                     ),
+                    child: const Text('OK'),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 
-  // ================= BUILD =================
+  // ─────────────────────────────────────────────
+  // BUILD
+  // ─────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6F9),
       body: LayoutBuilder(
         builder: (context, constraints) {
-          bool isMobile = constraints.maxWidth < 900;
+          final isMobile = constraints.maxWidth < 900;
 
           return Row(
             children: [
@@ -850,11 +840,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           ),
                           const SizedBox(height: 20),
                           ShaderMask(
-                            shaderCallback: (bounds) => const LinearGradient(
-                              colors: [Color(0xFFDAB76B), Color(0xFFA0813D)],
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                            ).createShader(bounds),
+                            shaderCallback: (bounds) {
+                              return const LinearGradient(
+                                colors: [Color(0xFFDAB76B), Color(0xFFA0813D)],
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                              ).createShader(bounds);
+                            },
                             child: const Text(
                               'IDIYANALE',
                               style: TextStyle(
@@ -867,10 +859,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           const SizedBox(height: 10),
                           const Text(
                             'BAKAWAN Ticketing System',
-                            style: TextStyle(
-                              color: Color(0xFF6B7280),
-                              fontSize: 16,
-                            ),
+                            style: TextStyle(color: Color(0xFF6B7280), fontSize: 16),
                           ),
                         ],
                       ),
@@ -891,8 +880,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(16),
-                            border:
-                            Border.all(color: const Color(0xFFE5E7EB)),
+                            border: Border.all(color: const Color(0xFFE5E7EB)),
                             boxShadow: [
                               BoxShadow(
                                 color: Colors.black.withOpacity(0.05),
@@ -907,8 +895,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               Row(
                                 children: [
                                   IconButton(
-                                    onPressed: () =>
-                                        Navigator.pop(context),
+                                    onPressed: () => Navigator.pop(context),
                                     icon: const Icon(
                                       Icons.arrow_back,
                                       color: Color(0xFF111827),
@@ -916,7 +903,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                   ),
                                   const SizedBox(width: 5),
                                   const Text(
-                                    "Create Account",
+                                    'Create Account',
                                     style: TextStyle(
                                       color: Color(0xFF111827),
                                       fontSize: 22,

@@ -166,25 +166,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
                             const SizedBox(height: 8),
 
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppTheme.sidebarActive,
-                                borderRadius:
-                                BorderRadius.circular(20),
-                              ),
-                              child: Text(
-                                _role.toUpperCase(),
-                                style: const TextStyle(
-                                  color: AppTheme.accent,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
+                            // Container(
+                            //   padding: const EdgeInsets.symmetric(
+                            //     horizontal: 10,
+                            //     vertical: 4,
+                            //   ),
+                            //   decoration: BoxDecoration(
+                            //     color: AppTheme.sidebarActive,
+                            //     borderRadius:
+                            //     BorderRadius.circular(20),
+                            //   ),
+                            //   // child: Text(
+                            //   //   _role.toUpperCase(),
+                            //   //   style: const TextStyle(
+                            //   //     color: AppTheme.accent,
+                            //   //     fontSize: 11,
+                            //   //     fontWeight: FontWeight.bold,
+                            //   //   ),
+                            //   // ),
+                            // ),
                           ],
                         ),
                       ),

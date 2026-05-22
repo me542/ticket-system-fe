@@ -4,8 +4,10 @@ import 'package:file_picker/file_picker.dart';
 import 'api_login.dart';
 
 class TicketService {
-  static const String baseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://idiyanale-be.bakawan-ai.com') + '/api/user';
+  //static const String baseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://localhost:8080') + '/api/user';
 
+  // Prod
+  static const String baseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://idiyanale-be.bakawan-ai.com') + '/api/user';
 
 
   // ─────────────────────────────────────────────

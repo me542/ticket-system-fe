@@ -44,8 +44,14 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
   List<String> _endorsers = [];
 
   // ── file ──────────────────────────────────────────────────────────────────
-  PlatformFile? _file;
   Uint8List? _fileBytes;
+
+  // ── file ──────────────────────────────────────────────────────────────────
+  List<PlatformFile> _files = [];
+  int _totalFileSize = 0;
+
+// 10 MB limit
+  static const int _maxTotalSize = 10 * 1024 * 1024;
 
   // ── submit state ──────────────────────────────────────────────────────────
   bool _submitting = false;
@@ -227,21 +233,32 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
   // ── file picker ───────────────────────────────────────────────────────────
   Future<void> _pickFile() async {
     final result = await FilePicker.platform.pickFiles(
+      allowMultiple: true,
       type: FileType.custom,
-      allowedExtensions: ['jpg', 'jpeg', 'png', 'pdf', 'docs', 'xlsx'],
+      allowedExtensions: ['jpg', 'jpeg', 'png', 'pdf', 'doc', 'docx', 'xls', 'xlsx'],
       withData: true,
     );
-    if (result != null && result.files.isNotEmpty) {
-      final f = result.files.first;
-      if (f.size > 25 * 1024 * 1024) {
-        _snack('File too large. Max 25 MB', color: Colors.redAccent);
-        return;
-      }
-      setState(() {
-        _file = f;
-        _fileBytes = f.bytes;
-      });
+
+    if (result == null || result.files.isEmpty) return;
+
+    int incomingSize = result.files.fold(
+      0,
+          (sum, f) => sum + f.size,
+    );
+
+    // check total size
+    if ((_totalFileSize + incomingSize) > _maxTotalSize) {
+      _snack(
+        'Total attachment size exceeds 10 MB',
+        color: Colors.redAccent,
+      );
+      return;
     }
+
+    setState(() {
+      _files.addAll(result.files);
+      _totalFileSize += incomingSize;
+    });
   }
 
   // ── submit confirmation ────────────────────────────────────────────────────
@@ -344,7 +361,7 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
         institution: _organization,
         priority: _priority,
         description: _descCtrl.text.trim(),
-        file: _file,
+        files: _files,
         endorser: _endorser ?? '',
       );
       if (ticketCode != null) {
@@ -376,8 +393,8 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
       _organization = 'Bakawan Data Analytics';
       _category = firstCat;
       _subCategory = firstSub?['name'];
-      _file = null;
-      _fileBytes = null;
+      _files.clear();
+      _totalFileSize = 0;
       _descManuallyEdited = false;
       if (_endorsers.isNotEmpty) _endorser = _endorsers.first;
     });
@@ -737,19 +754,19 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
                     children: [
                       _sectionLabel('ATTACHMENT'),
                       const SizedBox(height: 10),
-                      if (_file != null && _fileBytes != null)
+                      if (_files.isNotEmpty)
                         Padding(
                           padding: const EdgeInsets.only(bottom: 12),
-                          child: _buildFilePreview(),
+                          child: _buildFilesPreview(),
                         ),
                       SizedBox(
-                        height: _file == null ? 200 : 120,
+                        height: _files.isEmpty ? 200 : 120,
                         child: Center(
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               const Text(
-                                'Max file size: 25MB',
+                                'Max total attachment size: 10MB',
                                 style: TextStyle(
                                     color: AppTheme.textMuted, fontSize: 12),
                               ),
@@ -790,75 +807,142 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
   }
 
   // ── file preview ──────────────────────────────────────────────────────────
-  Widget _buildFilePreview() {
-    final isImage =
-    ['jpg', 'jpeg', 'png'].contains(_file!.extension);
-    return Container(
-      decoration: BoxDecoration(
-        color: AppTheme.sidebarBg,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppTheme.border),
-      ),
-      child: Column(
-        children: [
-          if (isImage && _fileBytes != null)
-            ClipRRect(
-              borderRadius:
-              const BorderRadius.vertical(top: Radius.circular(8)),
-              child: Image.memory(_fileBytes!,
-                  width: double.infinity, height: 140, fit: BoxFit.cover),
+  Widget _buildFilesPreview() {
+    return Column(
+      children: [
+        ..._files.asMap().entries.map((entry) {
+          final index = entry.key;
+          final file = entry.value;
+
+          final isImage = ['jpg', 'jpeg', 'png']
+              .contains(file.extension?.toLowerCase());
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            decoration: BoxDecoration(
+              color: AppTheme.sidebarBg,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppTheme.border),
             ),
-          Padding(
-            padding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Row(children: [
-              Icon(
-                isImage
-                    ? Icons.image_outlined
-                    : Icons.insert_drive_file_outlined,
-                color: isImage ? Colors.blue : Colors.orange,
-                size: 18,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  _file!.name,
-                  style: const TextStyle(
-                      color: AppTheme.textPrimary, fontSize: 12),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              GestureDetector(
-                onTap: () => setState(() {
-                  _file = null;
-                  _fileBytes = null;
-                }),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: Colors.redAccent.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(
-                        color: Colors.redAccent.withOpacity(0.5)),
+            child: Column(
+              children: [
+                if (isImage && file.bytes != null)
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(8),
+                    ),
+                    child: Image.memory(
+                      file.bytes!,
+                      width: double.infinity,
+                      height: 140,
+                      fit: BoxFit.cover,
+                    ),
                   ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
+
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  child: Row(
                     children: [
-                      Icon(Icons.delete_outline,
-                          size: 12, color: Colors.redAccent),
-                      SizedBox(width: 4),
-                      Text('Remove',
-                          style: TextStyle(
-                              fontSize: 11, color: Colors.redAccent)),
+                      Icon(
+                        isImage
+                            ? Icons.image_outlined
+                            : Icons.insert_drive_file_outlined,
+                        color: isImage ? Colors.blue : Colors.orange,
+                        size: 18,
+                      ),
+
+                      const SizedBox(width: 10),
+
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              file.name,
+                              style: const TextStyle(
+                                color: AppTheme.textPrimary,
+                                fontSize: 12,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+
+                            const SizedBox(height: 2),
+
+                            Text(
+                              '${(file.size / 1024).toStringAsFixed(1)} KB',
+                              style: const TextStyle(
+                                color: AppTheme.textMuted,
+                                fontSize: 10,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _totalFileSize -= file.size;
+                            _files.removeAt(index);
+                          });
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.redAccent.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: Colors.redAccent.withOpacity(0.5),
+                            ),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.delete_outline,
+                                size: 12,
+                                color: Colors.redAccent,
+                              ),
+                              SizedBox(width: 4),
+                              Text(
+                                'Remove',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.redAccent,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
+              ],
+            ),
+          );
+        }),
+
+        Align(
+          alignment: Alignment.centerRight,
+          child: Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              'Total: ${(_totalFileSize / (1024 * 1024)).toStringAsFixed(2)} MB / 10 MB',
+              style: const TextStyle(
+                color: AppTheme.textMuted,
+                fontSize: 11,
               ),
-            ]),
+            ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 

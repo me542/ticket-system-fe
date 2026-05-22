@@ -5,6 +5,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiGetUser {
 
+  //static const String baseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://localhost:8080') + '/api/user/list/all/users';
+
+  // Prod
   static const String baseUrl =
       String.fromEnvironment(
         'API_BASE_URL',

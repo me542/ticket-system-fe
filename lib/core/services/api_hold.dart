@@ -1,9 +1,14 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 class ApiHoldTicket {
+  // static String get _baseUrl =>
+  //     String.fromEnvironment(
+  //       'API_BASE_URL',
+  //       defaultValue: 'http://localhost:8080',
+  //     );
+
+  // Prod
   static String get _baseUrl => String.fromEnvironment('API_BASE_URL', defaultValue: 'http://idiyanale-be.bakawan-ai.com');
-
-
 
   /// Holds a ticket by ID. Requires a valid JWT [token].
   static Future<Map<String, dynamic>> holdTicket(String token, String ticketId) async {

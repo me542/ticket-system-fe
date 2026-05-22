@@ -226,6 +226,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       'inProgress':     visible.where((t) => t.status == TicketStatus.inProgress).length,
       'resolved':       visible.where((t) => t.status == TicketStatus.resolved).length,
       'closed':         visible.where((t) => t.status == TicketStatus.closed).length,  // ← added
+      'cancelled':      visible.where((t) => t.status == TicketStatus.cancelled).length,
     };
   }
 
@@ -340,7 +341,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         submitterInitials: (e['username'] ?? 'U').substring(0, 1).toUpperCase(),
         createdAt:         DateTime.tryParse(e['created_at'] ?? '') ?? DateTime.now(),
         description:       e['description'] ?? '',
-        resolver:          e['assignee'] ?? '',
+        resolver:          e['assignee'] ?? '', subcategoryName: '',
       );
     }).toList();
 
@@ -593,6 +594,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
               const SizedBox(width: 16),
 
+              const Spacer(),
+
               if (isNarrow)
                 SizedBox(
                   width: 260,
@@ -791,6 +794,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
         count: s['closed'] ?? 0,
         accentColor: Colors.indigo,
       )),
+      const SizedBox(width: 16),
+
+      Expanded(
+        child: StatsCard(
+          title: 'Cancelled',
+          count: s['cancelled'] ?? 0,
+          accentColor: AppTheme.statusCancelled,
+        ),
+      ),
     ]);
   }
 
@@ -1006,7 +1018,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           )
               : Column(
             children: items
-                .take(4)
+                .take(6)
                 .map((item) => _ActivityTile(
                 item: item, color: _activityColor(item.type)))
                 .toList(),

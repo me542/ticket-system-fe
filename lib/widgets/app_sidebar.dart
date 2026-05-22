@@ -145,9 +145,9 @@ class AppSidebar extends StatelessWidget {
 
                           if (snapshot.data == 'admin') {
                             return _navItem(
-                              icon: Icons.report,
-                              label: 'Template',
-                              route: 'template',
+                              icon: Icons.edit,
+                              label: 'Parameters',
+                              route: 'parameters',
                             );
                           }
 

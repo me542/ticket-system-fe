@@ -209,7 +209,9 @@ class TicketRow extends StatelessWidget {
               children: [
                 CircleAvatar(
                   radius: 14,
-                  backgroundColor: Colors.blueGrey,
+                  backgroundColor: ticket.resolver.isNotEmpty
+                      ? AppTheme.catNetwork
+                      : Colors.grey,
                   child: Text(
                     ticket.resolver.isNotEmpty
                         ? ticket.resolver.substring(0, 1).toUpperCase()
@@ -224,10 +226,15 @@ class TicketRow extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    ticket.resolver.isNotEmpty ? ticket.resolver : 'Unassigned',
-                    style: const TextStyle(
-                      color: AppTheme.textPrimary,
+                    ticket.resolver.isNotEmpty
+                        ? ticket.resolver
+                        : 'Unassigned',
+                    style: TextStyle(
+                      color: ticket.resolver.isNotEmpty
+                          ? AppTheme.catNetwork
+                          : Colors.grey,
                       fontSize: 12,
+                      fontWeight: FontWeight.w500,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),

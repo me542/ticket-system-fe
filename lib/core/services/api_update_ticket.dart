@@ -2,7 +2,11 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class ApiUpdateTicket {
+  //static const String baseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://localhost:8080') + '/api/user';
+
+  // Prod
   static const String baseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://idiyanale-be.bakawan-ai.com') + '/api/user';
+
 
   static Map<String, String> _headers(String token) {
     return {
@@ -144,19 +148,30 @@ class ApiUpdateTicket {
       String token, String ticketId) async {
     return _patch("$baseUrl/ticket/unhold/$ticketId", token);
   }
-  // // ================================
-  // // ✅ REASSIGN ENDORSER (PATCH)
-  // // ================================
-  // static Future<Map<String, dynamic>> reassignEndorser(
-  //     String token, String ticketId) async {
-  //   return _patch("$baseUrl/ticket/reassign-endorser/$ticketId", token);
-  // }
+
 // ================================
 // ✅ CLOSE TICKET (submitter only)
 // ================================
   static Future<Map<String, dynamic>> closeTicket(
       String token, String ticketId) async {
     return _put("$baseUrl/ticket/close/$ticketId", token);
+  }
+
+  // ================================
+// ✅ REASSIGN ENDORSER
+// ================================
+  static Future<Map<String, dynamic>> reassignEndorser(
+      String token,
+      String ticketId,
+      String endorser,
+      ) async {
+    return _put(
+      "$baseUrl/ticket/reassign-endorser/$ticketId",
+      token,
+      {
+        "endorser": endorser,
+      },
+    );
   }
 
 }

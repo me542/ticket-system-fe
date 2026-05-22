@@ -13,6 +13,7 @@ import '../data/light_theme.dart';
 import '../models/ticket.dart';
 import 'package:ticket_system/core/services/api_update_ticket.dart';
 import '../core/services/api_remarks.dart';
+import '../core/services/api_reassigned_endorser.dart';
 
 class TicketSidebar extends StatefulWidget {
   final Ticket? ticket;
@@ -273,6 +274,9 @@ class _TicketSidebarState extends State<TicketSidebar> {
     late IconData icon;
 
     switch (action) {
+      case 'reassign_endorser':
+      // Handled separately via dialog — should not reach here
+        return;
       case 'endorse':
         title = 'Endorse Ticket';
         message =
@@ -2088,6 +2092,21 @@ class _TicketSidebarState extends State<TicketSidebar> {
       );
     }
 
+    // ── SUBMITTER — reassign endorser while still pending endorsement ─────────
+    if (_isCreator && _isSubmitted) {
+      return _actionCard(
+        debugLabel: 'submitter · pending endorsement',
+        children: [
+          _actionBtn(
+            label: 'Reassign Endorser',
+            icon: Icons.swap_horiz_outlined,
+            color: Colors.orange,
+            onTap: () => _handleReassignEndorser(ticket.id),
+          ),
+        ],
+      );
+    }
+
     // ── SUBMITTER — close after resolved ─────────────────────────────────────
     if (_isCreator && _isResolved && !_isclosed) {
       return _actionCard(
@@ -2203,6 +2222,75 @@ class _TicketSidebarState extends State<TicketSidebar> {
       ),
     );
     return fullWidth ? Expanded(child: btn) : btn;
+  }
+
+  // ─── reassign endorser ─────────────────────────────────────────────────────
+
+  Future<void> _handleReassignEndorser(String ticketId) async {
+    // ── 1. Fetch all users with role == 'endorser' ──────────────────────────
+    List<Map<String, dynamic>> endorsers = [];
+    try {
+      final allUsers = await ApiGetUser.fetchUsers();
+      endorsers = allUsers
+          .where((u) =>
+      (u['role'] ?? '').toString().toLowerCase().trim() == 'endorser')
+          .map((u) => Map<String, dynamic>.from(u))
+          .toList();
+    } catch (e) {
+      _showSnackbar('Could not load endorsers: $e', color: Colors.redAccent);
+      return;
+    }
+
+    if (endorsers.isEmpty) {
+      _showSnackbar('No endorsers found.', color: Colors.orange);
+      return;
+    }
+
+    // ── 2. Show dialog with dropdown ────────────────────────────────────────
+    final currentEndorserUsername = _field(
+      ['endorser', 'endorser_name', 'endorsed_by', 'assigned_endorser'],
+    ).toLowerCase().trim();
+
+    final selected = await showDialog<Map<String, dynamic>>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => _ReassignEndorserDialog(
+        endorsers: endorsers,
+        currentEndorserUsername: currentEndorserUsername,
+      ),
+    );
+
+    if (selected == null) return;
+
+    final newEndorser = (selected['username'] ?? '').toString().trim();
+    if (newEndorser.isEmpty) return;
+
+    // ── 3. Call API ─────────────────────────────────────────────────────────
+    setState(() => _actionLoading = true);
+
+    try {
+      final result = await ApiReassignEndorser.reassignEndorser(
+        ticketId: ticketId,
+        newEndorser: newEndorser,
+      );
+
+      if (result['success'] == true) {
+        _showSnackbar(
+          result['message'] ?? 'Endorser reassigned successfully ✓',
+          color: Colors.orange,
+        );
+        await _fetchBySR(ticketId);
+      } else {
+        _showSnackbar(
+          result['message'] ?? 'Failed to reassign endorser.',
+          color: Colors.redAccent,
+        );
+      }
+    } catch (e) {
+      _showSnackbar('Reassign failed: $e', color: Colors.redAccent);
+    } finally {
+      if (mounted) setState(() => _actionLoading = false);
+    }
   }
 
   // ─── handle action ─────────────────────────────────────────────────────────
@@ -2691,6 +2779,231 @@ class _TicketSidebarState extends State<TicketSidebar> {
   DateTime? _parseDate(String raw) {
     if (raw == '—' || raw.trim().isEmpty) return null;
     return DateTime.tryParse(raw)?.toLocal();
+  }
+}
+
+// ─── Reassign Endorser Dialog ──────────────────────────────────────────────────
+class _ReassignEndorserDialog extends StatefulWidget {
+  final List<Map<String, dynamic>> endorsers;
+  final String currentEndorserUsername;
+
+  const _ReassignEndorserDialog({
+    required this.endorsers,
+    required this.currentEndorserUsername,
+  });
+
+  @override
+  State<_ReassignEndorserDialog> createState() =>
+      _ReassignEndorserDialogState();
+}
+
+class _ReassignEndorserDialogState extends State<_ReassignEndorserDialog> {
+  Map<String, dynamic>? _selected;
+
+  String _initialsFrom(String name) {
+    final parts = name.trim().split(RegExp(r'[\s._]+'));
+    if (parts.isEmpty) return '?';
+    if (parts.length == 1) return parts[0][0].toUpperCase();
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: AppTheme.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      title: Row(
+        children: const [
+          Icon(Icons.swap_horiz_outlined, color: Colors.orange, size: 20),
+          SizedBox(width: 8),
+          Text(
+            'Reassign Endorser',
+            style: TextStyle(color: AppTheme.textPrimary, fontSize: 16),
+          ),
+        ],
+      ),
+      content: SizedBox(
+        width: 360,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'The current endorser has not responded.\n'
+                  'Select a new endorser from the list:',
+              style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+            ),
+            const SizedBox(height: 14),
+
+            // ── Dropdown ────────────────────────────────────────────────────
+            Container(
+              decoration: BoxDecoration(
+                color: AppTheme.sidebarBg,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: _selected != null
+                      ? Colors.orange.withOpacity(0.7)
+                      : AppTheme.border,
+                  width: _selected != null ? 1.5 : 1,
+                ),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<Map<String, dynamic>>(
+                  value: _selected,
+                  isExpanded: true,
+                  dropdownColor: AppTheme.surface,
+                  icon: const Icon(Icons.keyboard_arrow_down_rounded,
+                      color: AppTheme.textMuted),
+                  hint: const Row(
+                    children: [
+                      Icon(Icons.person_search_rounded,
+                          size: 16, color: AppTheme.textMuted),
+                      SizedBox(width: 8),
+                      Text(
+                        'Select endorser…',
+                        style: TextStyle(
+                            color: AppTheme.textMuted, fontSize: 13),
+                      ),
+                    ],
+                  ),
+                  items: widget.endorsers.map((user) {
+                    final username =
+                    (user['username'] ?? '').toString();
+                    final fullName = (user['full_name'] ??
+                        user['name'] ??
+                        username)
+                        .toString();
+                    final isCurrent = username.toLowerCase().trim() ==
+                        widget.currentEndorserUsername;
+                    final initials = _initialsFrom(fullName.isNotEmpty ? fullName : username);
+
+                    return DropdownMenuItem<Map<String, dynamic>>(
+                      value: user,
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 14,
+                            backgroundColor:
+                            Colors.orange.withOpacity(0.2),
+                            child: Text(
+                              initials,
+                              style: const TextStyle(
+                                color: Colors.orange,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment:
+                              CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  fullName.isNotEmpty
+                                      ? fullName
+                                      : username,
+                                  style: const TextStyle(
+                                    color: AppTheme.textPrimary,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                Text(
+                                  '@$username',
+                                  style: const TextStyle(
+                                    color: AppTheme.textMuted,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (isCurrent)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(
+                                    color:
+                                    Colors.orange.withOpacity(0.4)),
+                              ),
+                              child: const Text(
+                                'Current',
+                                style: TextStyle(
+                                  color: Colors.orange,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (user) => setState(() => _selected = user),
+                ),
+              ),
+            ),
+
+            // ── Selected preview ─────────────────────────────────────────
+            if (_selected != null) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(8),
+                  border:
+                  Border.all(color: Colors.orange.withOpacity(0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.how_to_reg_outlined,
+                        color: Colors.orange, size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Will be assigned to: ${(_selected!['full_name'] ?? _selected!['name'] ?? _selected!['username'] ?? '').toString()}',
+                        style: const TextStyle(
+                          color: Colors.orange,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, null),
+          child: const Text('Cancel',
+              style: TextStyle(color: AppTheme.textMuted)),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.orange,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8)),
+          ),
+          onPressed:
+          _selected == null ? null : () => Navigator.pop(context, _selected),
+          child: const Text('Reassign'),
+        ),
+      ],
+    );
   }
 }
 
