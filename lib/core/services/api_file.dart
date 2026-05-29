@@ -135,6 +135,7 @@ class ApiTicket {
               'ticket_id':          t['ticket_id']          ?? '',
               'subject':            t['subject']             ?? '',
               'category':           t['category']            ?? '',
+              'subcategory':           t['subcategory']            ?? '',
               'description':        t['description']         ?? '',
               'institution':        t['institution']         ?? '',
               'tickettype':         t['tickettype']          ?? '',

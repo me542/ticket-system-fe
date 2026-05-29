@@ -61,56 +61,106 @@ class TicketService {
 
 
   // ─────────────────────────────────────────────
-  // GET ALL TICKETS (FIXED)
-  // ─────────────────────────────────────────────
+// GET ALL TICKETS
+// ─────────────────────────────────────────────
   static Future<List<Map<String, dynamic>>> getAll() async {
     try {
       final token = await ApiLogin.getToken();
+
       if (token == null) {
         return [];
       }
 
       final uri = Uri.parse('$baseUrl/list/all/tickets');
 
+      final res = await http.get(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      );
 
-      final res = await http.get(uri, headers: {
-        'Authorization': 'Bearer $token',
-      });
-      if (res.statusCode != 200) return [];
+      if (res.statusCode != 200) {
+        return [];
+      }
 
       final decoded = jsonDecode(res.body);
 
       List<dynamic> list = [];
 
-      if (decoded is List) {
-        list = decoded;
-      } else if (decoded is Map<String, dynamic>) {
+      // Backend response:
+      // {
+      //   "retCode": "200",
+      //   "message": "...",
+      //   "data": [...]
+      // }
+
+      if (decoded is Map<String, dynamic>) {
         if (decoded['data'] is List) {
           list = decoded['data'];
-        } else if (decoded['data'] is Map &&
-            decoded['data']['tickets'] is List) {
-          list = decoded['data']['tickets'];
-        } else if (decoded['tickets'] is List) {
-          list = decoded['tickets'];
         }
+      } else if (decoded is List) {
+        list = decoded;
       }
 
       return list.map<Map<String, dynamic>>((e) {
-        final Map<String, dynamic> t = Map<String, dynamic>.from(e as Map);
+        final Map<String, dynamic> t =
+        Map<String, dynamic>.from(e as Map);
 
         return {
-          'ticket_id':          t['ticket_id']          ?? '',
-          'subject':            t['subject']             ?? '',
-          'priority':           t['priority']            ?? 0,
-          'status':             t['status']              ?? '',
-          'description':        t['description']         ?? '',
-          'username':           t['username']            ?? 'Unknown',
-          'category':           t['category']            ?? '',
-          'created_at':         t['created_at']          ?? '',
-          'resolved_at':        t['resolved_at']         ?? '',
-          'resolution_minutes': (t['resolution_minutes'] as num?)?.toDouble() ?? 0.0,
-          'resolution_time':    t['resolution_time']?.toString() ?? '',
-          'resolver': t['resolver'] ?? '',
+          'ticket_id': t['ticket_id'] ?? '',
+          'username': t['username'] ?? '',
+          'category': t['category'] ?? '',
+          'subcategory': t['subcategory'] ?? '',
+          'subject': t['subject'] ?? '',
+          'institution': t['institution'] ?? '',
+          'tickettype': t['tickettype'] ?? '',
+          'description': t['description'] ?? '',
+          'priority': t['priority'] ?? 0,
+
+          // Assignment / approval
+          'assignee': t['assignee'] ?? '',
+          'resolver': t['assignee'] ?? '',
+          'endorser': t['endorser'] ?? '',
+          'approver': t['approver'] ?? '',
+
+          // Status
+          'status': t['status'] ?? '',
+
+          // Dates
+          'created_at': t['created_at'] ?? '',
+          'updated_at': t['updated_at'] ?? '',
+          'started_at': t['started_at'] ?? '',
+          'resolved_at': t['resolved_at'] ?? '',
+          'cancelled_at': t['cancelled_at'] ?? '',
+          'hold_started_at': t['hold_started_at'] ?? '',
+
+          // Cancellation
+          'cancelled_by': t['cancelled_by'] ?? '',
+          'cancelled_reason': t['cancelled_reason'] ?? '',
+
+          // Resolution
+          'resolution_minutes':
+          (t['resolution_minutes'] as num?)
+              ?.toDouble() ??
+              0.0,
+
+          'resolution_time':
+          t['resolution_time']?.toString() ?? '',
+
+          // Hold
+          'onhold': t['onhold'] ?? false,
+
+          'total_hold_seconds':
+          t['total_hold_seconds'] ?? 0,
+
+          // Attachments
+          'attachments':
+          t['attachments'] is List
+              ? List<Map<String, dynamic>>.from(
+            t['attachments'],
+          )
+              : [],
         };
       }).toList();
     } catch (e) {

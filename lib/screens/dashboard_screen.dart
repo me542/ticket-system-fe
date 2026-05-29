@@ -153,12 +153,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   // ── Role-filtered ticket list ─────────────────────────────
   List<Ticket> get _roleFilteredTickets {
-    if (_isPrivileged) return _allTickets;
-    return _allTickets
-        .where((t) =>
-    t.submitter.toLowerCase().trim() ==
-        _currentUsername.toLowerCase().trim())
-        .toList();
+    final role = _currentUserRole.toLowerCase().trim();
+    final username = _currentUsername.toLowerCase().trim();
+
+    switch (role) {
+      case 'admin':
+        return _allTickets;
+
+      case 'endorser':
+        return _allTickets.where((t) =>
+        t.rawStatus.toLowerCase().replaceAll(' ', '') == 'forendorsement'
+        ).toList();
+
+      case 'approver':
+        return _allTickets.where((t) =>
+        t.rawStatus.toLowerCase().replaceAll(' ', '') == 'forapproval'
+        ).toList();
+
+      case 'resolver':
+        return _allTickets.where((t) =>
+        t.resolver.toLowerCase().trim() == username ||
+            t.status == TicketStatus.inProgress
+        ).toList();
+
+      default: // requester / normal user
+        return _allTickets.where((t) =>
+        t.submitter.toLowerCase().trim() == username
+        ).toList();
+    }
   }
 
   // ── Status + search filter ────────────────────────────────
@@ -199,7 +221,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         .where((t) =>
     t.title.toLowerCase().contains(q) ||
         t.id.toLowerCase().contains(q) ||
-        t.submitter.toLowerCase().contains(q))
+        t.submitter.toLowerCase().contains(q) ||
+        t.resolver.toLowerCase().contains(q) ||
+        t.description.toLowerCase().contains(q) )
         .toList();
   }
 
@@ -402,6 +426,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _activities   ..clear()..addAll(activities.take(20));
       _categoryCount..clear()..addAll(catCount);
     });
+
+
   }
 
   // ── Build ─────────────────────────────────────────────────
@@ -665,7 +691,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       decoration: BoxDecoration(
         color: AppTheme.surface,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppTheme.border),
+        border: Border.all(color: AppTheme.textSecondary),
       ),
       child: Row(children: [
         const SizedBox(width: 12),

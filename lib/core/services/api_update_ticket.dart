@@ -118,11 +118,20 @@ class ApiUpdateTicket {
   }
 
   // ================================
-  // ✅ CANCEL TICKET
-  // ================================
+// ✅ CANCEL TICKET
+// ================================
   static Future<Map<String, dynamic>> cancelTicket(
-      String token, String ticketId) async {
-    return _put("$baseUrl/ticket/cancel/$ticketId", token);
+      String token,
+      String ticketId,
+      String cancelledReason,
+      ) async {
+    return _put(
+      "$baseUrl/ticket/cancel/$ticketId",
+      token,
+      {
+        "cancelled_reason": cancelledReason,
+      },
+    );
   }
 
   // ================================

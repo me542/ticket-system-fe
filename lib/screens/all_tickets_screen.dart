@@ -42,10 +42,12 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
   final Map<String, String> _colFilters = {
     'category':    '',
     'subcategory': '',
+    'description': '',
     'priority':    '',
     'assignee':    '',
     'endorser':    '',
     'approver':    '',
+    'assignment':    '',
     'status':      '',
     'tickettype':  '',
     'institution': '',
@@ -140,12 +142,17 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
 
     if (_search.isNotEmpty) {
       final q = _search.toLowerCase();
-      list = list
-          .where((r) =>
-      (r['ticket_id']  ?? '').toString().toLowerCase().contains(q) ||
-          (r['subject']    ?? '').toString().toLowerCase().contains(q) ||
-          (r['username']   ?? '').toString().toLowerCase().contains(q))
-          .toList();
+
+      list = list.where((r) =>
+      (r['ticket_id'] ?? '').toString().toLowerCase().contains(q) ||
+          (r['subject'] ?? '').toString().toLowerCase().contains(q) ||
+          (r['username'] ?? '').toString().toLowerCase().contains(q) ||
+          (r['creator'] ?? '').toString().toLowerCase().contains(q) ||
+          (r['endorser'] ?? '').toString().toLowerCase().contains(q) ||
+          (r['approver'] ?? '').toString().toLowerCase().contains(q) ||
+          (r['assignee'] ?? '').toString().toLowerCase().contains(q) ||
+          (r['description'] ?? '').toString().toLowerCase().contains(q)
+      ).toList();
     }
 
     _colFilters.forEach((col, val) {
@@ -605,7 +612,7 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
               decoration: BoxDecoration(
                 color: AppTheme.surface,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppTheme.border),
+                border: Border.all(color: AppTheme.textSecondary),
               ),
               child: Row(children: [
                 const SizedBox(width: 12),

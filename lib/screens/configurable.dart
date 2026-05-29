@@ -574,28 +574,48 @@ class _TemplateScreenState extends State<TemplateScreen> {
                     height: 20,
                     width: 20,
                     child: CircularProgressIndicator(strokeWidth: 2))
-                    : _inlineDropdown(
-                  value: _formCategory,
-                  items: [..._categoryMap.keys, addCategoryKey],
-                  hint: 'Select category',
-                  onChanged: _isEditing
-                      ? null
-                      : (v) {
-                    if (v == addCategoryKey) {
-                      _addCategoryDialog();
-                      return;
-                    }
-                    final subs     = _subNames(v);
-                    final firstSub = subs.isNotEmpty ? subs.first : null;
-                    setState(() {
-                      _formCategory    = v;
-                      _formSubcategory = firstSub;
-                    });
-                    _descCtrl.text =
-                    (firstSub != null && v != null)
-                        ? _subDescription(v, firstSub)
-                        : '';
-                  },
+                    : Row(
+                  children: [
+                    Expanded(
+                      child: _inlineDropdown(
+                        value: _formCategory,
+                        items: [..._categoryMap.keys, addCategoryKey],
+                        hint: 'Select category',
+                        onChanged: _isEditing
+                            ? null
+                            : (v) {
+                          if (v == addCategoryKey) {
+                            _addCategoryDialog();
+                            return;
+                          }
+                          final subs     = _subNames(v);
+                          final firstSub = subs.isNotEmpty ? subs.first : null;
+                          setState(() {
+                            _formCategory    = v;
+                            _formSubcategory = firstSub;
+                          });
+                          _descCtrl.text =
+                          (firstSub != null && v != null)
+                              ? _subDescription(v, firstSub)
+                              : '';
+                        },
+                      ),
+                    ),
+                    if (_formCategory != null && !_isEditing) ...[
+                      IconButton(
+                        icon: const Icon(Icons.edit_outlined, size: 16, color: Colors.blueGrey),
+                        tooltip: 'Rename category',
+                        visualDensity: VisualDensity.compact,
+                        onPressed: _editCategoryDialog,
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline, size: 16, color: Colors.redAccent),
+                        tooltip: 'Delete category',
+                        visualDensity: VisualDensity.compact,
+                        onPressed: _deleteCategory,
+                      ),
+                    ],
+                  ],
                 ),
               ),
               _formRow(
@@ -605,23 +625,43 @@ class _TemplateScreenState extends State<TemplateScreen> {
                     height: 20,
                     width: 20,
                     child: CircularProgressIndicator(strokeWidth: 2))
-                    : _inlineDropdown(
-                  value: _formSubcategory,
-                  items: [..._subNames(_formCategory), addSubcategoryKey],
-                  hint: 'Select subcategory',
-                  onChanged: _isEditing
-                      ? null
-                      : (v) {
-                    if (v == addSubcategoryKey) {
-                      _addSubcategoryDialog();
-                      return;
-                    }
-                    setState(() => _formSubcategory = v);
-                    if (v != null && _formCategory != null) {
-                      _descCtrl.text =
-                          _subDescription(_formCategory!, v);
-                    }
-                  },
+                    : Row(
+                  children: [
+                    Expanded(
+                      child: _inlineDropdown(
+                        value: _formSubcategory,
+                        items: [..._subNames(_formCategory), addSubcategoryKey],
+                        hint: 'Select subcategory',
+                        onChanged: _isEditing
+                            ? null
+                            : (v) {
+                          if (v == addSubcategoryKey) {
+                            _addSubcategoryDialog();
+                            return;
+                          }
+                          setState(() => _formSubcategory = v);
+                          if (v != null && _formCategory != null) {
+                            _descCtrl.text =
+                                _subDescription(_formCategory!, v);
+                          }
+                        },
+                      ),
+                    ),
+                    if (_formSubcategory != null && !_isEditing) ...[
+                      IconButton(
+                        icon: const Icon(Icons.edit_outlined, size: 16, color: Colors.blueGrey),
+                        tooltip: 'Rename subcategory',
+                        visualDensity: VisualDensity.compact,
+                        onPressed: _editSubcategoryDialog,
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline, size: 16, color: Colors.redAccent),
+                        tooltip: 'Delete subcategory',
+                        visualDensity: VisualDensity.compact,
+                        onPressed: _deleteSubcategory,
+                      ),
+                    ],
+                  ],
                 ),
               ),
             ]),
