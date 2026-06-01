@@ -7,6 +7,9 @@ class ApiHoldTicket {
         defaultValue: 'http://localhost:8080',
       );
 
+  // Prod
+  //static String get _baseUrl => String.fromEnvironment('API_BASE_URL', defaultValue: 'http://idiyanale-be.bakawan-ai.com');
+
   /// Holds a ticket by ID. Requires a valid JWT [token].
   static Future<Map<String, dynamic>> holdTicket(String token, String ticketId) async {
     final url = Uri.parse('$_baseUrl/ticket/hold/$ticketId');

@@ -153,12 +153,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   // ── Role-filtered ticket list ─────────────────────────────
   List<Ticket> get _roleFilteredTickets {
-    if (_isPrivileged) return _allTickets;
-    return _allTickets
-        .where((t) =>
-    t.submitter.toLowerCase().trim() ==
-        _currentUsername.toLowerCase().trim())
-        .toList();
+    final role = _currentUserRole.toLowerCase().trim();
+    final username = _currentUsername.toLowerCase().trim();
+
+    switch (role) {
+      case 'admin':
+        return _allTickets;
+
+      case 'endorser':
+        return _allTickets.where((t) =>
+        t.rawStatus.toLowerCase().replaceAll(' ', '') == 'forendorsement'
+        ).toList();
+
+      case 'approver':
+        return _allTickets.where((t) =>
+        t.rawStatus.toLowerCase().replaceAll(' ', '') == 'forapproval'
+        ).toList();
+
+      case 'resolver':
+        return _allTickets.where((t) =>
+        t.resolver.toLowerCase().trim() == username ||
+            t.status == TicketStatus.inProgress
+        ).toList();
+
+      default: // requester / normal user
+        return _allTickets.where((t) =>
+        t.submitter.toLowerCase().trim() == username
+        ).toList();
+    }
   }
 
   // ── Status + search filter ────────────────────────────────
@@ -199,7 +221,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         .where((t) =>
     t.title.toLowerCase().contains(q) ||
         t.id.toLowerCase().contains(q) ||
-        t.submitter.toLowerCase().contains(q))
+        t.submitter.toLowerCase().contains(q) ||
+        t.resolver.toLowerCase().contains(q) ||
+        t.description.toLowerCase().contains(q) )
         .toList();
   }
 
@@ -226,6 +250,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       'inProgress':     visible.where((t) => t.status == TicketStatus.inProgress).length,
       'resolved':       visible.where((t) => t.status == TicketStatus.resolved).length,
       'closed':         visible.where((t) => t.status == TicketStatus.closed).length,  // ← added
+      'cancelled':      visible.where((t) => t.status == TicketStatus.cancelled).length,
     };
   }
 
@@ -340,7 +365,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         submitterInitials: (e['username'] ?? 'U').substring(0, 1).toUpperCase(),
         createdAt:         DateTime.tryParse(e['created_at'] ?? '') ?? DateTime.now(),
         description:       e['description'] ?? '',
-        resolver:          e['assignee'] ?? '',
+        resolver:          e['assignee'] ?? '', subcategoryName: '',
       );
     }).toList();
 
@@ -401,6 +426,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _activities   ..clear()..addAll(activities.take(20));
       _categoryCount..clear()..addAll(catCount);
     });
+
+
   }
 
   // ── Build ─────────────────────────────────────────────────
@@ -593,6 +620,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
               const SizedBox(width: 16),
 
+              const Spacer(),
+
               if (isNarrow)
                 SizedBox(
                   width: 260,
@@ -662,7 +691,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       decoration: BoxDecoration(
         color: AppTheme.surface,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppTheme.border),
+        border: Border.all(color: AppTheme.textSecondary),
       ),
       child: Row(children: [
         const SizedBox(width: 12),
@@ -791,6 +820,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
         count: s['closed'] ?? 0,
         accentColor: Colors.indigo,
       )),
+      const SizedBox(width: 16),
+
+      Expanded(
+        child: StatsCard(
+          title: 'Cancelled',
+          count: s['cancelled'] ?? 0,
+          accentColor: AppTheme.statusCancelled,
+        ),
+      ),
     ]);
   }
 
@@ -1006,7 +1044,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           )
               : Column(
             children: items
-                .take(4)
+                .take(6)
                 .map((item) => _ActivityTile(
                 item: item, color: _activityColor(item.type)))
                 .toList(),

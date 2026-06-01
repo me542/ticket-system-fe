@@ -145,9 +145,9 @@ class AppSidebar extends StatelessWidget {
 
                           if (snapshot.data == 'admin') {
                             return _navItem(
-                              icon: Icons.report,
-                              label: 'Template',
-                              route: 'template',
+                              icon: Icons.edit,
+                              label: 'Parameters',
+                              route: 'parameters',
                             );
                           }
 
@@ -230,14 +230,69 @@ class AppSidebar extends StatelessWidget {
                             color: AppTheme.textSecondary,
                           ),
                           onPressed: () async {
-                            await ApiLogin.logout();
-                            Navigator.pushAndRemoveUntil(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const LoginScreen(),
-                              ),
-                                  (route) => false,
+                            final shouldLogout = await showDialog<bool>(
+                              context: context,
+                              barrierDismissible: false,
+                              builder: (context) {
+                                return AlertDialog(
+                                  backgroundColor: AppTheme.surfaceElevated,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                  title: const Text(
+                                    'Confirm Logout',
+                                    style: TextStyle(
+                                      color: AppTheme.textPrimary,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  content: const Text(
+                                    'Are you sure you want to logout?',
+                                    style: TextStyle(
+                                      color: AppTheme.textSecondary,
+                                    ),
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () {
+                                        Navigator.pop(context, false);
+                                      },
+                                      child: const Text(
+                                        'Cancel',
+                                        style: TextStyle(
+                                          color: AppTheme.textSecondary,
+                                        ),
+                                      ),
+                                    ),
+                                    ElevatedButton(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.redAccent,
+                                        foregroundColor: Colors.white,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                      ),
+                                      onPressed: () {
+                                        Navigator.pop(context, true);
+                                      },
+                                      child: const Text('Logout'),
+                                    ),
+                                  ],
+                                );
+                              },
                             );
+
+                            if (shouldLogout == true) {
+                              await ApiLogin.logout();
+
+                              Navigator.pushAndRemoveUntil(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const LoginScreen(),
+                                ),
+                                    (route) => false,
+                              );
+                            }
                           },
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(),

@@ -6,6 +6,10 @@ import 'api_login.dart';
 class ApiRemarks {
   static const String _baseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://localhost:8080') + '/api/user';
 
+  // Prod
+  //static const String _baseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://idiyanale-be.bakawan-ai.com') + '/api/user';
+
+
   // ─── Fetch all remarks for a ticket ──────────────────────────────────────
 
   /// Returns a list of remark maps sorted ascending by created_at.

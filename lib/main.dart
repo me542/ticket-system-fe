@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:ticket_system/screens/template.dart';
+import 'package:ticket_system/screens/configurable.dart';
 import 'data/light_theme.dart';
 import 'widgets/app_sidebar.dart';
 import 'screens/dashboard_screen.dart';
@@ -196,7 +196,7 @@ class _MainShellState extends State<MainShell> {
       case 'users':
         return const UserScreen();
 
-      case 'template':
+      case 'parameters':
         return const TemplateScreen();
 
       case 'profile':

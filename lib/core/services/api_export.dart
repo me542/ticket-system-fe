@@ -15,6 +15,10 @@ class ApiExport {
       ) +
           '/api/user';
 
+  // Prod
+  //static const String _baseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://idiyanale-be.bakawan-ai.com') + '/api/user';
+
+
   static Future<void> downloadTicketsExcel({
     String? month,
     String? year,

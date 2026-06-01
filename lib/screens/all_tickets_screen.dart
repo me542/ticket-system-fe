@@ -36,15 +36,18 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
 
   // ── Status Filter ─────────────────────────────────────────
   String _selectedFilter = 'All';
-  final List<String> _filters = ['All', 'For', 'In', 'Resolved', 'Cancelled'];
+  final List<String> _filters = ['All', 'For Endorsement', 'For Approval', 'For Assignment ', 'In Progress', 'Resolved', 'Cancelled'];
 
   // ── Column Filters ────────────────────────────────────────
   final Map<String, String> _colFilters = {
     'category':    '',
+    'subcategory': '',
+    'description': '',
     'priority':    '',
     'assignee':    '',
     'endorser':    '',
     'approver':    '',
+    'assignment':    '',
     'status':      '',
     'tickettype':  '',
     'institution': '',
@@ -123,8 +126,10 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
 
     if (_selectedFilter != 'All') {
       const map = {
-        'For':       'for',
-        'In':        'in',
+        'For Endorsement':       'for endorsement',
+        'For Approval':       'for approval',
+        'For Assignment':       'for Assignment',
+        'In Progress':        'in progress',
         'Resolved':  'resolved',
         'Cancelled': 'cancelled',
       };
@@ -137,12 +142,17 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
 
     if (_search.isNotEmpty) {
       final q = _search.toLowerCase();
-      list = list
-          .where((r) =>
-      (r['ticket_id']  ?? '').toString().toLowerCase().contains(q) ||
-          (r['subject']    ?? '').toString().toLowerCase().contains(q) ||
-          (r['username']   ?? '').toString().toLowerCase().contains(q))
-          .toList();
+
+      list = list.where((r) =>
+      (r['ticket_id'] ?? '').toString().toLowerCase().contains(q) ||
+          (r['subject'] ?? '').toString().toLowerCase().contains(q) ||
+          (r['username'] ?? '').toString().toLowerCase().contains(q) ||
+          (r['creator'] ?? '').toString().toLowerCase().contains(q) ||
+          (r['endorser'] ?? '').toString().toLowerCase().contains(q) ||
+          (r['approver'] ?? '').toString().toLowerCase().contains(q) ||
+          (r['assignee'] ?? '').toString().toLowerCase().contains(q) ||
+          (r['description'] ?? '').toString().toLowerCase().contains(q)
+      ).toList();
     }
 
     _colFilters.forEach((col, val) {
@@ -286,6 +296,7 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
           id:                item['ticket_id'] ?? '',
           title:             item['subject'] ?? '',
           categoryName:      item['category'] ?? '',
+          subcategoryName:      item['subcategory'] ?? '',
           status:            _mapStatus(rawStatus),
           rawStatus:         rawStatus,
           priority:          _mapPriority(item['priority']),
@@ -324,7 +335,7 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
       );
 
       const headers = [
-        'Ticket ID', 'Creator', 'Category', 'Subject', 'Institution',
+        'Ticket ID', 'Creator', 'Category', 'Subcategory',  'Subject', 'Institution',
         'Type', 'Description', 'Priority', 'Assignee', 'Endorser',
         'Approver', 'Status', 'Created At', 'Updated At',
         'Cancelled By', 'Cancelled At', 'Started At',
@@ -344,6 +355,7 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
           r['ticket_id']          ?? '',
           r['username']           ?? '',
           r['category']           ?? '',
+          r['subcategory']        ?? '',
           r['subject']            ?? '',
           r['institution']        ?? '',
           r['tickettype']         ?? '',
@@ -591,6 +603,8 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
 
           const SizedBox(width: 16),
 
+          const Spacer(),
+
           // ── Search ─────────────────────────────────────────
           Expanded(
             child: Container(
@@ -598,7 +612,7 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
               decoration: BoxDecoration(
                 color: AppTheme.surface,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppTheme.border),
+                border: Border.all(color: AppTheme.textSecondary),
               ),
               child: Row(children: [
                 const SizedBox(width: 12),
@@ -702,7 +716,7 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
     final filtered     = _filteredRaw.length;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
       child: Row(children: [
         const Text('Tickets',
             style: TextStyle(
@@ -715,7 +729,7 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
               ? '$filtered of $visibleTotal'
               : '$visibleTotal total',
           style: const TextStyle(
-              color: AppTheme.textSecondary, fontSize: 12),
+              color: AppTheme.textPrimary, fontSize: 12),
         ),
         const SizedBox(width: 8),
 
@@ -752,41 +766,96 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
         const SizedBox(height: 50),
 
         // Status filter pills
+        // Status filter dropdown + refresh button
         Row(
-          children: _filters.map((f) {
-            final isSelected = _selectedFilter == f;
-            return GestureDetector(
-              onTap: () => setState(() {
-                _selectedFilter = f;
-                _currentPage    = 1;
-              }),
-              child: Container(
-                margin: const EdgeInsets.only(left: 6),
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? AppTheme.accent.withOpacity(0.15)
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(
-                      color: isSelected
-                          ? AppTheme.accent
-                          : AppTheme.border),
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              height: 34,
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              decoration: BoxDecoration(
+                color: _selectedFilter != 'All'
+                    ? AppTheme.accent.withOpacity(0.10)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: _selectedFilter != 'All'
+                      ? AppTheme.accent
+                      : AppTheme.border,
                 ),
-                child: Text(f,
-                    style: TextStyle(
-                      color: isSelected
-                          ? AppTheme.accent
-                          : AppTheme.textSecondary,
-                      fontSize: 12,
-                      fontWeight: isSelected
-                          ? FontWeight.w600
-                          : FontWeight.normal,
-                    )),
               ),
-            );
-          }).toList(),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: _selectedFilter,
+                  isDense: true,
+                  icon: Icon(
+                    Icons.keyboard_arrow_down,
+                    size: 16,
+                    color: _selectedFilter != 'All'
+                        ? AppTheme.accent
+                        : AppTheme.textSecondary,
+                  ),
+                  dropdownColor: AppTheme.surface,
+                  items: _filters
+                      .map((f) => DropdownMenuItem(
+                    value: f,
+                    child: Text(
+                      f == 'All' ? 'All Status' : f,
+                      style: TextStyle(
+                        color: f == _selectedFilter
+                            ? AppTheme.accent
+                            : AppTheme.textPrimary,
+                        fontSize: 12,
+                        fontWeight: f == _selectedFilter
+                            ? FontWeight.w600
+                            : FontWeight.normal,
+                      ),
+                    ),
+                  ))
+                      .toList(),
+                  onChanged: (val) {
+                    if (val != null) {
+                      setState(() {
+                        _selectedFilter = val;
+                        _currentPage    = 1;
+                      });
+                    }
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Tooltip(
+              message: 'Refresh tickets',
+              child: SizedBox(
+                width: 34,
+                height: 34,
+                child: IconButton(
+                  padding: EdgeInsets.zero,
+                  onPressed: _loading ? null : _fetchAllTickets,
+                  icon: _loading
+                      ? const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppTheme.textSecondary),
+                  )
+                      : const Icon(
+                    Icons.refresh_rounded,
+                    size: 17,
+                    color: AppTheme.textSecondary,
+                  ),
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.transparent,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                    side: const BorderSide(color: AppTheme.border),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ]),
     );
@@ -826,6 +895,7 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
       _ColDef('Status',             'status',             140, true),
       _ColDef('Creator',            'username',           120, true),
       _ColDef('Category',           'category',           160, true),
+      _ColDef('SubCategory',           'subcategory',           160, true),
       _ColDef('Subject',            'subject',            200, false),
       _ColDef('Institution',        'institution',        140, true),
       _ColDef('Type',               'tickettype',         120, true),
@@ -909,7 +979,7 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
                                         style: TextStyle(
                                           color: (hasFilter || isSorted)
                                               ? AppTheme.accent
-                                              : AppTheme.textMuted,
+                                              : AppTheme.textPrimary,
                                           fontSize: 10,
                                           fontWeight: FontWeight.w700,
                                           letterSpacing: 0.6,
@@ -990,6 +1060,7 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
                         id:                r['ticket_id'] ?? '',
                         title:             r['subject'] ?? '',
                         categoryName:      r['category'] ?? '',
+                        subcategoryName:      r['subcategory'] ?? '',
                         status:            _mapStatus(r['status'] ?? ''),
                         priority:          _mapPriority(r['priority']),
                         submitter:         r['username'] ?? '',

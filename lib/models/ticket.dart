@@ -5,6 +5,7 @@ class Ticket {
   final String id;
   final String title;
   final String categoryName;
+  final String subcategoryName;
 
   final TicketStatus status;
 
@@ -23,6 +24,7 @@ class Ticket {
     required this.id,
     required this.title,
     required this.categoryName,
+    required this.subcategoryName,
     required this.status,
     required this.rawStatus,
     required this.priority,
@@ -65,6 +67,7 @@ class Ticket {
       id:                json['id'].toString(),
       title:             json['title'] ?? '',
       categoryName:      json['category'] ?? '',
+      subcategoryName:      json['subcategory'] ?? '',
       status:            mapStatus(rawSt),
       rawStatus:         rawSt,
       priority:          mapPriority((json['priority'] ?? '').toString()),

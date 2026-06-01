@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../core/services/api_login.dart';
 import '../core/services/api_user_data.dart';
 import '../core/services/api_user.dart';
+import '../core/services/api_insti_&_postition.dart';
 import '../data/light_theme.dart';
 import 'package:intl/intl.dart';
 
@@ -30,6 +31,10 @@ class _UserScreenState extends State<UserScreen> {
   int _currentPage = 1;
   static const int _perPage = 20;
 
+  // ── Shared data singleton ─────────────────────────────────
+  List<String> _positions = [];
+  List<String> _institutions = [];
+
   // ── Computed lists ────────────────────────────────────────
   List<Map<String, String>> get _filteredUsers {
     var list = List<Map<String, String>>.from(_users);
@@ -37,13 +42,13 @@ class _UserScreenState extends State<UserScreen> {
     if (_search.isNotEmpty) {
       final q = _search.toLowerCase();
       list = list.where((u) =>
-      (u['username']   ?? '').toLowerCase().contains(q) ||
-          (u['first_name'] ?? '').toLowerCase().contains(q) ||
-          (u['last_name']  ?? '').toLowerCase().contains(q) ||
-          (u['email']      ?? '').toLowerCase().contains(q) ||
-          (u['role']       ?? '').toLowerCase().contains(q) ||
-          (u['position']   ?? '').toLowerCase().contains(q) ||
-          (u['institution']?? '').toLowerCase().contains(q)
+      (u['username']    ?? '').toLowerCase().contains(q) ||
+          (u['first_name']  ?? '').toLowerCase().contains(q) ||
+          (u['last_name']   ?? '').toLowerCase().contains(q) ||
+          (u['email']       ?? '').toLowerCase().contains(q) ||
+          (u['role']        ?? '').toLowerCase().contains(q) ||
+          (u['position']    ?? '').toLowerCase().contains(q) ||
+          (u['institution'] ?? '').toLowerCase().contains(q)
       ).toList();
     }
 
@@ -73,10 +78,13 @@ class _UserScreenState extends State<UserScreen> {
   @override
   void initState() {
     super.initState();
+
     _loadUsersAndRole();
+    _loadDropdownData();
+
     _searchController.addListener(() {
       setState(() {
-        _search      = _searchController.text;
+        _search = _searchController.text;
         _currentPage = 1;
       });
     });
@@ -86,6 +94,30 @@ class _UserScreenState extends State<UserScreen> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadDropdownData() async {
+    try {
+      final positionsData =
+      await ApiInstitutionPosition.getPositions();
+
+      final institutionsData =
+      await ApiInstitutionPosition.getInstitutions();
+
+      setState(() {
+        _positions = positionsData
+            .map((e) => e['name'].toString())
+            .toList();
+
+        _institutions = institutionsData
+            .map((e) => e['name'].toString())
+            .toList();
+      });
+    } catch (e) {
+      debugPrint(
+        'Failed loading positions/institutions: $e',
+      );
+    }
   }
 
   // ── Load ──────────────────────────────────────────────────
@@ -278,60 +310,49 @@ class _UserScreenState extends State<UserScreen> {
               fontWeight: FontWeight.w700,
             ),
           ),
-
           const SizedBox(width: 16),
-
-          // ── Search ─────────────────────────────────────────
+          const Spacer(),
           Expanded(
             child: Container(
-                height: 36,
-                decoration: BoxDecoration(
-                  color: AppTheme.surface,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppTheme.border),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const SizedBox(width: 12),
-
-                    const Icon(Icons.search,
-                        size: 16,
-                        color: AppTheme.textSecondary),
-
-                    const SizedBox(width: 8),
-
-                    Expanded(
-                      child: TextField(
-                        controller: _searchController,
-                        style: const TextStyle(
-                          color: AppTheme.textPrimary,
-                          fontSize: 13,
-                        ),
-                        decoration: const InputDecoration(
-                          hintText: 'Search users...',
-                          hintStyle: TextStyle(color: AppTheme.textMuted),
-                          border: InputBorder.none,
-                          isDense: true,
-                          contentPadding: EdgeInsets.zero,
-                        ),
+              height: 36,
+              decoration: BoxDecoration(
+                color: AppTheme.surface,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppTheme.border),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(width: 12),
+                  const Icon(Icons.search, size: 16, color: AppTheme.textSecondary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextField(
+                      controller: _searchController,
+                      style: const TextStyle(
+                        color: AppTheme.textPrimary,
+                        fontSize: 13,
+                      ),
+                      decoration: const InputDecoration(
+                        hintText: 'Search users...',
+                        hintStyle: TextStyle(color: AppTheme.textMuted),
+                        border: InputBorder.none,
+                        isDense: true,
+                        contentPadding: EdgeInsets.zero,
                       ),
                     ),
-
-                    if (_search.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 4),
-                        child: GestureDetector(
-                          onTap: () => _searchController.clear(),
-                          child: const Icon(
-                            Icons.close,
-                            size: 14,
-                            color: AppTheme.textSecondary,
-                          ),
-                        ),
+                  ),
+                  if (_search.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 4),
+                      child: GestureDetector(
+                        onTap: () => _searchController.clear(),
+                        child: const Icon(Icons.close,
+                            size: 14, color: AppTheme.textSecondary),
                       ),
-                  ],
-                )
+                    ),
+                ],
+              ),
             ),
           ),
         ],
@@ -342,24 +363,58 @@ class _UserScreenState extends State<UserScreen> {
   // ── Table header ──────────────────────────────────────────
   Widget _buildTableHeader() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      child: Row(children: [
-        const Text(
-          'List of Users',
-          style: TextStyle(
-            color: AppTheme.textPrimary,
-            fontSize: 15,
-            fontWeight: FontWeight.w700,
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
+      child: Row(
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'List of Users',
+                style: TextStyle(
+                  color: AppTheme.textPrimary,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                _filteredUsers.length != _users.length
+                    ? '${_filteredUsers.length} of ${_users.length}'
+                    : '${_users.length} total',
+                style: const TextStyle(
+                  color: AppTheme.textSecondary,
+                  fontSize: 12,
+                ),
+              ),
+            ],
           ),
-        ),
-        const SizedBox(width: 8),
-        Text(
-          _filteredUsers.length != _users.length
-              ? '${_filteredUsers.length} of ${_users.length}'
-              : '${_users.length} total',
-          style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
-        ),
-      ]),
+          const Spacer(),
+          Tooltip(
+            message: 'Refresh users',
+            child: InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: _loading ? null : _loadUsersAndRole,
+              child: Container(
+                height: 34,
+                width: 34,
+                decoration: BoxDecoration(
+                  color: AppTheme.surface,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppTheme.border),
+                ),
+                child: _loading
+                    ? const Padding(
+                  padding: EdgeInsets.all(8),
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+                    : const Icon(Icons.refresh,
+                    size: 18, color: AppTheme.textSecondary),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -387,7 +442,7 @@ class _UserScreenState extends State<UserScreen> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final minWidth  = _cols.fold(0.0, (s, c) => s + c.width);
+        final minWidth   = _cols.fold(0.0, (s, c) => s + c.width);
         final tableWidth = constraints.maxWidth > minWidth
             ? constraints.maxWidth
             : minWidth;
@@ -422,11 +477,13 @@ class _UserScreenState extends State<UserScreen> {
                     ),
                     child: Row(
                       children: scaledCols.map((col) {
-                        final isSorted = _sortColumn == col.key && col.key.isNotEmpty;
+                        final isSorted =
+                            _sortColumn == col.key && col.key.isNotEmpty;
                         return SizedBox(
                           width: col.width,
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 10),
                             child: col.key.isEmpty
                                 ? Text(
                               col.label.toUpperCase(),
@@ -448,7 +505,7 @@ class _UserScreenState extends State<UserScreen> {
                                       style: TextStyle(
                                         color: isSorted
                                             ? AppTheme.accent
-                                            : AppTheme.textMuted,
+                                            : AppTheme.textPrimary,
                                         fontSize: 10,
                                         fontWeight: FontWeight.w700,
                                         letterSpacing: 0.6,
@@ -483,7 +540,8 @@ class _UserScreenState extends State<UserScreen> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.people_outline, size: 36, color: AppTheme.textMuted),
+                          Icon(Icons.people_outline,
+                              size: 36, color: AppTheme.textMuted),
                           const SizedBox(height: 10),
                           Text(
                             _search.isNotEmpty
@@ -512,7 +570,8 @@ class _UserScreenState extends State<UserScreen> {
                                   ? Colors.transparent
                                   : AppTheme.border.withOpacity(0.15),
                               border: const Border(
-                                bottom: BorderSide(color: AppTheme.border, width: 0.5),
+                                bottom: BorderSide(
+                                    color: AppTheme.border, width: 0.5),
                               ),
                             ),
                             child: Row(
@@ -521,14 +580,13 @@ class _UserScreenState extends State<UserScreen> {
                                   width: col.width,
                                   child: Padding(
                                     padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 10,
-                                    ),
+                                        horizontal: 12, vertical: 10),
                                     child: col.key == ''
                                         ? _actionsCell(u, id)
                                         : Text(
                                       col.key == 'created_at'
-                                          ? _formatDate(u['created_at'] ?? '')
+                                          ? _formatDate(
+                                          u['created_at'] ?? '')
                                           : (u[col.key] ?? '').isEmpty
                                           ? '—'
                                           : u[col.key]!,
@@ -565,14 +623,20 @@ class _UserScreenState extends State<UserScreen> {
           icon: Icons.edit_outlined,
           color: AppTheme.accent,
           tooltip: 'Edit user',
-          onTap: _isAdmin ? () => _showEditUserDialog(u) : _showAdminOnlyWarning,
+          onTap: _isAdmin
+              ? () => _showEditUserDialog(u)
+              : _showAdminOnlyWarning,
         ),
         const SizedBox(width: 4),
         _ActionIcon(
-          icon: u['status'] == 'active' ? Icons.block : Icons.check_circle_outline,
+          icon: u['status'] == 'active'
+              ? Icons.block
+              : Icons.check_circle_outline,
           color: u['status'] == 'active' ? Colors.red : Colors.green,
           tooltip: u['status'] == 'active' ? 'Disable user' : 'Enable user',
-          onTap: _isAdmin ? () => _confirmToggleUser(u, id) : _showAdminOnlyWarning,
+          onTap: _isAdmin
+              ? () => _confirmToggleUser(u, id)
+              : _showAdminOnlyWarning,
         ),
       ],
     );
@@ -592,20 +656,19 @@ class _UserScreenState extends State<UserScreen> {
           Expanded(
             child: Text(
                   () {
-                final start = _filteredUsers.isEmpty ? 0 : (current - 1) * _perPage + 1;
-                final end   = (current * _perPage).clamp(0, _filteredUsers.length);
+                final start = _filteredUsers.isEmpty
+                    ? 0
+                    : (current - 1) * _perPage + 1;
+                final end =
+                (current * _perPage).clamp(0, _filteredUsers.length);
                 return 'Showing $start–$end of ${_filteredUsers.length}';
               }(),
               style: const TextStyle(
-                color: AppTheme.textSecondary,
-                fontSize: 12,
-              ),
+                  color: AppTheme.textSecondary, fontSize: 12),
               overflow: TextOverflow.ellipsis,
             ),
           ),
-
           const SizedBox(width: 8),
-
           Flexible(
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -617,9 +680,7 @@ class _UserScreenState extends State<UserScreen> {
                     onTap: () => setState(() => _currentPage--),
                   ),
                   const SizedBox(width: 4),
-
                   ..._buildPagePills(current, total),
-
                   const SizedBox(width: 4),
                   _PageButton(
                     icon: Icons.chevron_right,
@@ -656,7 +717,8 @@ class _UserScreenState extends State<UserScreen> {
           decoration: BoxDecoration(
             color: isActive ? AppTheme.accent : Colors.transparent,
             borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: isActive ? AppTheme.accent : AppTheme.border),
+            border: Border.all(
+                color: isActive ? AppTheme.accent : AppTheme.border),
           ),
           child: Center(
             child: Text(
@@ -664,7 +726,8 @@ class _UserScreenState extends State<UserScreen> {
               style: TextStyle(
                 color: isActive ? Colors.white : AppTheme.textSecondary,
                 fontSize: 12,
-                fontWeight: isActive ? FontWeight.w700 : FontWeight.normal,
+                fontWeight:
+                isActive ? FontWeight.w700 : FontWeight.normal,
               ),
             ),
           ),
@@ -673,424 +736,363 @@ class _UserScreenState extends State<UserScreen> {
     }).toList();
   }
 
-  // ── Edit user dialog ──────────────────────────────────────
+  // ══════════════════════════════════════════════════════════
+  //  Edit user dialog — Position & Institution use ModificationData
+  // ══════════════════════════════════════════════════════════
   void _showEditUserDialog(Map<String, String> user) {
-    final firstNameController  = TextEditingController(text: user['first_name']);
-    final lastNameController   = TextEditingController(text: user['last_name']);
-    final emailController      = TextEditingController(text: user['email']);
-    final passwordController   = TextEditingController();
-    final institutionController= TextEditingController(text: user['institution']);
+    final firstNameCtrl   = TextEditingController(text: user['first_name']);
+    final lastNameCtrl    = TextEditingController(text: user['last_name']);
+    final emailCtrl       = TextEditingController(text: user['email']);
+    final passwordCtrl    = TextEditingController();
+    final institutionCtrl = TextEditingController(text: user['institution']);
 
-    String? selectedPosition = (user['position'] ?? '').isNotEmpty
-        ? user['position']
-        : null;
+    String? selectedPosition =
+    (user['position'] ?? '').isNotEmpty ? user['position'] : null;
 
     String selectedRole =
     ['user', 'endorser', 'approver', 'resolver'].contains(user['role'])
         ? user['role']!
         : 'user';
-    String selectedStatus = user['status'] == 'inactive' ? 'inactive' : 'active';
+    String selectedStatus =
+    user['status'] == 'inactive' ? 'inactive' : 'active';
 
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setStateDialog) => AlertDialog(
-          backgroundColor: AppTheme.surface,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          title: const Text(
-            'Edit User',
-            style: TextStyle(color: AppTheme.textPrimary, fontSize: 15),
-          ),
-          content: SizedBox(
-            width: 400,
-            child: SingleChildScrollView(
-              child: Column(children: [
+        builder: (context, setStateDialog) {
+          // ── Read live lists inside the builder so every rebuild is fresh ──
+          final positions = _positions;
+          final institutions = _institutions;
 
-                // ── First Name | Last Name ─────────────────
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: firstNameController,
-                        style: const TextStyle(color: AppTheme.textPrimary),
-                        decoration: const InputDecoration(labelText: 'First Name'),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextField(
-                        controller: lastNameController,
-                        style: const TextStyle(color: AppTheme.textPrimary),
-                        decoration: const InputDecoration(labelText: 'Last Name'),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-
-                // ── Email ──────────────────────────────────
-                TextField(
-                  controller: emailController,
-                  style: const TextStyle(color: AppTheme.textPrimary),
-                  decoration: const InputDecoration(labelText: 'Email'),
-                ),
-                const SizedBox(height: 10),
-
-                // ── Password ───────────────────────────────
-                TextField(
-                  controller: passwordController,
-                  obscureText: true,
-                  style: const TextStyle(color: AppTheme.textPrimary),
-                  decoration: const InputDecoration(
-                    labelText: 'Password',
-                    hintText: 'Leave blank to keep current',
-                  ),
-                ),
-                const SizedBox(height: 10),
-
-                // ── Position (Autocomplete) ────────────────
-                Column(
+          return AlertDialog(
+            backgroundColor: AppTheme.surface,
+            shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            title: const Text(
+              'Edit User',
+              style: TextStyle(color: AppTheme.textPrimary, fontSize: 15),
+            ),
+            content: SizedBox(
+              width: 400,
+              child: SingleChildScrollView(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Position',
-                      style: TextStyle(
-                        color: AppTheme.textSecondary,
-                        fontSize: 13,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Autocomplete<String>(
-                      optionsBuilder: (TextEditingValue val) {
-                        if (val.text.isEmpty) return _kPositions;
-                        return _kPositions.where((p) =>
-                            p.toLowerCase().contains(val.text.toLowerCase()));
-                      },
-                      initialValue: TextEditingValue(
-                        text: selectedPosition ?? '',
-                      ),
-                      onSelected: (String s) {
-                        setStateDialog(() => selectedPosition = s);
-                      },
-                      fieldViewBuilder: (ctx, fieldCtrl, focus, onSubmit) {
-                        return TextField(
-                          controller: fieldCtrl,
-                          focusNode: focus,
-                          style: const TextStyle(color: AppTheme.textPrimary),
-                          onChanged: (v) {
-                            setStateDialog(() => selectedPosition = v);
-                          },
-                          decoration: const InputDecoration(
-                            hintText: 'Search position…',
-                            suffixIcon: Icon(
-                              Icons.arrow_drop_down,
-                              color: AppTheme.textSecondary,
-                            ),
-                          ),
-                        );
-                      },
-                      optionsViewBuilder: (ctx, onSelected, options) => Align(
-                        alignment: Alignment.topLeft,
-                        child: Material(
-                          elevation: 6,
-                          borderRadius: BorderRadius.circular(8),
-                          color: AppTheme.surface,
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxHeight: 220),
-                            child: ListView.builder(
-                              padding: EdgeInsets.zero,
-                              shrinkWrap: true,
-                              itemCount: options.length,
-                              itemBuilder: (_, i) {
-                                final opt = options.elementAt(i);
-                                return InkWell(
-                                  onTap: () => onSelected(opt),
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 16, vertical: 12),
-                                    child: Text(
-                                      opt,
-                                      style: const TextStyle(
-                                        color: AppTheme.textPrimary,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
+
+                    // ── First Name | Last Name ─────────────────────
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: firstNameCtrl,
+                            style: const TextStyle(
+                                color: AppTheme.textPrimary),
+                            decoration: const InputDecoration(
+                                labelText: 'First Name'),
                           ),
                         ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-
-                // ── Institution (Autocomplete) ────────────────
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Institution',
-                      style: TextStyle(
-                        color: AppTheme.textSecondary,
-                        fontSize: 13,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Autocomplete<String>(
-                      optionsBuilder: (TextEditingValue val) {
-                        if (val.text.isEmpty) return _kInstitution;
-                        return _kInstitution.where((i) =>
-                            i.toLowerCase().contains(val.text.toLowerCase()));
-                      },
-                      initialValue: TextEditingValue(
-                        text: institutionController.text,
-                      ),
-                      onSelected: (String s) {
-                        institutionController.text = s;
-                      },
-                      fieldViewBuilder: (ctx, fieldCtrl, focus, onSubmit) {
-                        fieldCtrl.text = institutionController.text;
-
-                        return TextField(
-                          controller: fieldCtrl,
-                          focusNode: focus,
-                          style: const TextStyle(color: AppTheme.textPrimary),
-                          onChanged: (v) {
-                            institutionController.text = v;
-                          },
-                          decoration: const InputDecoration(
-                            hintText: 'Search institution…',
-                            suffixIcon: Icon(
-                              Icons.arrow_drop_down,
-                              color: AppTheme.textSecondary,
-                            ),
-                          ),
-                        );
-                      },
-                      optionsViewBuilder: (ctx, onSelected, options) => Align(
-                        alignment: Alignment.topLeft,
-                        child: Material(
-                          elevation: 6,
-                          borderRadius: BorderRadius.circular(8),
-                          color: AppTheme.surface,
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxHeight: 220),
-                            child: ListView.builder(
-                              padding: EdgeInsets.zero,
-                              shrinkWrap: true,
-                              itemCount: options.length,
-                              itemBuilder: (_, i) {
-                                final opt = options.elementAt(i);
-
-                                return InkWell(
-                                  onTap: () => onSelected(opt),
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 16,
-                                      vertical: 12,
-                                    ),
-                                    child: Text(
-                                      opt,
-                                      style: const TextStyle(
-                                        color: AppTheme.textPrimary,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextField(
+                            controller: lastNameCtrl,
+                            style: const TextStyle(
+                                color: AppTheme.textPrimary),
+                            decoration: const InputDecoration(
+                                labelText: 'Last Name'),
                           ),
                         ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+
+                    // ── Email ──────────────────────────────────────
+                    TextField(
+                      controller: emailCtrl,
+                      style:
+                      const TextStyle(color: AppTheme.textPrimary),
+                      decoration:
+                      const InputDecoration(labelText: 'Email'),
+                    ),
+                    const SizedBox(height: 10),
+
+                    // ── Password ───────────────────────────────────
+                    TextField(
+                      controller: passwordCtrl,
+                      obscureText: true,
+                      style:
+                      const TextStyle(color: AppTheme.textPrimary),
+                      decoration: const InputDecoration(
+                        labelText: 'Password',
+                        hintText: 'Leave blank to keep current',
                       ),
+                    ),
+                    const SizedBox(height: 10),
+
+                    // ── Position (dynamic autocomplete) ───────────
+                    _EditAutocomplete(
+                      label: 'Position',
+                      initialText: selectedPosition ?? '',
+                      options: positions,
+                      onChanged: (v) =>
+                          setStateDialog(() => selectedPosition = v),
+                    ),
+                    const SizedBox(height: 10),
+
+                    // ── Institution (dynamic autocomplete) ────────
+                    _EditAutocomplete(
+                      label: 'Institution',
+                      initialText: institutionCtrl.text,
+                      options: institutions,
+                      onChanged: (v) => institutionCtrl.text = v,
+                    ),
+                    const SizedBox(height: 10),
+
+                    // ── Role ───────────────────────────────────────
+                    DropdownButtonFormField<String>(
+                      value: selectedRole,
+                      decoration:
+                      const InputDecoration(labelText: 'Role'),
+                      items: const [
+                        DropdownMenuItem(
+                            value: 'user', child: Text('User')),
+                        DropdownMenuItem(
+                            value: 'endorser',
+                            child: Text('Endorser')),
+                        DropdownMenuItem(
+                            value: 'approver',
+                            child: Text('Approver')),
+                        DropdownMenuItem(
+                            value: 'resolver',
+                            child: Text('Resolver')),
+                      ],
+                      onChanged: (v) {
+                        if (v != null)
+                          setStateDialog(() => selectedRole = v);
+                      },
+                    ),
+                    const SizedBox(height: 10),
+
+                    // ── Status ─────────────────────────────────────
+                    DropdownButtonFormField<String>(
+                      value: selectedStatus,
+                      decoration:
+                      const InputDecoration(labelText: 'Status'),
+                      items: const [
+                        DropdownMenuItem(
+                            value: 'active', child: Text('Active')),
+                        DropdownMenuItem(
+                            value: 'inactive',
+                            child: Text('Inactive')),
+                      ],
+                      onChanged: (v) {
+                        if (v != null)
+                          setStateDialog(() => selectedStatus = v);
+                      },
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
-
-                // ── Role ───────────────────────────────────
-                DropdownButtonFormField<String>(
-                  value: selectedRole,
-                  decoration: const InputDecoration(labelText: 'Role'),
-                  items: const [
-                    DropdownMenuItem(value: 'user',     child: Text('User')),
-                    DropdownMenuItem(value: 'endorser', child: Text('Endorser')),
-                    DropdownMenuItem(value: 'approver', child: Text('Approver')),
-                    DropdownMenuItem(value: 'resolver', child: Text('Resolver')),
-                  ],
-                  onChanged: (v) { if (v != null) setStateDialog(() => selectedRole = v); },
-                ),
-                const SizedBox(height: 10),
-
-                // ── Status ─────────────────────────────────
-                DropdownButtonFormField<String>(
-                  value: selectedStatus,
-                  decoration: const InputDecoration(labelText: 'Status'),
-                  items: const [
-                    DropdownMenuItem(value: 'active',   child: Text('Active')),
-                    DropdownMenuItem(value: 'inactive', child: Text('Inactive')),
-                  ],
-                  onChanged: (v) { if (v != null) setStateDialog(() => selectedStatus = v); },
-                ),
-              ]),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.accent,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
-              onPressed: () async {
-                final id = int.tryParse(user['id'] ?? '');
-                if (id == null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Invalid user ID')),
-                  );
-                  return;
-                }
-
-                final success = await ApiUser.updateUser(
-                  id:          id,
-                  firstName:   firstNameController.text.trim(),
-                  lastName:    lastNameController.text.trim(),
-                  email:       emailController.text.trim(),
-                  password:    passwordController.text.trim().isNotEmpty
-                      ? passwordController.text.trim()
-                      : null,
-                  role:        selectedRole,
-                  position:    selectedPosition ?? '',
-                  institution: institutionController.text.trim(),
-                  status:      selectedStatus,
-                );
-
-                if (success) {
-                  setState(() {
-                    user['first_name']  = firstNameController.text.trim();
-                    user['last_name']   = lastNameController.text.trim();
-                    user['email']       = emailController.text.trim();
-                    user['role']        = selectedRole;
-                    user['position']    = selectedPosition ?? '';
-                    user['institution'] = institutionController.text.trim();
-                    user['status']      = selectedStatus;
-                  });
-                  if (context.mounted) Navigator.pop(context);
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('User updated successfully'),
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
-                  }
-                } else {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Failed to update user'),
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
-                  }
-                }
-              },
-              child: const Text('Save'),
             ),
-          ],
-        ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.accent,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                ),
+                onPressed: () async {
+                  final id = int.tryParse(user['id'] ?? '');
+                  if (id == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Invalid user ID')),
+                    );
+                    return;
+                  }
+
+                  final success = await ApiUser.updateUser(
+                    id:          id,
+                    firstName:   firstNameCtrl.text.trim(),
+                    lastName:    lastNameCtrl.text.trim(),
+                    email:       emailCtrl.text.trim(),
+                    password:    passwordCtrl.text.trim().isNotEmpty
+                        ? passwordCtrl.text.trim()
+                        : null,
+                    role:        selectedRole,
+                    position:    selectedPosition ?? '',
+                    institution: institutionCtrl.text.trim(),
+                    status:      selectedStatus,
+                  );
+
+                  if (success) {
+                    setState(() {
+                      user['first_name']  = firstNameCtrl.text.trim();
+                      user['last_name']   = lastNameCtrl.text.trim();
+                      user['email']       = emailCtrl.text.trim();
+                      user['role']        = selectedRole;
+                      user['position']    = selectedPosition ?? '';
+                      user['institution'] = institutionCtrl.text.trim();
+                      user['status']      = selectedStatus;
+                    });
+                    if (context.mounted) Navigator.pop(context);
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('User updated successfully'),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    }
+                  } else {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Failed to update user'),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    }
+                  }
+                },
+                child: const Text('Save'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Position list
+//  _EditAutocomplete
+//  Reusable autocomplete field for the Edit User dialog.
+//  Accepts a live `options` list so it always reflects the current
+//  ModificationData state without needing a ValueListenableBuilder here
+//  (the StatefulBuilder in _showEditUserDialog already rebuilds on changes
+//  because the lists are re-read on each build call).
 // ─────────────────────────────────────────────────────────────────────────────
+class _EditAutocomplete extends StatefulWidget {
+  const _EditAutocomplete({
+    required this.label,
+    required this.initialText,
+    required this.options,
+    required this.onChanged,
+  });
 
-const List<String> _kPositions = [
-  'Analytics Engineer - OIC',
-  'Application Analyst 2',
-  'Application Developer',
-  'Application Developer 1 - OIC',
-  'Business Intelligence Analyst - OIC',
-  'Business Intelligence Lead OIC',
-  'Business Relationship Manager - OIC',
-  'Chief Data Officer - OIC',
-  'Chief Data Scientist - OIC',
-  'Chief Operating Officer - OIC',
-  'Cloud Engineer - OIC',
-  'Cloud Operations Administrator - OIC',
-  'Cloud Operations Support',
-  'Compliance',
-  'Compliance Officer',
-  'Data Scientist OIC',
-  'DDFA- OIC',
-  'Developer',
-  'Developer 1',
-  'Developer 1 - OIC',
-  'Developer 2 - OIC',
-  'Finance Assistant',
-  'Information Security Officer - OIC',
-  'Junior Analytics Developer',
-  'Junior Analytics Engineer',
-  'Junior Data Engineer',
-  'Machine Learning Engineer OIC',
-  'Product Specialist',
-  'Product Specialist 1',
-  'Product Specialist 1 - OIC',
-  'Product Specialist Head OIC',
-  'Project Manager - OIC',
-  'Quality Assurance Analyst',
-  'Quality Assurance Analyst 1',
-  'Quality Assurance Manager',
-  'Report Specialist I',
-  'Report Specialist II',
-  'Report Specialist II - OIC',
-  'Report Specialist III',
-  'Report Specialist III - OIC',
-  'Risk Management Officer - OIC',
-  'Senior Finance Officer OIC',
-];
+  final String         label;
+  final String         initialText;
+  final List<String>   options;
+  final void Function(String) onChanged;
 
-const List<String> _kInstitution = [
-  'MHI Healthcare Inc.',
-  'CMIT',
-  'FDSAP',
-  'Bakawan Data Analytics',
-  'EMPC',
-  'CARD Bank',
-  'CARD SME Bank',
-  'CARD RBI',
-  'CARD Inc.',
-  'Padayon Microfinance',
-  'Astro',
-  'Laguna Fresh',
-  'CARD MRI International Partnership Project Institution',
-  'CARD MRI Holdings Company',
-  'CARD MBA',
-  'Bente Production',
-  'Hijos Tours',
-  'CARD Publishing House',
-  'CARD Indogrosir Inc.',
-  'LIKHA NI INAY',
-  'OTTO KONEK',
-  'CARD Pioneer Microinsurance Inc.',
-  'CARD Mutually Reinforcing Institutions',
-  'CARD Engagement Services Inc.',
-  'CARD MRI Development Institute Inc.',
-  'CARD-PCPD',
-  'BotiCARD Pharmacy',
-  'CaMIA (CARD MRI Insurance Agency)',
-  'CARD MBA Pioneer',
-];
+  @override
+  State<_EditAutocomplete> createState() => _EditAutocompleteState();
+}
+
+class _EditAutocompleteState extends State<_EditAutocomplete> {
+  late final TextEditingController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = TextEditingController(text: widget.initialText);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          widget.label,
+          style: const TextStyle(
+            color: AppTheme.textSecondary,
+            fontSize: 13,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Autocomplete<String>(
+          optionsBuilder: (TextEditingValue tv) {
+            if (tv.text.isEmpty) return widget.options;
+            return widget.options.where(
+                    (o) => o.toLowerCase().contains(tv.text.toLowerCase()));
+          },
+          initialValue: TextEditingValue(text: widget.initialText),
+          onSelected: (String s) {
+            _ctrl.text = s;
+            widget.onChanged(s);
+          },
+          fieldViewBuilder: (ctx, fieldCtrl, focusNode, onSubmitted) {
+            // Keep field in sync when initialText changes (e.g. dialog reopen)
+            if (fieldCtrl.text.isEmpty && _ctrl.text.isNotEmpty) {
+              fieldCtrl.text = _ctrl.text;
+            }
+            return TextField(
+              controller: fieldCtrl,
+              focusNode: focusNode,
+              style: const TextStyle(color: AppTheme.textPrimary),
+              onChanged: (v) {
+                _ctrl.text = v;
+                widget.onChanged(v);
+              },
+              decoration: InputDecoration(
+                hintText: 'Search ${widget.label.toLowerCase()}…',
+                suffixIcon: const Icon(
+                  Icons.arrow_drop_down,
+                  color: AppTheme.textSecondary,
+                ),
+              ),
+            );
+          },
+          optionsViewBuilder: (ctx, onSelected, options) => Align(
+            alignment: Alignment.topLeft,
+            child: Material(
+              elevation: 6,
+              borderRadius: BorderRadius.circular(8),
+              color: AppTheme.surface,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 220),
+                child: ListView.builder(
+                  padding: EdgeInsets.zero,
+                  shrinkWrap: true,
+                  itemCount: options.length,
+                  itemBuilder: (_, i) {
+                    final opt = options.elementAt(i);
+                    return InkWell(
+                      onTap: () => onSelected(opt),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 12),
+                        child: Text(
+                          opt,
+                          style: const TextStyle(
+                            color: AppTheme.textPrimary,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────

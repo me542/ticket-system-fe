@@ -112,12 +112,19 @@ class _LoginScreenState extends State<LoginScreen> {
                     width: 400,
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1A1F2E),
+                      color: Colors.white,
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: const Color(0xFF2A3142),
+                        color: const Color(0xFFE5E7EB),
                         width: 1,
                       ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -128,38 +135,43 @@ class _LoginScreenState extends State<LoginScreen> {
                           style: TextStyle(
                             color: Color(0xFF268A15),
                             fontSize: 20,
-                            fontWeight: FontWeight.w500,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
+
                         const SizedBox(height: 16),
+
                         const Text(
                           'Enter your email to receive a verification code.',
                           style: TextStyle(
-                            color: Color(0xFF8A92A3),
+                            color: Color(0xFF6B7280),
                             fontSize: 14,
                           ),
                         ),
+
                         const SizedBox(height: 16),
+
                         TextField(
                           controller: emailController,
-                          style: const TextStyle(color: Colors.white),
+                          style: const TextStyle(color: Colors.black),
                           decoration: InputDecoration(
                             hintText: 'admin@example.com',
                             hintStyle: const TextStyle(
-                              color: Color(0xFF4A5268),
+                              color: Color(0xFF9CA3AF),
                             ),
                             prefixIcon: const Icon(
                               Icons.email_outlined,
                               color: Color(0xFF268A15),
                             ),
                             filled: true,
-                            fillColor: const Color(0xFF0F1419),
+                            fillColor: const Color(0xFFF4F6F9),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
                               borderSide: BorderSide(
                                 color: errorText != null
                                     ? Colors.red
-                                    : const Color(0xFF2A3142),
+                                    : const Color(0xFFE5E7EB),
+                                width: 2,
                               ),
                             ),
                             enabledBorder: OutlineInputBorder(
@@ -167,7 +179,8 @@ class _LoginScreenState extends State<LoginScreen> {
                               borderSide: BorderSide(
                                 color: errorText != null
                                     ? Colors.red
-                                    : const Color(0xFF2A3142),
+                                    : const Color(0xFFE5E7EB),
+                                width: 2,
                               ),
                             ),
                             focusedBorder: OutlineInputBorder(
@@ -181,6 +194,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
                         ),
+
                         if (errorText != null) ...[
                           const SizedBox(height: 8),
                           Text(
@@ -191,7 +205,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
                         ],
+
                         const SizedBox(height: 24),
+
                         SizedBox(
                           width: double.infinity,
                           height: 48,
@@ -199,8 +215,6 @@ class _LoginScreenState extends State<LoginScreen> {
                             onPressed: () async {
                               final email = emailController.text.trim();
 
-
-                              // Email format validation
                               if (email.isEmpty || !isValidEmail(email)) {
                                 setState(() {
                                   errorText = 'Please enter a valid email';
@@ -208,13 +222,11 @@ class _LoginScreenState extends State<LoginScreen> {
                                 return;
                               }
 
-
                               final res =
                               await ApiForgotPassword.forgotPassword(email);
 
-
                               if (res['success'] && res['token'] != null) {
-                                Navigator.pop(context); // Close only on success
+                                Navigator.pop(context);
                                 _showVerifyCodeDialog(email, res['token']);
                               } else {
                                 setState(() {
@@ -273,9 +285,19 @@ class _LoginScreenState extends State<LoginScreen> {
             width: 400,
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: const Color(0xFF1A1F2E),
+              color: Colors.white,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFF2A3142), width: 1),
+              border: Border.all(
+                color: const Color(0xFFE5E7EB),
+                width: 1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -286,44 +308,51 @@ class _LoginScreenState extends State<LoginScreen> {
                   style: TextStyle(
                     color: Color(0xFF268A15),
                     fontSize: 20,
-                    fontWeight: FontWeight.w500,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
+
                 const SizedBox(height: 16),
+
                 const Text(
-                  'Enter the code:',
-                  style: TextStyle(color: Color(0xFF8A92A3), fontSize: 14),
+                  'Enter the 6-digit code:',
+                  style: TextStyle(
+                    color: Color(0xFF6B7280),
+                    fontSize: 14,
+                  ),
                 ),
+
                 const SizedBox(height: 16),
+
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: List.generate(
                     6,
                         (index) => SizedBox(
-                      width: 50, // Wider box for digit
+                      width: 50,
                       child: TextField(
                         controller: otpControllers[index],
                         style: const TextStyle(
-                          color: Colors.white,
+                          color: Colors.black,
                           fontSize: 20,
+                          fontWeight: FontWeight.w600,
                         ),
                         keyboardType: TextInputType.number,
                         textAlign: TextAlign.center,
                         maxLength: 1,
                         inputFormatters: [
-                          FilteringTextInputFormatter
-                              .digitsOnly, // Only numbers
+                          FilteringTextInputFormatter.digitsOnly,
                         ],
                         decoration: InputDecoration(
                           counterText: '',
                           filled: true,
-                          fillColor: const Color(0xFF0F1419),
+                          fillColor: const Color(0xFFF4F6F9),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
                             borderSide: BorderSide(
                               color: errorText != null
                                   ? Colors.red
-                                  : const Color(0xFF2A3142),
+                                  : const Color(0xFFE5E7EB),
                               width: 2,
                             ),
                           ),
@@ -332,7 +361,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             borderSide: BorderSide(
                               color: errorText != null
                                   ? Colors.red
-                                  : const Color(0xFF2A3142),
+                                  : const Color(0xFFE5E7EB),
                               width: 2,
                             ),
                           ),
@@ -347,15 +376,12 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                         onChanged: (value) {
-                          // Move focus automatically
                           if (value.isNotEmpty && index < 5) {
                             FocusScope.of(context).nextFocus();
                           } else if (value.isEmpty && index > 0) {
                             FocusScope.of(context).previousFocus();
                           }
 
-
-                          // Reset error when user types again
                           setStateDialog(() {
                             errorText = null;
                           });
@@ -364,17 +390,23 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                 ),
+
                 if (errorText != null) ...[
                   const SizedBox(height: 8),
                   Center(
                     child: Text(
                       errorText!,
-                      style: const TextStyle(color: Colors.red, fontSize: 13),
+                      style: const TextStyle(
+                        color: Colors.red,
+                        fontSize: 13,
+                      ),
                       textAlign: TextAlign.center,
                     ),
                   ),
                 ],
+
                 const SizedBox(height: 24),
+
                 SizedBox(
                   width: double.infinity,
                   height: 48,
@@ -384,14 +416,13 @@ class _LoginScreenState extends State<LoginScreen> {
                           .map((e) => e.text.trim())
                           .join();
 
-
                       if (enteredCode.length < 6) {
                         setStateDialog(() {
-                          errorText = 'Please enter the complete 6-digit code';
+                          errorText =
+                          'Please enter the complete 6-digit code';
                         });
                         return;
                       }
-
 
                       if (enteredCode != token) {
                         setStateDialog(() {
@@ -399,7 +430,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         });
                         return;
                       }
-
 
                       Navigator.pop(context);
                       _showNewPasswordDialog(token);
@@ -413,14 +443,17 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     child: const Text(
                       'Verify Code',
-                      style: TextStyle(color: Colors.white, fontSize: 16),
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                      ),
                     ),
                   ),
                 ),
               ],
             ),
           ),
-        ),
+        )
       ),
     );
   }
@@ -483,12 +516,19 @@ class _LoginScreenState extends State<LoginScreen> {
             width: 400,
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: const Color(0xFF1A1F2E),
+              color: Colors.white,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: const Color(0xFF2A3142),
+                color: const Color(0xFFE5E7EB),
                 width: 1,
               ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -499,7 +539,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   style: TextStyle(
                     color: Color(0xFF268A15),
                     fontSize: 20,
-                    fontWeight: FontWeight.w500,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
 
@@ -508,22 +548,23 @@ class _LoginScreenState extends State<LoginScreen> {
                 const Text(
                   'Enter your new password.',
                   style: TextStyle(
-                    color: Color(0xFF8A92A3),
+                    color: Color(0xFF6B7280),
                     fontSize: 14,
                   ),
                 ),
 
                 const SizedBox(height: 16),
 
-                // New Password Field
+                // New Password
                 TextField(
                   controller: passwordController,
                   obscureText: obscurePassword,
-                  style: const TextStyle(color: Colors.white),
+                  style: const TextStyle(color: Colors.black),
                   decoration: InputDecoration(
                     hintText: 'New password',
-                    hintStyle:
-                    const TextStyle(color: Color(0xFF4A5268)),
+                    hintStyle: const TextStyle(
+                      color: Color(0xFF9CA3AF),
+                    ),
                     prefixIcon: const Icon(
                       Icons.lock_outlined,
                       color: Color(0xFF268A15),
@@ -542,13 +583,13 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     filled: true,
-                    fillColor: const Color(0xFF0F1419),
+                    fillColor: const Color(0xFFF4F6F9),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                       borderSide: BorderSide(
                         color: passwordError != null
                             ? Colors.red
-                            : const Color(0xFF2A3142),
+                            : const Color(0xFFE5E7EB),
                         width: 2,
                       ),
                     ),
@@ -557,7 +598,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       borderSide: BorderSide(
                         color: passwordError != null
                             ? Colors.red
-                            : const Color(0xFF2A3142),
+                            : const Color(0xFFE5E7EB),
                         width: 2,
                       ),
                     ),
@@ -594,7 +635,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 const SizedBox(height: 12),
 
-                // Password Rules UI
                 _buildRule(
                   "At least 8 characters",
                   _hasMinLength,
@@ -618,15 +658,16 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 const SizedBox(height: 16),
 
-                // Confirm Password Field
+                // Confirm Password
                 TextField(
                   controller: confirmController,
                   obscureText: obscureConfirm,
-                  style: const TextStyle(color: Colors.white),
+                  style: const TextStyle(color: Colors.black),
                   decoration: InputDecoration(
                     hintText: 'Confirm password',
-                    hintStyle:
-                    const TextStyle(color: Color(0xFF4A5268)),
+                    hintStyle: const TextStyle(
+                      color: Color(0xFF9CA3AF),
+                    ),
                     prefixIcon: const Icon(
                       Icons.lock_outlined,
                       color: Color(0xFF268A15),
@@ -645,13 +686,13 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     filled: true,
-                    fillColor: const Color(0xFF0F1419),
+                    fillColor: const Color(0xFFF4F6F9),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                       borderSide: BorderSide(
                         color: confirmError != null
                             ? Colors.red
-                            : const Color(0xFF2A3142),
+                            : const Color(0xFFE5E7EB),
                         width: 2,
                       ),
                     ),
@@ -660,7 +701,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       borderSide: BorderSide(
                         color: confirmError != null
                             ? Colors.red
-                            : const Color(0xFF2A3142),
+                            : const Color(0xFFE5E7EB),
                         width: 2,
                       ),
                     ),
@@ -752,11 +793,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       }
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor:
-                      const Color(0xFF268A15),
+                      backgroundColor: const Color(0xFF268A15),
                       shape: RoundedRectangleBorder(
-                        borderRadius:
-                        BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(8),
                       ),
                       elevation: 0,
                     ),
@@ -772,7 +811,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ],
             ),
           ),
-        ),
+        )
       ),
     );
   }

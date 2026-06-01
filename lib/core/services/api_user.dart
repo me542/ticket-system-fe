@@ -5,6 +5,10 @@ import 'api_login.dart';
 class ApiUser {
   static const String baseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://localhost:8080') + '/api/user';
 
+  // Prod
+  //static const String baseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://idiyanale-be.bakawan-ai.com') + '/api/user';
+
+
   // ================= TOKEN =================
   static Future<String?> getToken() async {
     final token = await ApiLogin.getToken();
@@ -21,6 +25,8 @@ class ApiUser {
     };
     return headers;
   }
+
+
 
   // ================= CREATE =================
   static Future<bool> createUser({

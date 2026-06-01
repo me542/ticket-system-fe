@@ -9,6 +9,10 @@ class ApiForgotPassword {
       ) +
           '/api';
 
+  // Prod
+  // static const String baseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://idiyanale-be.bakawan-ai.com') + '/api';
+
+
   // -----------------------------
   // STEP 1: Request OTP
   // -----------------------------

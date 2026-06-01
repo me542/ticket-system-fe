@@ -17,6 +17,9 @@ class _ReportsState extends State<Reports> {
   bool _loading = true;
   Map<String, Map<String, dynamic>> _monthly = {};
 
+  // Category → { count, totalMinutes, resolvedCount }
+  Map<String, Map<String, dynamic>> _byCategory = {};
+
   @override
   void initState() {
     super.initState();
@@ -42,6 +45,7 @@ class _ReportsState extends State<Reports> {
       final excel = Excel.createExcel();
       final sheet = excel['Report'];
       excel.delete('Sheet1');
+      final catSheet = excel['Category Report'];
 
       final titleStyle = CellStyle(
         bold: true,
@@ -331,6 +335,71 @@ class _ReportsState extends State<Reports> {
       sheet.setColumnWidth(rStart + 5, 20.0);
       sheet.setColumnWidth(rStart + 6, 12.0);
 
+
+      // ===================== CATEGORY REPORT SHEET =====================
+      const catTitleRow = 0;
+
+      final catTitleCell = catSheet.cell(
+        CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: catTitleRow),
+      );
+      catTitleCell.value = TextCellValue('Category Summary Report');
+      catTitleCell.cellStyle = titleStyle;
+
+      catSheet.merge(
+        CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0),
+        CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: 0),
+      );
+
+      // headers
+      const catHeaders = [
+        'Category',
+        'Total Tickets',
+        'Resolved',
+        'Avg Resolution Time'
+      ];
+
+      for (var i = 0; i < catHeaders.length; i++) {
+        final cell = catSheet.cell(
+          CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 1),
+        );
+        cell.value = TextCellValue(catHeaders[i]);
+        cell.cellStyle = headerStyle;
+      }
+
+      // data rows
+      int row = 2;
+
+      final sorted = _byCategory.entries.toList()
+        ..sort((a, b) =>
+            (b.value['count'] as int).compareTo(a.value['count'] as int));
+
+      for (final entry in sorted) {
+        final category = entry.key;
+        final v = entry.value;
+
+        final count = v['count'] as int;
+        final rc = v['resolvedCount'] as int;
+        final mins = v['totalMinutes'] as double;
+
+        final avg = rc == 0 ? '-' : _formatMinutes(mins / rc);
+
+        final rowData = [
+          category,
+          count.toString(),
+          rc.toString(),
+          avg,
+        ];
+
+        for (var i = 0; i < rowData.length; i++) {
+          final cell = catSheet.cell(
+            CellIndex.indexByColumnRow(columnIndex: i, rowIndex: row),
+          );
+          cell.value = TextCellValue(rowData[i]);
+        }
+
+        row++;
+      }
+
       final bytes = excel.encode();
       if (bytes == null) throw Exception('Failed to encode');
       final now      = DateTime.now();
@@ -369,7 +438,8 @@ class _ReportsState extends State<Reports> {
 
     try {
       final data = await TicketService.getAll();
-      _monthly = {};
+      _monthly   = {};
+      _byCategory = {};
 
       for (final t in data) {
         final created = _parseDate(
@@ -392,7 +462,18 @@ class _ReportsState extends State<Reports> {
         final m = _monthly[key]!;
         m['total']++;
 
-        final status = (t['status'] ?? '').toString().toLowerCase();
+        final status   = (t['status']   ?? '').toString().toLowerCase();
+        // ── category field: adjust key names to match your API response ──
+        final category = (t['category'] ?? t['type'] ?? t['ticket_type'] ?? 'Uncategorized')
+            .toString()
+            .trim();
+        if (category.isNotEmpty) {
+          _byCategory.putIfAbsent(category, () => {
+            'count': 0,
+            'totalMinutes': 0.0,
+            'resolvedCount': 0,
+          });
+        }
 
         double parsedMinutes = 0.0;
 
@@ -425,6 +506,25 @@ class _ReportsState extends State<Reports> {
           m['disapprove']++;
         } else {
           m['pending']++;
+        }
+
+        // ── accumulate category stats ──
+        if (category.isNotEmpty) {
+          final cat = _byCategory[category]!;
+
+          // always count tickets
+          cat['count']++;
+
+          // ONLY resolved/closed should affect resolution time
+          final isResolved = status.contains('resolved') || status.contains('closed');
+
+          if (isResolved) {
+            cat['resolvedCount']++;
+
+            if (parsedMinutes > 0) {
+              cat['totalMinutes'] += parsedMinutes;
+            }
+          }
         }
       }
     } catch (e) {}
@@ -557,13 +657,126 @@ class _ReportsState extends State<Reports> {
     );
   }
 
+  // ===================== CATEGORY TABLE =====================
+  Widget _categoryTable() {
+    final entries = _byCategory.entries.toList()
+      ..sort((a, b) => (b.value['count'] as int).compareTo(a.value['count'] as int));
+
+    const colWidths = [180.0, 80.0, 140.0];
+
+    Widget catHeaderCell(String t, double w) => SizedBox(
+      width: w,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        child: Text(
+          t,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: AppTheme.textMuted,
+          ),
+        ),
+      ),
+    );
+
+    Widget catCell(String t, double w, {bool bold = false}) => SizedBox(
+      width: w,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        child: Text(
+          t,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: bold ? FontWeight.w600 : FontWeight.normal,
+            color: AppTheme.textPrimary,
+          ),
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
+    );
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Table title
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+            child: Text(
+              'By Category',
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.textPrimary,
+              ),
+            ),
+          ),
+          // Header row
+          Container(
+            decoration: const BoxDecoration(
+              border: Border(bottom: BorderSide(color: AppTheme.border)),
+            ),
+            child: Row(
+              children: [
+                catHeaderCell('Category', colWidths[0]),
+                catHeaderCell('Count',    colWidths[1]),
+                catHeaderCell('Avg Time', colWidths[2]),
+              ],
+            ),
+          ),
+          // Data rows
+          if (entries.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                'No category data',
+                style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+              ),
+            )
+          else
+            ...entries.asMap().entries.map((entry) {
+              final i   = entry.key;
+              final cat = entry.value.key;
+              final v   = entry.value.value;
+              final count = v['count'] as int;
+              final rc    = v['resolvedCount'] as int;
+              final mins  = v['totalMinutes'] as double;
+              final avgStr = rc == 0 ? 'N/A' : _formatMinutes(mins / rc);
+              return Container(
+                decoration: BoxDecoration(
+                  color: i % 2 != 0
+                      ? AppTheme.border.withOpacity(0.1)
+                      : Colors.transparent,
+                  border: const Border(
+                    bottom: BorderSide(color: AppTheme.border),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    catCell(cat,           colWidths[0], bold: true),
+                    catCell(count.toString(), colWidths[1]),
+                    catCell(avgStr,           colWidths[2]),
+                  ],
+                ),
+              );
+            }),
+        ],
+      ),
+    );
+  }
+
   // ===================== SUMMARY =====================
   Widget _summary() {
     final s = _stats();
 
-    Widget card(String title, String value) {
+    Widget card(String title, String value, {required MaterialColor valueColor}) {
       return Container(
-        width: 200, // fixed width instead of Expanded
+        width: 200,
         margin: const EdgeInsets.only(right: 12),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -591,19 +804,32 @@ class _ReportsState extends State<Reports> {
       scrollDirection: Axis.horizontal,
       child: Row(
         children: [
-          card("Total Request (Month)", "${s['total'].toInt()}"),
-          card("Avg Req / Day", (s['avgPerDay'] as double).toStringAsFixed(1)),
+          card(
+            "Total Request",
+            "${s['total'].toInt()}",
+            valueColor: Colors.blue,
+          ),
+
+          card(
+            "Avg Req / Day",
+            (s['avgPerDay'] as double).toStringAsFixed(1),
+            valueColor: Colors.green,
+          ),
+
           card(
             "Completion Rate",
             s['total'] == 0
                 ? "No data"
                 : "${(s['completionRate'] as double).toStringAsFixed(1)}%",
+            valueColor: Colors.orange,
           ),
+
           card(
             "Avg Resolution Time",
             s['avgResolution'] == 0
                 ? "No data"
                 : _formatMinutes((s['avgResolution'] as num).toDouble()),
+            valueColor: Colors.red,
           ),
         ],
       ),
@@ -616,7 +842,7 @@ class _ReportsState extends State<Reports> {
 
     return Column(
       children: [
-        // TOP BAR
+        // ── TOP BAR ──
         Container(
           height: 56,
           padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -636,7 +862,7 @@ class _ReportsState extends State<Reports> {
               ),
               const Spacer(),
               ElevatedButton.icon(
-                onPressed: _loading ? null : _exportExcel,
+                onPressed: _loading ? null : _confirmDownload,
                 icon: const Icon(Icons.download, size: 16),
                 label: const Text("Download"),
                 style: ElevatedButton.styleFrom(
@@ -656,49 +882,79 @@ class _ReportsState extends State<Reports> {
           ),
         ),
 
-        // TABLE + SUMMARY
+        // ── MAIN CONTENT ──
         Expanded(
           child: Padding(
             padding: const EdgeInsets.all(24),
             child: Column(
               children: [
+                // ── TOP ROW: category table (left) + monthly table (right) ──
                 Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: AppTheme.surface,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppTheme.border),
-                    ),
-                    child: _loading
-                        ? const Center(child: CircularProgressIndicator())
-                        : Column(
-                      children: [
-                        // ── Horizontally scrollable table ──
-                        Expanded(
-                          child: SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: SizedBox(
-                              width: 160 * 7, // 7 columns × 160
-                              child: Column(
-                                children: [
-                                  _header(),
-                                  Expanded(
-                                    child: ListView.builder(
-                                      itemCount: rows.length,
-                                      itemBuilder: (_, i) =>
-                                          _row(rows[i], i % 2 == 0),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // LEFT: By Category
+                      SizedBox(
+                        width: 420,
+                        child: _loading
+                            ? Container(
+                          decoration: BoxDecoration(
+                            color: AppTheme.surface,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppTheme.border),
+                          ),
+                          child: const Center(
+                            child: CircularProgressIndicator(),
+                          ),
+                        )
+                            : _categoryTable(),
+                      ),
+
+                      const SizedBox(width: 16),
+
+                      // RIGHT: Monthly table
+                      Expanded(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: AppTheme.surface,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppTheme.border),
+                          ),
+                          child: _loading
+                              ? const Center(child: CircularProgressIndicator())
+                              : Column(
+                            children: [
+                              Expanded(
+                                child: SingleChildScrollView(
+                                  scrollDirection: Axis.horizontal,
+                                  child: SizedBox(
+                                    width: 160 * 7,
+                                    child: Column(
+                                      children: [
+                                        _header(),
+                                        Expanded(
+                                          child: ListView.builder(
+                                            itemCount: rows.length,
+                                            itemBuilder: (_, i) =>
+                                                _row(rows[i], i % 2 == 0),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
-                                ],
+                                ),
                               ),
-                            ),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
+
                 const SizedBox(height: 16),
+
+                // ── SUMMARY CARDS ──
                 _summary(),
               ],
             ),
@@ -706,5 +962,30 @@ class _ReportsState extends State<Reports> {
         ),
       ],
     );
+  }
+  Future<void> _confirmDownload() async {
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Confirm Download"),
+          content: const Text("Do you want to download the Excel file?"),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text("Cancel"),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text("Download"),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true) {
+      _exportExcel();
+    }
   }
 }

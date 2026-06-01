@@ -43,6 +43,12 @@ class ApiAttachment {
       ) +
           '/api/user';
 
+  // Prod
+  // static const String _baseUrl = String.fromEnvironment(
+  //   'API_BASE_URL',
+  //   defaultValue: 'http://idiyanale-be.bakawan-ai.com',
+  // ) + '/api/user';
+
   // ── Auth headers ────────────────────────────────────────────────────────────
 
   static Future<Map<String, String>> _authHeaders() async {

@@ -14,6 +14,12 @@ class ApiTicket {
       ) +
           '/api/user';
 
+  // Prod
+  // static const String baseUrl =
+  //     String.fromEnvironment('API_BASE_URL',
+  //         defaultValue: 'http://idiyanale-be.bakawan-ai.com') +
+  //         '/api/user';
+
   /// Maps file extension → MIME type (must match backend allowedTypes exactly)
   static MediaType _mimeType(String? extension) {
     switch (extension?.toLowerCase()) {
@@ -47,7 +53,7 @@ class ApiTicket {
     required String endorser,
     String assignee = '',
     String approver = '',
-    PlatformFile? file,
+    PlatformFile? file, required List<PlatformFile> files,
   }) async {
     try {
       final token = await ApiLogin.getToken();
@@ -129,6 +135,7 @@ class ApiTicket {
               'ticket_id':          t['ticket_id']          ?? '',
               'subject':            t['subject']             ?? '',
               'category':           t['category']            ?? '',
+              'subcategory':           t['subcategory']            ?? '',
               'description':        t['description']         ?? '',
               'institution':        t['institution']         ?? '',
               'tickettype':         t['tickettype']          ?? '',
