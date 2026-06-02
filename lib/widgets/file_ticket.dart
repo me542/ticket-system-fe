@@ -612,7 +612,7 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
 
                 // ── ORGANIZATION ──
                 _fieldCard(
-                  label: 'ORGANIZATION',
+                  label: 'RESOLVER POLL',
                   child: _styledDropdown(
                     value: _organization,
                     items: const ['Bakawan Data Analytics'],

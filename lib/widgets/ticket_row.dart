@@ -231,7 +231,7 @@ class TicketRow extends StatelessWidget {
                         : 'Unassigned',
                     style: TextStyle(
                       color: ticket.resolver.isNotEmpty
-                          ? AppTheme.catNetwork
+                          ? AppTheme.textPrimary
                           : Colors.grey,
                       fontSize: 12,
                       fontWeight: FontWeight.w500,

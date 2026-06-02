@@ -30,6 +30,22 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
   bool get _isPrivileged =>
       _privilegedRoles.contains(_currentUserRole.toLowerCase().trim());
 
+  String _formatResolutionTime(String val) {
+    if (val.isEmpty) return '—';
+
+    // Already in MM:SS format
+    if (RegExp(r'^\d+:\d{2}$').hasMatch(val)) return val;
+
+    // Parse total seconds or minutes
+    final num = int.tryParse(val);
+    if (num == null) return val;
+
+    // Assumes the API returns total seconds
+    final minutes = num ~/ 60;
+    final seconds = num % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
+
   // ── Search ────────────────────────────────────────────────
   final TextEditingController _searchController = TextEditingController();
   String _search = '';
@@ -1105,6 +1121,15 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
                                       ? _statusChip(val)
                                       : col.key == 'priority'
                                       ? _priorityChip(val)
+                                      : col.key == 'resolution_time'
+                                      ? Text(
+                                    _formatResolutionTime(val),
+                                    style: const TextStyle(
+                                      color: AppTheme.textPrimary,
+                                      fontSize: 12,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  )
                                       : Text(
                                     val.isEmpty ? '—' : val,
                                     style: const TextStyle(
@@ -2094,47 +2119,50 @@ class _DateRangePickerDialogState extends State<_DateRangePickerDialog> {
         ],
       )),
       const SizedBox(width: 8),
-      Expanded(child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(timeLabel,
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              timeLabel,
               style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600)),
-          const SizedBox(height: 6),
-          Container(
-            padding: const EdgeInsets.symmetric(
-                horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: const Color(0xFF0A1520),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFF1E3A5F)),
-            ),
-            child: TextField(
-              controller: timeCtrl,
-              style: const TextStyle(
-                  color: Colors.white, fontSize: 13),
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(
-                    RegExp(r'[0-9:]')),
-                LengthLimitingTextInputFormatter(8),
-              ],
-              decoration: const InputDecoration(
-                hintText: 'hh:mm:ss',
-                hintStyle: TextStyle(
-                  color: AppTheme.textSecondary,
-                  fontSize: 13,
-                  fontStyle: FontStyle.italic,
-                ),
-                border: InputBorder.none,
-                isDense: true,
-                contentPadding: EdgeInsets.zero,
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
               ),
             ),
-          ),
-        ],
-      )),
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0A1520),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFF1E3A5F)),
+              ),
+              child: TextField(
+                controller: timeCtrl,
+                keyboardType: TextInputType.number,
+                style: const TextStyle(color: Colors.white, fontSize: 13),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'[0-9:]')),
+                  LengthLimitingTextInputFormatter(5), // MM:SS only
+                ],
+                decoration: const InputDecoration(
+                  hintText: 'mm:ss',
+                  hintStyle: TextStyle(
+                    color: AppTheme.textSecondary,
+                    fontSize: 13,
+                    fontStyle: FontStyle.italic,
+                  ),
+                  border: InputBorder.none,
+                  isDense: true,
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+            ),
+          ],
+        ),
+      )
     ]);
   }
 

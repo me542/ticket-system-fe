@@ -207,12 +207,10 @@ class _TicketSidebarState extends State<TicketSidebar> {
   }
 
   String _formatElapsed(int seconds) {
-    final h = seconds ~/ 3600;
-    final m = (seconds % 3600) ~/ 60;
-    final s = seconds % 60;
-    if (h > 0) return '${h}h ${_p(m)}m ${_p(s)}s';
-    if (m > 0) return '${m}m ${_p(s)}s';
-    return '${s}s';
+    final minutes = seconds ~/ 60;
+    final secs = seconds % 60;
+
+    return '${_p(minutes)}:${_p(secs)}';
   }
 
   // ─── confirmation dialogs ──────────────────────────────────────────────────
@@ -277,6 +275,10 @@ class _TicketSidebarState extends State<TicketSidebar> {
       case 'reassign_endorser':
       // Handled separately via dialog — should not reach here
         return;
+      case 'cancel':
+      // Reason dialog inside _handleAction acts as confirmation — skip generic confirm
+        await _handleAction(action, ticketId);
+        return;
       case 'endorse':
         title = 'Endorse Ticket';
         message =
@@ -285,15 +287,6 @@ class _TicketSidebarState extends State<TicketSidebar> {
         color = Colors.green;
         icon = Icons.thumb_up_alt_outlined;
         break;
-    // case 'reassign_endorser':
-    //   title = 'Reassign Endorsement';
-    //   message =
-    //   'Are you sure you want to reassign this ticket to yourself as endorser? '
-    //       'You will become the new assigned endorser.';
-    //   label = 'Yes, Reassign';
-    //   color = Colors.orange;
-    //   icon = Icons.swap_horiz_outlined;
-    //   break;
       case 'approve':
         title = 'Approve Ticket';
         message =
@@ -373,7 +366,7 @@ class _TicketSidebarState extends State<TicketSidebar> {
     if (ok) await _handleAction(action, ticketId);
   }
 
-  Future<void> _fetchBySR(String? srNumber) async {
+  Future<void> _fetchBySR(String? srNumber, {bool syncTimer = true}) async {
     if (srNumber == null || srNumber.trim().isEmpty) return;
 
     setState(() {
@@ -385,7 +378,6 @@ class _TicketSidebarState extends State<TicketSidebar> {
     try {
       final response = await ApiTicket.getTicketByID(srNumber.trim());
 
-      // 🔥 normalize response (handles both direct + wrapped API)
       final ticket = (response is Map && response?['data'] != null)
           ? response!['data']
           : response;
@@ -403,7 +395,10 @@ class _TicketSidebarState extends State<TicketSidebar> {
         _isLoading = false;
       });
 
-      _syncTimer();
+      // ✅ Only sync timer if explicitly allowed (not on manual refresh)
+      if (syncTimer) {
+        _syncTimer();
+      }
 
       if (_currentUsername.isEmpty) await _loadCurrentUser();
 
@@ -655,9 +650,38 @@ class _TicketSidebarState extends State<TicketSidebar> {
   // ─── header ────────────────────────────────────────────────────────────────
 
   Widget _buildHeader(Ticket ticket) {
-    // Cancel is only shown to the ticket creator while still active
-    final canCancel = (_isCreator || _isAdmin)
-        && !_isResolved && !_isCancelled;
+    // Cancel is shown to: creator, admin, the assigned endorser (while submitted),
+    // the approver (while endorsed), and the assigned resolver (while assigned).
+    final _role = _currentUserRole.toLowerCase().trim();
+    final _isEndorserRole = _role == 'endorser' || _role.startsWith('endorser');
+    final _isApproverRole = _role == 'approver' || _role.startsWith('approver');
+    final _isResolverRole = _role == 'resolver' || _role.startsWith('resolver') || _role.contains('resolv');
+
+    final _assignedEndorser = _field([
+      'endorser', 'endorser_name', 'endorsed_by', 'assigned_endorser',
+    ]).toLowerCase().trim();
+    final _isAssignedEndorser = _isEndorserRole &&
+        _assignedEndorser.isNotEmpty &&
+        _assignedEndorser == _currentUsername;
+
+    final canCancel = !_isResolved && !_isCancelled && !_isclosed && (() {
+      // Admin can always cancel
+      if (_isAdmin || _isCreator) return true;
+
+      // Creator can cancel only while submitted (before endorsement)
+      if (_isCreator && _isSubmitted) return true;
+
+      // Assigned endorser can cancel while ticket is submitted
+      if (_isAssignedEndorser && _isSubmitted) return true;
+
+      // Approver can cancel while ticket is endorsed (awaiting approval)
+      if (_isApproverRole && _isEndorsed) return true;
+
+      // Resolver (assigned) can cancel while ticket is assigned (in progress)
+      if (_isResolverRole && isMyTicket && _isAssigned) return true;
+
+      return false;
+    }());
 
     final canHold = (_isCreator || _isAdmin || isMyTicket)
         && _isAssigned && !_isResolved && !_isCancelled && !hold;
@@ -783,7 +807,7 @@ class _TicketSidebarState extends State<TicketSidebar> {
                         Icon(Icons.block_outlined, size: 14, color: Colors.red),
                         SizedBox(width: 5),
                         Text(
-                          'Cancel',
+                          'Cancel Ticket',
                           style: TextStyle(
                             color: Colors.red,
                             fontSize: 12,
@@ -799,8 +823,9 @@ class _TicketSidebarState extends State<TicketSidebar> {
             const SizedBox(width: 8), // 👈 spacing
           ],
 
+
           IconButton(
-            onPressed: () => _fetchBySR(ticket.id),
+            onPressed: () => _fetchBySR(ticket.id, syncTimer: false), // 👈
             icon: const Icon(
               Icons.refresh,
               color: AppTheme.textSecondary,
@@ -997,7 +1022,7 @@ class _TicketSidebarState extends State<TicketSidebar> {
             if (institution != '—')
               _detailRow(
                 Icons.business_outlined,
-                'Organization',
+                'RESOLVER POLL',
                 institution,
               ),
 
@@ -1011,22 +1036,6 @@ class _TicketSidebarState extends State<TicketSidebar> {
             ),
 
             _detailRow(Icons.access_time, 'Created', createdStr),
-
-            // ── Cancellation info (only when cancelled) ───────────────
-            // if (_isCancelled) ...[
-            //   const SizedBox(height: 4),
-            //   const Divider(color: AppTheme.border, height: 12),
-            //   _detailRow(
-            //     Icons.person_off_outlined,
-            //     'Cancelled By',
-            //     _field(['cancelled_by'], fallback: '—'),
-            //   ),
-            //   _detailRow(
-            //     Icons.info_outline,
-            //     'Cancel Reason',
-            //     _field(['cancelled_reason'], fallback: '—'),
-            //   ),
-            // ],
           ],
         ),
       ),
@@ -1399,8 +1408,8 @@ class _TicketSidebarState extends State<TicketSidebar> {
             Color lineColor(bool isLeft) {
               if (_isCancelled) {
                 // Completed segments = red, future segments = grey
-                if (isLeft) return (i > 0 && i <= active) ? Colors.redAccent : Colors.grey.shade800;
-                return (i < active) ? Colors.redAccent : Colors.grey.shade800;
+                if (isLeft) return (i > 0 && i <= active) ? Colors.green : Colors.grey.shade800;
+                return (i < active) ? Colors.green : Colors.grey.shade800;
               }
               if (_isclosed) {
                 return isLeft
@@ -2212,13 +2221,13 @@ class _TicketSidebarState extends State<TicketSidebar> {
                 color: Colors.orange,
                 onTap: () => _confirmAndAct('ungrab', ticket.id),
               ),
-              const SizedBox(width: 12),
-              _actionBtn(
-                label: 'Reject',
-                icon: Icons.cancel_outlined,
-                color: Colors.redAccent,
-                onTap: () => _handleAction('reject', ticket.id),
-              ),
+              // const SizedBox(width: 12),
+              // _actionBtn(
+              //   label: 'Reject',
+              //   icon: Icons.cancel_outlined,
+              //   color: Colors.redAccent,
+              //   onTap: () => _handleAction('reject', ticket.id),
+              // ),
             ] else ...[
               const Icon(Icons.lock_outline, color: Colors.grey, size: 18),
               const SizedBox(width: 8),
@@ -2522,29 +2531,83 @@ class _TicketSidebarState extends State<TicketSidebar> {
 
           final reason = await showDialog<String>(
             context: context,
-            builder: (_) => AlertDialog(
-              title: const Text('Cancel Ticket'),
-              content: TextField(
-                controller: reasonController,
-                maxLines: 2,
-                decoration: const InputDecoration(
-                  hintText: 'Enter cancellation reason',
-                ),
+            builder: (dialogCtx) => AlertDialog(
+              backgroundColor: AppTheme.surface,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              title: Row(
+                children: const [
+                  Icon(Icons.block_outlined, color: Colors.redAccent, size: 20),
+                  SizedBox(width: 8),
+                  Text(
+                    'Cancel Ticket',
+                    style: TextStyle(
+                        color: AppTheme.textPrimary, fontSize: 16),
+                  ),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Please provide a reason for cancellation:',
+                    style: TextStyle(
+                        color: AppTheme.textSecondary, fontSize: 13),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: reasonController,
+                    maxLines: 3,
+                    autofocus: true,
+                    style: const TextStyle(
+                        color: AppTheme.textPrimary, fontSize: 13),
+                    decoration: InputDecoration(
+                      hintText: 'Enter cancellation reason…',
+                      hintStyle: const TextStyle(
+                          color: AppTheme.textMuted, fontSize: 13),
+                      filled: true,
+                      fillColor: AppTheme.sidebarBg,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide:
+                        const BorderSide(color: AppTheme.border),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide:
+                        const BorderSide(color: AppTheme.border),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(
+                            color: Colors.redAccent, width: 1.5),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
+                    ),
+                  ),
+                ],
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Close'),
+                  onPressed: () => Navigator.pop(dialogCtx),
+                  child: const Text('Close',
+                      style: TextStyle(color: AppTheme.textMuted)),
                 ),
                 ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.redAccent,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                  ),
                   onPressed: () {
                     final value = reasonController.text.trim();
-
                     if (value.isEmpty) return;
-
-                    Navigator.pop(context, value);
+                    Navigator.pop(dialogCtx, value);
                   },
-                  child: const Text('Confirm'),
+                  child: const Text('Confirm Cancel'),
                 ),
               ],
             ),
