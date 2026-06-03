@@ -10,6 +10,7 @@ import '../widgets/stats_card.dart';
 import 'package:ticket_system/widgets/ticket_row.dart';
 import '../widgets/status_sidebar.dart';
 import 'dart:ui';
+import '../widgets/ticket_row.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -919,7 +920,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       child: Row(children: [
         const Text(
-          'Recent Tickets',
+          'My Tickets',
           style: TextStyle(
               color: AppTheme.textPrimary,
               fontSize: 15,

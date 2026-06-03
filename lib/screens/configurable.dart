@@ -902,6 +902,9 @@ class _ModPanelContentState extends State<_ModPanelContent> {
   final _searchCtrl = TextEditingController();
   String _query = '';
 
+  List<Map<String, dynamic>> _institutions = [];
+  int? _selectedInstitutionId;
+
   List<Map<String, dynamic>> _items = [];
   bool _loading = true;
 
@@ -912,13 +915,42 @@ class _ModPanelContentState extends State<_ModPanelContent> {
   @override
   void initState() {
     super.initState();
+
+    if (!widget.isInstitution) {
+      _loadInstitutions();
+    }
+
     _loadItems();
   }
+
 
   @override
   void dispose() {
     _searchCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadInstitutions() async {
+    try {
+      final data = await ApiInstitutionPosition.getInstitutions();
+
+      setState(() {
+        _institutions = data;
+
+        if (_institutions.isNotEmpty) {
+          _selectedInstitutionId =
+              _institutions.first['institution_id'] ??
+                  _institutions.first['id'];
+        }
+      });
+
+      await _loadItems();
+    } catch (_) {
+      widget.snack(
+        'Failed to load institutions',
+        color: Colors.red,
+      );
+    }
   }
 
   // ── Load from API ──────────────────────────────────────────────────────────
@@ -936,11 +968,26 @@ class _ModPanelContentState extends State<_ModPanelContent> {
   }
 
   List<Map<String, dynamic>> get _filtered {
-    if (_query.isEmpty) return _items;
-    final q = _query.toLowerCase();
-    return _items
-        .where((e) => (e['name'] ?? '').toString().toLowerCase().contains(q))
-        .toList();
+    var data = _items;
+
+    if (!widget.isInstitution && _selectedInstitutionId != null) {
+      data = data.where((e) {
+        return e['institution_id'] == _selectedInstitutionId;
+      }).toList();
+    }
+
+    if (_query.isNotEmpty) {
+      final q = _query.toLowerCase();
+
+      data = data.where((e) {
+        return (e['name'] ?? '')
+            .toString()
+            .toLowerCase()
+            .contains(q);
+      }).toList();
+    }
+
+    return data;
   }
 
   // ── Add dialog ─────────────────────────────────────────────────────────────
@@ -1249,6 +1296,31 @@ class _ModPanelContentState extends State<_ModPanelContent> {
           ),
 
           const SizedBox(height: 12),
+
+          if (!widget.isInstitution) ...[
+            DropdownButtonFormField<int>(
+              value: _selectedInstitutionId,
+              decoration: const InputDecoration(
+                labelText: 'Institution',
+                border: OutlineInputBorder(),
+              ),
+              items: _institutions.map((inst) {
+                final id =
+                (inst['institution_id'] ?? inst['id']) as int?;
+
+                return DropdownMenuItem<int>(
+                  value: id,
+                  child: Text(inst['name'] ?? ''),
+                );
+              }).toList(),
+              onChanged: (value) {
+                setState(() {
+                  _selectedInstitutionId = value;
+                });
+              },
+            ),
+            const SizedBox(height: 12),
+          ],
 
           // ── Add button ─────────────────────────────────────
           SizedBox(

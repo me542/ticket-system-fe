@@ -13,6 +13,44 @@ class TicketService {
   // ─────────────────────────────────────────────
   // CREATE TICKET
   // ─────────────────────────────────────────────
+  static Future<Map<String, int>> getTicketStats() async {
+    final tickets = await getAll();
+
+    int forReview = 0;
+    int inProgress = 0;
+    int resolved = 0;
+    int closed = 0;
+    int cancelled = 0;
+
+    for (final t in tickets) {
+      final status = (t['status'] ?? '')
+          .toString()
+          .toLowerCase()
+          .trim();
+
+      if (status.contains('for review')) {
+        forReview++;
+      } else if (status.contains('progress')) {
+        inProgress++;
+      } else if (status.contains('resolved')) {
+        resolved++;
+      } else if (status.contains('closed')) {
+        closed++;
+      } else if (status.contains('cancel')) {
+        cancelled++;
+      }
+    }
+
+    return {
+      'total': tickets.length,
+      'for_review': forReview,
+      'in_progress': inProgress,
+      'resolved': resolved,
+      'closed': closed,
+      'cancelled': cancelled,
+    };
+  }
+
   static Future<bool> create({
     required String subject,
     required String ticketType,

@@ -750,7 +750,7 @@ class _UserScreenState extends State<UserScreen> {
     (user['position'] ?? '').isNotEmpty ? user['position'] : null;
 
     String selectedRole =
-    ['user', 'endorser', 'approver', 'resolver'].contains(user['role'])
+    ['user', 'endorser', 'approver', 'resolver', 'auditor'].contains(user['role'])
         ? user['role']!
         : 'user';
     String selectedStatus =
@@ -864,6 +864,12 @@ class _UserScreenState extends State<UserScreen> {
                         DropdownMenuItem(
                             value: 'resolver',
                             child: Text('Resolver')),
+                        DropdownMenuItem(
+                            value: 'auditor',
+                            child: Text('Auditor')),
+                        DropdownMenuItem(
+                            value: 'admin',
+                            child: Text('Admin')),
                       ],
                       onChanged: (v) {
                         if (v != null)
