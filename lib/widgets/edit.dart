@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
@@ -5,35 +6,38 @@ import '../core/services/api_file.dart';
 import '../core/services/api_login.dart';
 import '../core/services/api_user_data.dart';
 import '../core/services/api_category.dart';
+import '../core/services/api_edit_ticket.dart';
 import '../data/light_theme.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../models/ticket.dart';
 
-class CreateTicketSidebar extends StatefulWidget {
+class EditTicketSidebar extends StatefulWidget {
+  final Ticket ticket;
+  final Map<String, dynamic> ticketDetail;
   final VoidCallback onClose;
-  final VoidCallback? onCreated;
+  final VoidCallback onUpdated;
 
-  const CreateTicketSidebar({
+  const EditTicketSidebar({
     super.key,
+    required this.ticket,
+    required this.ticketDetail,
     required this.onClose,
-    this.onCreated,
+    required this.onUpdated,
   });
 
   @override
-  State<CreateTicketSidebar> createState() => _CreateTicketSidebarState();
+  State<EditTicketSidebar> createState() => _EditTicketSidebarState();
 }
 
-class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
-  // ── form state ────────────────────────────────────────────────────────────
-  final _subjectCtrl = TextEditingController();
-  final _descCtrl = TextEditingController();
+class _EditTicketSidebarState extends State<EditTicketSidebar> {
+  // ── form state ────────────────────────────────���───────────────────────────
+  late final TextEditingController _subjectCtrl;
+  late final TextEditingController _descCtrl;
 
-  int _priority = 1;
-  String _ticketType = 'Service Request';
-  String _organization = 'Bakawan Data Analytics';
+  late int _priority;
+  late String _ticketType;
+  late String _organization;
 
   // ── category ──────────────────────────────────────────────────────────────
-  // Now stores subcategory name → description, not just name list
-  // Structure: { categoryName: { 'subs': [{ 'name': '', 'description': '' }] } }
   Map<String, List<Map<String, String>>> _categoryMap = {};
   String? _category;
   String? _subCategory;
@@ -44,28 +48,62 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
   List<String> _endorsers = [];
 
   // ── file ──────────────────────────────────────────────────────────────────
-  Uint8List? _fileBytes;
-
-  // ── file ──────────────────────────────────────────────────────────────────
-  List<PlatformFile> _files = [];
+  List<PlatformFile> _newFiles = [];
   int _totalFileSize = 0;
 
-// 10 MB limit
   static const int _maxTotalSize = 10 * 1024 * 1024;
 
-  // ── submit state ──────────────────────────────────────────────────────────
+  // ── submit state ────────────────��─────────────────────────────────────────
   bool _submitting = false;
-
-  // ── tracks whether user has manually edited the description ───────────────
-  // If true, switching subcategory won't overwrite their typed content.
   bool _descManuallyEdited = false;
+  bool _isProgrammaticallySettingDesc = false;
 
   @override
   void initState() {
     super.initState();
+    _initializeForm();
     _loadUsers();
     _loadCategories();
     _descCtrl.addListener(_onDescChanged);
+  }
+
+  void _initializeForm() {
+    _subjectCtrl = TextEditingController(
+      text: widget.ticketDetail['subject'] ?? widget.ticket.title,
+    );
+
+    _descCtrl = TextEditingController(
+      text: widget.ticketDetail['description'] ?? widget.ticket.description,
+    );
+
+    _priority = _parsePriority(
+      widget.ticketDetail['priority'] ?? widget.ticket.priority.index,
+    );
+
+    _ticketType = widget.ticketDetail['ticket_type'] ??
+        widget.ticketDetail['tickettype'] ??
+        'Service Request';
+
+    _organization = widget.ticketDetail['institution'] ??
+        widget.ticketDetail['organization'] ??
+        'Bakawan Data Analytics';
+
+    _category = widget.ticketDetail['category'];
+    _subCategory = widget.ticketDetail['subcategory'] ??
+        widget.ticketDetail['sub_category'];
+
+    _endorser = widget.ticketDetail['endorser'] ??
+        widget.ticketDetail['endorser_name'] ??
+        widget.ticketDetail['assigned_endorser'];
+  }
+
+  int _parsePriority(dynamic val) {
+    if (val is int) return val.clamp(1, 4);
+    if (val is String) {
+      final map = {'low': 1, 'medium': 2, 'high': 3, 'critical': 4};
+      return map[val.toLowerCase()] ?? 1;
+    }
+    return 1;
   }
 
   @override
@@ -76,21 +114,11 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
     super.dispose();
   }
 
-  // Called whenever user types in the description field.
-  // Once they type something themselves, stop auto-filling from templates.
-  void _onDescChanged() {
-    // We only flag as manually edited during active user input,
-    // not when we programmatically set the text.
-    // We use _isProgrammaticallySettingDesc to distinguish the two.
-  }
+  void _onDescChanged() {}
 
-  bool _isProgrammaticallySettingDesc = false;
-
-  /// Set description text from a template without flagging it as manual edit.
   void _setDescFromTemplate(String text) {
     _isProgrammaticallySettingDesc = true;
     _descCtrl.text = text;
-    // Move cursor to end
     _descCtrl.selection = TextSelection.collapsed(offset: text.length);
     _isProgrammaticallySettingDesc = false;
     _descManuallyEdited = false;
@@ -99,21 +127,15 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
   // ── loaders ───────────────────────────────────────────────────────────────
   Future<void> _loadUsers() async {
     final users = await ApiGetUser.fetchUsers();
-
-    // Get current logged in username
     final currentUser = await ApiUserData.getUsername();
 
     if (!mounted) return;
 
-    // Only users with role = endorser
     final endorserUsers = users.where((u) {
       final role = (u['role'] ?? '').toLowerCase();
       final username = (u['username'] ?? '').trim().toLowerCase();
-
-      // Prevent self-endorsement
       final isCurrentUser =
           username == (currentUser ?? '').trim().toLowerCase();
-
       return role == 'endorser' && !isCurrentUser;
     }).toList();
 
@@ -124,10 +146,9 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
 
     setState(() {
       _endorsers = endorserNames;
-
-      // Auto select first available endorser
-      _endorser =
-      endorserNames.isNotEmpty ? endorserNames.first : null;
+      if (_endorser == null && endorserNames.isNotEmpty) {
+        _endorser = endorserNames.first;
+      }
     });
   }
 
@@ -137,7 +158,6 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
     final raw = await ApiCategory.fetchCategories(token: token);
     if (!mounted) return;
 
-    // ── Build map: categoryName → list of { name, description } ──────────
     final Map<String, List<Map<String, String>>> built = {};
 
     for (final cat in raw) {
@@ -145,13 +165,11 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
       ((cat['name'] ?? cat['Name']) as String? ?? '').trim();
       if (name.isEmpty) continue;
 
-      // Handle all common key casings from the backend
-      final subsRaw =
-          cat['SubCategories'] ??
-              cat['sub_categories'] ??
-              cat['subcategories'] ??
-              cat['Subcategories'] ??
-              <dynamic>[];
+      final subsRaw = cat['SubCategories'] ??
+          cat['sub_categories'] ??
+          cat['subcategories'] ??
+          cat['Subcategories'] ??
+          <dynamic>[];
 
       final subs = (subsRaw as List<dynamic>).map((s) {
         final subName =
@@ -165,27 +183,12 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
       built[name] = subs;
     }
 
-    final cats = built.keys.toList();
-    final firstCat = cats.isNotEmpty ? cats.first : null;
-    final firstSub =
-    firstCat != null && built[firstCat]!.isNotEmpty
-        ? built[firstCat]!.first
-        : null;
-
     setState(() {
       _categoryMap = built;
-      _category = firstCat;
-      _subCategory = firstSub?['name'];
       _loadingCats = false;
     });
-
-    // Pre-fill description with first subcategory's template
-    if (firstSub != null && (firstSub['description'] ?? '').isNotEmpty) {
-      _setDescFromTemplate(firstSub['description']!);
-    }
   }
 
-  // ── subcategory names for a given category ────────────────────────────────
   List<String> _subNames(String? category) {
     if (category == null) return [];
     return (_categoryMap[category] ?? [])
@@ -193,7 +196,6 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
         .toList();
   }
 
-  // ── get template description for a subcategory ────────────────────────────
   String _subDescription(String category, String subName) {
     final subs = _categoryMap[category] ?? [];
     final match = subs.firstWhere(
@@ -212,7 +214,6 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
       _subCategory = firstSub?['name'];
       _descManuallyEdited = false;
     });
-    // Pre-fill description from template
     final desc = firstSub?['description'] ?? '';
     _setDescFromTemplate(desc);
   }
@@ -223,7 +224,6 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
       _subCategory = val;
       _descManuallyEdited = false;
     });
-    // Pre-fill description from this subcategory's template
     if (_category != null) {
       final desc = _subDescription(_category!, val);
       _setDescFromTemplate(desc);
@@ -235,35 +235,22 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
     final result = await FilePicker.platform.pickFiles(
       allowMultiple: true,
       type: FileType.custom,
-      // Removed 'doc' and 'xls' — no proper MIME mapping for them
-      allowedExtensions: ['jpg', 'jpeg', 'png', 'pdf', 'docx', 'xlsx'],
+      allowedExtensions: [
+        'jpg',
+        'jpeg',
+        'png',
+        'pdf',
+        'doc',
+        'docx',
+        'xls',
+        'xlsx'
+      ],
       withData: true,
     );
 
     if (result == null || result.files.isEmpty) return;
 
-    // ✅ Filter out files with null bytes and warn the user
-    final validFiles = <PlatformFile>[];
-    final skipped = <String>[];
-
-    for (final f in result.files) {
-      if (f.bytes == null) {
-        skipped.add(f.name);
-      } else {
-        validFiles.add(f);
-      }
-    }
-
-    if (skipped.isNotEmpty) {
-      _snack(
-        'Could not read: ${skipped.join(', ')}. Try again.',
-        color: Colors.orange,
-      );
-    }
-
-    if (validFiles.isEmpty) return;
-
-    final incomingSize = validFiles.fold(0, (sum, f) => sum + f.size);
+    int incomingSize = result.files.fold(0, (sum, f) => sum + f.size);
 
     if ((_totalFileSize + incomingSize) > _maxTotalSize) {
       _snack(
@@ -274,13 +261,13 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
     }
 
     setState(() {
-      _files.addAll(validFiles);
+      _newFiles.addAll(result.files);
       _totalFileSize += incomingSize;
     });
   }
 
   // ── submit confirmation ────────────────────────────────────────────────────
-  Future<bool> showSubmitConfirmation(BuildContext context) async {
+  Future<bool> showUpdateConfirmation(BuildContext context) async {
     final result = await showDialog<bool>(
       context: context,
       useRootNavigator: true,
@@ -314,7 +301,7 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
                       const SizedBox(width: 8),
                       const Expanded(
                         child: Text(
-                          'Confirm Submission',
+                          'Confirm Update',
                           style: TextStyle(
                             color: AppTheme.textPrimary,
                             fontSize: 15,
@@ -331,7 +318,7 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
                   ),
                   const SizedBox(height: 10),
                   const Text(
-                    'Are you sure you want to submit this ticket?',
+                    'Are you sure you want to update this ticket?',
                     style: TextStyle(
                         color: AppTheme.textSecondary, fontSize: 13),
                   ),
@@ -347,7 +334,7 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: _primaryBtn(
-                          'Submit',
+                          'Update',
                               () => Navigator.pop(context, true),
                         ),
                       ),
@@ -363,62 +350,56 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
     return result ?? false;
   }
 
-  // ── submit ────────────────────────────────────────────────────────────────
-  Future<void> _submit() async {
-    if (_subjectCtrl.text.trim().isEmpty || _descCtrl.text.trim().isEmpty) {
-      _snack('Subject and description are required', color: Colors.redAccent);
+  // ── submit/update ─────────────────────────────────────────────────────────
+  Future<void> _updateTicket() async {
+    if (_subjectCtrl.text.trim().isEmpty ||
+        _descCtrl.text.trim().isEmpty ||
+        _category == null ||
+        _subCategory == null ||
+        _endorser == null) {
+      _snack('Subject and description are required',
+          color: Colors.redAccent);
       return;
     }
+
     setState(() => _submitting = true);
+
     try {
-      final ticketCode = await ApiTicket.createTicket(
+      final token = await ApiLogin.getToken();
+      if (token == null || token.isEmpty) {
+        _snack('Not authenticated. Please log in again.',
+            color: Colors.redAccent);
+        return;
+      }
+
+      final result = await TicketService.updateTicket(
+        token: token,
+        ticketId: widget.ticket.id,
         subject: _subjectCtrl.text.trim(),
-        tickettype: _ticketType,
         category: _category ?? '',
         subcategory: _subCategory ?? '',
         institution: _organization,
-        priority: _priority,
         description: _descCtrl.text.trim(),
-        files: _files,
+        priority: _priority.toString(),
         endorser: _endorser ?? '',
+        attachments: _newFiles,
       );
-      if (ticketCode != null) {
-        _snack('Ticket $ticketCode created successfully',
+
+      if (result['success'] == true) {
+        _snack('Ticket updated successfully ✓',
             color: AppTheme.statusResolved);
-        _reset();
-        widget.onCreated?.call();
-        widget.onClose();
+        widget.onUpdated();
       } else {
-        _snack('Failed to create ticket', color: Colors.redAccent);
+        _snack(
+          result['message'] ?? 'Failed to update ticket',
+          color: Colors.redAccent,
+        );
       }
+    } catch (e) {
+      _snack('Update failed: $e', color: Colors.redAccent);
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
-  }
-
-  void _reset() {
-    _subjectCtrl.clear();
-    final cats = _categoryMap.keys.toList();
-    final firstCat = cats.isNotEmpty ? cats.first : null;
-    final firstSub =
-    firstCat != null && (_categoryMap[firstCat] ?? []).isNotEmpty
-        ? _categoryMap[firstCat]!.first
-        : null;
-
-    setState(() {
-      _priority = 1;
-      _ticketType = 'Service Request';
-      _organization = 'Bakawan Data Analytics';
-      _category = firstCat;
-      _subCategory = firstSub?['name'];
-      _files.clear();
-      _totalFileSize = 0;
-      _descManuallyEdited = false;
-      if (_endorsers.isNotEmpty) _endorser = _endorsers.first;
-    });
-
-    // Restore template description
-    _setDescFromTemplate(firstSub?['description'] ?? '');
   }
 
   void _snack(String msg, {Color color = Colors.black87}) {
@@ -431,9 +412,6 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
     ));
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // BUILD
-  // ─────────────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return Material(
@@ -453,6 +431,10 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
 
   // ── header ────────────────────────────────────────────────────────────────
   Widget _buildHeader() {
+    final srNumber = widget.ticketDetail['ticket_code'] ??
+        widget.ticketDetail['sr_number'] ??
+        widget.ticket.id;
+
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
       decoration: const BoxDecoration(
@@ -460,24 +442,46 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
       ),
       child: Row(
         children: [
-          const Icon(Icons.add_circle_outline,
-              color: AppTheme.accent, size: 18),
+          const Icon(Icons.edit_outlined, color: AppTheme.accent, size: 18),
           const SizedBox(width: 8),
-          const Expanded(
-            child: Text(
-              'New Ticket',
-              style: TextStyle(
-                color: AppTheme.textPrimary,
-                fontSize: 17,
-                fontWeight: FontWeight.bold,
-              ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Edit Ticket',
+                  style: TextStyle(
+                    color: AppTheme.textPrimary,
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.confirmation_number_outlined,
+                      size: 11,
+                      color: AppTheme.textMuted,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      srNumber.toString(),
+                      style: const TextStyle(
+                        color: AppTheme.textMuted,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
           IconButton(
-            onPressed: () {
-              _reset();
-              widget.onClose();
-            },
+            onPressed: widget.onClose,
             icon: const Icon(Icons.close, color: AppTheme.textSecondary),
             tooltip: 'Close',
           ),
@@ -498,7 +502,6 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-
                 _card(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -557,7 +560,6 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
 
                 const SizedBox(height: 20),
 
-
                 // ── TICKET TYPE ──
                 _fieldCard(
                   label: 'TICKET TYPE',
@@ -600,7 +602,7 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
                       : _styledDropdown(
                     value: _subNames(_category).contains(_subCategory)
                         ? _subCategory
-                        : _subNames(_category).isNotEmpty          // ← fallback to first
+                        : _subNames(_category).isNotEmpty
                         ? _subNames(_category).first
                         : null,
                     items: _subNames(_category),
@@ -610,7 +612,7 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
                 ),
                 const SizedBox(height: 10),
 
-// ── ENDORSER ──
+                // ── ENDORSER ──
                 _fieldCard(
                   label: 'ENDORSER',
                   child: _endorsers.isEmpty
@@ -618,7 +620,7 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
                       : _styledDropdown(
                     value: _endorsers.contains(_endorser)
                         ? _endorser
-                        : _endorsers.isNotEmpty                    // ← fallback to first
+                        : _endorsers.isNotEmpty
                         ? _endorsers.first
                         : null,
                     items: _endorsers,
@@ -650,7 +652,6 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // ── Subject ─
-
                 _fieldCard(
                   label: 'SUBJECT',
                   required: true,
@@ -692,7 +693,6 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
                                   .isNotEmpty)
                             GestureDetector(
                               onTap: () {
-                                // Let user restore template if they want
                                 final tmpl = _subDescription(
                                     _category!, _subCategory!);
                                 _setDescFromTemplate(tmpl);
@@ -704,8 +704,8 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
                                   color: AppTheme.accent.withOpacity(0.1),
                                   borderRadius: BorderRadius.circular(5),
                                   border: Border.all(
-                                      color:
-                                      AppTheme.accent.withOpacity(0.3)),
+                                      color: AppTheme.accent
+                                          .withOpacity(0.3)),
                                 ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
@@ -733,14 +733,11 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
                       const SizedBox(height: 8),
 
                       // ── Editable description field ───────────────────
-                      // Pre-filled with template, fully editable by user
                       TextField(
                         controller: _descCtrl,
                         minLines: 12,
                         maxLines: null,
                         onChanged: (_) {
-                          // Mark as manually edited so switching sub
-                          // doesn't silently wipe their work
                           if (!_isProgrammaticallySettingDesc) {
                             _descManuallyEdited = true;
                           }
@@ -772,13 +769,13 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
                     children: [
                       _sectionLabel('ATTACHMENT'),
                       const SizedBox(height: 10),
-                      if (_files.isNotEmpty)
+                      if (_newFiles.isNotEmpty)
                         Padding(
                           padding: const EdgeInsets.only(bottom: 12),
                           child: _buildFilesPreview(),
                         ),
                       SizedBox(
-                        height: _files.isEmpty ? 200 : 120,
+                        height: _newFiles.isEmpty ? 200 : 120,
                         child: Center(
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
@@ -805,13 +802,13 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
                 // ── BUTTONS ──────────────────────────────────────────────
                 Row(
                   children: [
-                    Expanded(child: _outlineBtn('Clear', _reset)),
+                    Expanded(child: _outlineBtn('Cancel', widget.onClose)),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: _primaryBtn('Submit', () async {
+                      child: _primaryBtn('Update', () async {
                         final confirm =
-                        await showSubmitConfirmation(context);
-                        if (confirm) _submit();
+                        await showUpdateConfirmation(context);
+                        if (confirm) _updateTicket();
                       }),
                     ),
                   ],
@@ -828,12 +825,12 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
   Widget _buildFilesPreview() {
     return Column(
       children: [
-        ..._files.asMap().entries.map((entry) {
+        ..._newFiles.asMap().entries.map((entry) {
           final index = entry.key;
           final file = entry.value;
 
-          final isImage = ['jpg', 'jpeg', 'png']
-              .contains(file.extension?.toLowerCase());
+          final isImage =
+          ['jpg', 'jpeg', 'png'].contains(file.extension?.toLowerCase());
 
           return Container(
             margin: const EdgeInsets.only(bottom: 10),
@@ -869,11 +866,9 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
                             ? Icons.image_outlined
                             : Icons.insert_drive_file_outlined,
                         color: isImage ? Colors.blue : Colors.orange,
-                        size: 18,
+                        size: 20,
                       ),
-
                       const SizedBox(width: 10),
-
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -904,7 +899,7 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
                         onTap: () {
                           setState(() {
                             _totalFileSize -= file.size;
-                            _files.removeAt(index);
+                            _newFiles.removeAt(index);
                           });
                         },
                         child: Container(
@@ -945,7 +940,7 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
               ],
             ),
           );
-        }),
+        }).toList(),
 
         Align(
           alignment: Alignment.centerRight,
@@ -1088,13 +1083,19 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
       foregroundColor: Colors.white,
       padding:
       const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      shape:
-      RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       textStyle:
       const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
     ),
-    onPressed: onPressed,
-    child: Text(text),
+    onPressed: _submitting ? null : onPressed,
+    child: _submitting
+        ? const SizedBox(
+      width: 16,
+      height: 16,
+      child: CircularProgressIndicator(
+          strokeWidth: 2, color: Colors.white),
+    )
+        : Text(text),
   );
 
   Widget _outlineBtn(String text, VoidCallback onPressed) => OutlinedButton(
@@ -1102,11 +1103,10 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
       side: const BorderSide(color: AppTheme.border),
       padding:
       const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      shape:
-      RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       textStyle: const TextStyle(fontSize: 13),
     ),
-    onPressed: onPressed,
+    onPressed: _submitting ? null : onPressed,
     child: Text(text,
         style: const TextStyle(color: AppTheme.textSecondary)),
   );

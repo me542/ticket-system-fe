@@ -1342,7 +1342,7 @@ class _BarPainter extends CustomPainter {
       canvas.drawRRect(rect, isHov ? hovPaint : normalPaint);
 
       // Day label (show every 5th day to avoid crowding)
-      if (i % 1 == 0 || i == n - 1) {
+      if (i % 5 == 0 || i == n - 1) {
         final day = days[i].split('-').last;
         textPainter.text = TextSpan(
           text: day,

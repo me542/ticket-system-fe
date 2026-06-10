@@ -14,6 +14,8 @@ import '../models/ticket.dart';
 import 'package:ticket_system/core/services/api_update_ticket.dart';
 import '../core/services/api_remarks.dart';
 import '../core/services/api_reassigned_endorser.dart';
+import '../widgets/edit.dart';
+import '../core/services/api_edit_ticket.dart';
 
 class TicketSidebar extends StatefulWidget {
   final Ticket? ticket;
@@ -33,6 +35,7 @@ class _TicketSidebarState extends State<TicketSidebar> {
   String _currentUsername = '';
   bool _actionLoading = false;
   bool hold = false;
+  bool _showEditSidebar = false;
   bool get _isAdmin => _currentUserRole.trim().toLowerCase() == 'admin';
 
   bool get isMyTicket {
@@ -628,21 +631,50 @@ class _TicketSidebarState extends State<TicketSidebar> {
 
     return Material(
       elevation: 20,
-      child: Container(
-        width: 1100,
-        color: AppTheme.sidebarBg,
-        child: Column(
-          children: [
-            _buildHeader(ticket),
-            Expanded(
-              child: _isLoading
-                  ? _buildLoading()
-                  : _error != null
-                  ? _buildError()
-                  : _buildContent(ticket),
+      child: Stack(
+        children: [
+          Container(
+            width: 1100,
+            color: AppTheme.sidebarBg,
+            child: Column(
+              children: [
+                _buildHeader(ticket),
+                Expanded(
+                  child: _isLoading
+                      ? _buildLoading()
+                      : _error != null
+                      ? _buildError()
+                      : _buildContent(ticket),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+
+          // ── Edit Ticket overlay ───────────────────────────────────────────
+          if (_showEditSidebar && _detail != null)
+            Positioned.fill(
+              child: EditTicketSidebar(
+                ticket: ticket,
+                ticketDetail: _detail!,
+                onClose: () => setState(() => _showEditSidebar = false),
+                onUpdated: () async {
+                  // 👈 Close edit sidebar first
+                  setState(() => _showEditSidebar = false);
+
+                  // 👈 Wait a moment for the sidebar to close
+                  await Future.delayed(const Duration(milliseconds: 300));
+
+                  // 👈 Refresh ticket details from API
+                  if (mounted) {
+                    await _fetchBySR(ticket.id, syncTimer: true);
+                    _showSnackbar('Ticket details updated! ✓',
+                        color: Colors.green);
+                  }
+                },
+              ),
+            ),
+
+        ],
       ),
     );
   }
@@ -663,6 +695,10 @@ class _TicketSidebarState extends State<TicketSidebar> {
     final _isAssignedEndorser = _isEndorserRole &&
         _assignedEndorser.isNotEmpty &&
         _assignedEndorser == _currentUsername;
+
+    // Edit is allowed only for the creator, and only while the ticket has not
+    // yet been endorsed (i.e. status is still 'submitted').
+    final canEdit = _isCreator && _isSubmitted && !_isCancelled;
 
     final canCancel = !_isResolved && !_isCancelled && !_isclosed && (() {
       // Admin can always cancel
@@ -706,6 +742,52 @@ class _TicketSidebarState extends State<TicketSidebar> {
               ),
             ),
           ),
+
+          if (canEdit) ...[
+            Tooltip(
+              message: 'Edit Ticket',
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: GestureDetector(
+                  onTap: _actionLoading
+                      ? null
+                      : () => setState(() => _showEditSidebar = true),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppTheme.accent.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                          color: AppTheme.accent.withOpacity(0.5)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.edit_outlined,
+                          size: 14,
+                          color: AppTheme.accent,
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          'Edit',
+                          style: TextStyle(
+                            color: AppTheme.accent,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
 
           if (canHold) ...[
             Tooltip(
@@ -2506,7 +2588,96 @@ class _TicketSidebarState extends State<TicketSidebar> {
           );
           break;
         case 'reject':
-          result = await ApiUpdateTicket.rejectTicket(token, ticketId);
+          final rejectReasonController = TextEditingController();
+
+          final rejectReason = await showDialog<String>(
+            context: context,
+            builder: (dialogCtx) => AlertDialog(
+              backgroundColor: AppTheme.surface,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              title: Row(
+                children: const [
+                  Icon(Icons.thumb_down_alt_outlined,
+                      color: Colors.redAccent, size: 20),
+                  SizedBox(width: 8),
+                  Text(
+                    'Reject Ticket',
+                    style: TextStyle(
+                        color: AppTheme.textPrimary, fontSize: 16),
+                  ),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Please provide a reason for rejection:',
+                    style: TextStyle(
+                        color: AppTheme.textSecondary, fontSize: 13),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: rejectReasonController,
+                    maxLines: 3,
+                    autofocus: true,
+                    style: const TextStyle(
+                        color: AppTheme.textPrimary, fontSize: 13),
+                    decoration: InputDecoration(
+                      hintText: 'Enter rejection reason…',
+                      hintStyle: const TextStyle(
+                          color: AppTheme.textMuted, fontSize: 13),
+                      filled: true,
+                      fillColor: AppTheme.sidebarBg,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide:
+                        const BorderSide(color: AppTheme.border),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide:
+                        const BorderSide(color: AppTheme.border),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(
+                            color: Colors.redAccent, width: 1.5),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogCtx),
+                  child: const Text('Close',
+                      style: TextStyle(color: AppTheme.textMuted)),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.redAccent,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onPressed: () {
+                    final value = rejectReasonController.text.trim();
+                    if (value.isEmpty) return;
+                    Navigator.pop(dialogCtx, value);
+                  },
+                  child: const Text('Reject'),
+                ),
+              ],
+            ),
+          );
+
+          if (rejectReason == null || rejectReason.isEmpty) return;
+
+          result = await ApiUpdateTicket.cancelTicket(token, ticketId, rejectReason);
           _showSnackbar(
             result['message'] ?? 'Ticket rejected',
             color: Colors.redAccent,
