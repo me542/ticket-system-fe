@@ -33,9 +33,13 @@ class ApiTicket {
       case 'xlsx':
         return MediaType('application',
             'vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      case 'xls':                                          // ← add
+        return MediaType('application', 'vnd.ms-excel');  // ← add
       case 'docx':
         return MediaType('application',
             'vnd.openxmlformats-officedocument.wordprocessingml.document');
+      case 'doc':                                          // ← add
+        return MediaType('application', 'msword');        // ← add
       default:
         return MediaType('application', 'octet-stream');
     }
@@ -53,7 +57,7 @@ class ApiTicket {
     required String endorser,
     String assignee = '',
     String approver = '',
-    PlatformFile? file, required List<PlatformFile> files,
+    required List<PlatformFile> files,
   }) async {
     try {
       final token = await ApiLogin.getToken();
@@ -76,21 +80,44 @@ class ApiTicket {
       request.fields['approver']    = approver;
 
       // ✅ Explicitly set Content-Type so backend validation passes
-      if (file != null && file.bytes != null) {
+      // Upload ALL selected files
+      for (final file in files) {
+        if (file.bytes == null) {
+          debugPrint('⚠️ Skipping ${file.name} because bytes are null');
+          continue;
+        }
+
         final mime = _mimeType(file.extension);
 
-        debugPrint('📎 Attaching: ${file.name} | ext: ${file.extension} | mime: $mime');
+        debugPrint(
+          '📎 Attaching: ${file.name} '
+              '| size: ${file.size} '
+              '| ext: ${file.extension} '
+              '| mime: $mime',
+        );
 
         request.files.add(
           http.MultipartFile.fromBytes(
-            'attachments',
+            'attachments', // backend field name
             file.bytes!,
             filename: file.name,
-            contentType: mime,   // ✅ this was missing — backend was getting empty Content-Type
+            contentType: mime,
           ),
         );
       }
+      debugPrint('═══════════════════════════════');
+      debugPrint('Creating ticket...');
+      debugPrint('Files attached: ${request.files.length}');
 
+      for (final f in request.files) {
+        debugPrint(
+          'FILE => ${f.filename} '
+              '| length=${f.length} '
+              '| type=${f.contentType}',
+        );
+      }
+
+      debugPrint('═══════════════════════════════');
       final streamedResponse = await request.send();
       final resBody = await streamedResponse.stream.bytesToString();
 
