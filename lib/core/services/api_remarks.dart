@@ -4,10 +4,10 @@ import 'package:http/http.dart' as http;
 import 'api_login.dart';
 
 class ApiRemarks {
-  //static const String _baseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://localhost:8080') + '/api/user';
+  static const String _baseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://localhost:8080') + '/api/user';
 
   // Prod
-  static const String _baseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://idiyanale-be.bakawan-ai.com') + '/api/user';
+  //static const String _baseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://idiyanale-be.bakawan-ai.com') + '/api/user';
 
 
   // ─── Fetch all remarks for a ticket ──────────────────────────────────────
@@ -55,7 +55,7 @@ class ApiRemarks {
     required String ticketId,
     required String userId,
     required String message,
-    String username = '',
+    String username = '', required String attachmentId, required String attachmentName,
   }) async {
     if (ticketId.isEmpty || userId.isEmpty || message.trim().isEmpty) {
       throw ArgumentError('ticketId, userId, and message are required');

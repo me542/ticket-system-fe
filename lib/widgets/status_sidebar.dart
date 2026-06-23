@@ -5,6 +5,8 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
+import 'package:file_picker/file_picker.dart';
+import 'package:universal_html/html.dart' as html;
 import '../core/services/api_attachment.dart';
 import '../core/services/api_file.dart';
 import '../core/services/api_login.dart';
@@ -63,6 +65,14 @@ class _TicketSidebarState extends State<TicketSidebar> {
   bool _postingRemark = false;
   final TextEditingController _remarkCtrl = TextEditingController();
   final ScrollController _remarkScroll = ScrollController();
+
+  // ─── remark attachments (multi) ────────────────────────────────────────────
+  // Each entry: { 'bytes': Uint8List, 'name': String, 'isImage': bool }
+  final List<Map<String, dynamic>> _pendingAttachments = [];
+
+  // Local bytes cache: keyed by attachmentId OR a temp key like "local_<filename>"
+  // so images render instantly without a round-trip to S3.
+  final Map<String, Uint8List> _attachmentBytesCache = {};
 
   // ─── lifecycle ─────────────────────────────────────────────────────────────
 
@@ -451,7 +461,7 @@ class _TicketSidebarState extends State<TicketSidebar> {
 
   Future<void> _postRemark(String ticketId) async {
     final msg = _remarkCtrl.text.trim();
-    if (msg.isEmpty) return;
+    if (msg.isEmpty && _pendingAttachments.isEmpty) return;
 
     String userId = (_detail?['user_id'] ?? _detail?['id'] ?? '').toString();
 
@@ -473,29 +483,66 @@ class _TicketSidebarState extends State<TicketSidebar> {
     }
 
     if (userId.isEmpty || userId == 'null') {
-      _showSnackbar(
-        'Could not determine user ID. Please re-login.',
-        color: Colors.redAccent,
-      );
+      _showSnackbar('Could not determine user ID. Please re-login.',
+          color: Colors.redAccent);
       return;
     }
 
     setState(() => _postingRemark = true);
 
+    // Snapshot the list before any async work
+    final List<Map<String, dynamic>> attachSnap =
+    List.of(_pendingAttachments);
+
     try {
-      await ApiRemarks.postRemark(
-        ticketId: ticketId,
-        userId: userId,
-        username: _currentUsername,
-        message: msg,
-      );
+      // ── Upload all attachments in parallel ────────────────────────────────
+      final List<({String id, String name})> uploaded = [];
+
+      await Future.wait(attachSnap.map((att) async {
+        final Uint8List bytes = att['bytes'] as Uint8List;
+        final String name = att['name'] as String;
+
+        String? id = await _uploadRemarkAttachment(bytes, name);
+        final cacheKey = id ?? 'local_$name';
+        _attachmentBytesCache[cacheKey] = bytes;
+        id ??= cacheKey;
+
+        uploaded.add((id: id, name: name));
+      }));
+
+      // ── Post one remark per attachment + optional text on the first ───────
+      // message is required by the API — use text if provided, else filename.
+      if (uploaded.isEmpty) {
+        // Text-only remark
+        await ApiRemarks.postRemark(
+          ticketId: ticketId,
+          userId: userId,
+          username: _currentUsername,
+          message: msg, attachmentId: '', attachmentName: '',
+        );
+      } else {
+        for (int i = 0; i < uploaded.length; i++) {
+          // First attachment carries the typed text (if any);
+          // subsequent ones use their filename so message is never blank.
+          final remarkMsg = (i == 0 && msg.isNotEmpty)
+              ? msg
+              : uploaded[i].name;
+
+          await ApiRemarks.postRemark(
+            ticketId: ticketId,
+            userId: userId,
+            username: _currentUsername,
+            message: remarkMsg,
+            attachmentId: uploaded[i].id,
+            attachmentName: uploaded[i].name,
+          );
+        }
+      }
 
       _remarkCtrl.clear();
+      setState(() => _pendingAttachments.clear());
 
-      // ❌ REMOVE THIS (causes jump)
-      // _scrollRemarksToBottom();
-
-      await _fetchRemarks(ticketId); // this will handle scroll properly
+      await _fetchRemarks(ticketId);
     } catch (e) {
       _showSnackbar(
         e.toString().replaceFirst('Exception: ', ''),
@@ -504,6 +551,88 @@ class _TicketSidebarState extends State<TicketSidebar> {
     } finally {
       if (mounted) setState(() => _postingRemark = false);
     }
+  }
+
+  /// Uploads bytes to S3 via the backend and returns the attachment ID.
+  /// Returns null (silently) on localhost/S3 failures — caller uses local cache.
+  Future<String?> _uploadRemarkAttachment(
+      Uint8List bytes, String fileName) async {
+    try {
+      final token = await ApiLogin.getToken();
+      if (token == null || token.isEmpty) {
+        throw const AttachmentUnauthorizedException();
+      }
+
+      final baseUrl = const String.fromEnvironment(
+        'API_BASE_URL',
+        defaultValue: 'http://localhost:8080',
+      );
+
+      final uri = Uri.parse('$baseUrl/api/user/attachments');
+      final request = http.MultipartRequest('POST', uri)
+        ..headers['Authorization'] = 'Bearer $token'
+        ..files.add(http.MultipartFile.fromBytes(
+          'file',
+          bytes,
+          filename: fileName,
+        ));
+
+      final streamed = await request.send();
+      final response = await http.Response.fromStream(streamed);
+
+      debugPrint('📎 Upload response [${response.statusCode}]: ${response.body}');
+
+      if (response.statusCode != 200 && response.statusCode != 201) {
+        // Don't show snackbar — caller will fall back to local cache
+        debugPrint('⚠️ Attachment upload HTTP ${response.statusCode}');
+        return null;
+      }
+
+      final decoded = jsonDecode(response.body);
+      // Try every field name the backend might use
+      final id = decoded['data']?['id']?.toString()
+          ?? decoded['data']?['attachment_id']?.toString()
+          ?? decoded['data']?['file_id']?.toString()
+          ?? decoded['id']?.toString()
+          ?? decoded['attachment_id']?.toString()
+          ?? decoded['file_id']?.toString();
+
+      debugPrint('📎 Attachment uploaded — id: $id');
+      return id;
+    } catch (e) {
+      debugPrint('⚠️ Attachment upload error: $e');
+      return null; // graceful — local cache will be used
+    }
+  }
+
+  /// Opens the file picker allowing multiple files; appends to pending list.
+  Future<void> _pickAttachment() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: [
+        'jpg', 'jpeg', 'png', 'gif', 'webp',
+        'pdf', 'docx', 'xlsx', 'txt',
+      ],
+      allowMultiple: true,
+      withData: true,
+    );
+
+    if (result == null || result.files.isEmpty) return;
+
+    final newItems = result.files
+        .where((f) => f.bytes != null)
+        .map((f) {
+      final ext = (f.extension ?? '').toLowerCase();
+      return {
+        'bytes': f.bytes!,
+        'name': f.name,
+        'isImage': ['jpg', 'jpeg', 'png', 'gif', 'webp'].contains(ext),
+      };
+    })
+        .toList();
+
+    if (newItems.isEmpty) return;
+    setState(() => _pendingAttachments.addAll(newItems));
   }
 
   void _scrollRemarksToBottom() {
@@ -3006,12 +3135,221 @@ class _TicketSidebarState extends State<TicketSidebar> {
 
           const Divider(height: 1, color: AppTheme.border),
 
+          // ── Pending attachments tray (scrollable horizontal chips) ─────────
+          if (_pendingAttachments.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 10, 10, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Label row
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      children: [
+                        Text(
+                          '${_pendingAttachments.length} file${_pendingAttachments.length > 1 ? 's' : ''} attached',
+                          style: const TextStyle(
+                            color: AppTheme.textMuted,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const Spacer(),
+                        GestureDetector(
+                          onTap: () => setState(() => _pendingAttachments.clear()),
+                          child: const Text(
+                            'Clear all',
+                            style: TextStyle(
+                              color: Colors.redAccent,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Horizontal scroll of thumbnails
+                  SizedBox(
+                    height: 72,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _pendingAttachments.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 8),
+                      itemBuilder: (_, i) {
+                        final att = _pendingAttachments[i];
+                        final isImg = att['isImage'] as bool;
+                        final name = att['name'] as String;
+                        final bytes = att['bytes'] as Uint8List;
+
+                        return Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            // Thumbnail / file icon
+                            Container(
+                              width: 72,
+                              height: 72,
+                              decoration: BoxDecoration(
+                                color: AppTheme.sidebarBg,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                    color: Colors.blue.withOpacity(0.35)),
+                              ),
+                              clipBehavior: Clip.antiAlias,
+                              child: isImg
+                                  ? Image.memory(bytes,
+                                  fit: BoxFit.cover,
+                                  width: 72,
+                                  height: 72)
+                                  : Column(
+                                mainAxisAlignment:
+                                MainAxisAlignment.center,
+                                children: [
+                                  const Icon(
+                                    Icons.insert_drive_file_outlined,
+                                    color: Colors.blue,
+                                    size: 26,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 4),
+                                    child: Text(
+                                      name.split('.').last.toUpperCase(),
+                                      style: const TextStyle(
+                                        color: Colors.blue,
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            // × remove badge
+                            Positioned(
+                              top: -6,
+                              right: -6,
+                              child: GestureDetector(
+                                onTap: () =>
+                                    setState(() => _pendingAttachments.removeAt(i)),
+                                child: Container(
+                                  width: 18,
+                                  height: 18,
+                                  decoration: BoxDecoration(
+                                    color: Colors.redAccent,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                        color: AppTheme.surface, width: 1.5),
+                                  ),
+                                  child: const Icon(Icons.close,
+                                      size: 10, color: Colors.white),
+                                ),
+                              ),
+                            ),
+                            // Filename tooltip on hover / long-press
+                            Positioned(
+                              bottom: 0,
+                              left: 0,
+                              right: 0,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 3, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.black54,
+                                  borderRadius: const BorderRadius.only(
+                                    bottomLeft: Radius.circular(8),
+                                    bottomRight: Radius.circular(8),
+                                  ),
+                                ),
+                                child: Text(
+                                  name,
+                                  style: const TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 8,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
           // ── Input box ─────────────────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.all(10),
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
+                // ── Attachment button (with count badge) ────────────────────
+                Tooltip(
+                  message: 'Attach files or images',
+                  child: GestureDetector(
+                    onTap: _postingRemark ? null : _pickAttachment,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Container(
+                          width: 38,
+                          height: 48,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: _pendingAttachments.isNotEmpty
+                                ? Colors.blue.withOpacity(0.18)
+                                : AppTheme.sidebarBg,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: _pendingAttachments.isNotEmpty
+                                  ? Colors.blue.withOpacity(0.6)
+                                  : AppTheme.border,
+                            ),
+                          ),
+                          child: Icon(
+                            Icons.attach_file_rounded,
+                            size: 18,
+                            color: _pendingAttachments.isNotEmpty
+                                ? Colors.blue
+                                : AppTheme.textMuted,
+                          ),
+                        ),
+                        // Count badge
+                        if (_pendingAttachments.isNotEmpty)
+                          Positioned(
+                            top: -6,
+                            right: -6,
+                            child: Container(
+                              padding: const EdgeInsets.all(3),
+                              constraints: const BoxConstraints(
+                                  minWidth: 16, minHeight: 16),
+                              decoration: const BoxDecoration(
+                                color: Colors.blue,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Text(
+                                '${_pendingAttachments.length}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                const SizedBox(width: 8),
+
                 Expanded(
                   child: TextField(
                     controller: _remarkCtrl,
@@ -3065,7 +3403,7 @@ class _TicketSidebarState extends State<TicketSidebar> {
                   onTap: () => _postRemark(ticketId),
                   child: Container(
                     width: 38,
-                    height: 38,
+                    height: 48,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       color: Colors.blue,
@@ -3087,10 +3425,46 @@ class _TicketSidebarState extends State<TicketSidebar> {
   }
 
   Widget _buildRemarkBubble(Map<String, dynamic> remark) {
-    final message = remark['message']?.toString() ?? '';
+    String message = remark['message']?.toString() ?? '';
     final remarkUserId = remark['user_id']?.toString() ?? '';
     final username = remark['username']?.toString() ?? '';
     final createdAt = remark['created_at']?.toString() ?? '';
+
+    // ── Resolve attachment fields — try every key the backend might use ──────
+    final rawAttachId = remark['attachment_id']?.toString()
+        ?? remark['file_id']?.toString()
+        ?? remark['fileId']?.toString()
+        ?? remark['attachment']?['id']?.toString();
+
+    final rawAttachName = remark['attachment_name']?.toString()
+        ?? remark['file_name']?.toString()
+        ?? remark['fileName']?.toString()
+        ?? remark['attachment']?['name']?.toString()
+        ?? remark['attachment']?['file_name']?.toString();
+
+    // ── Detect when the backend stored filename as message text ──────────────
+    // e.g. "1000009771.png" — treat it as an attachment, clear message text
+    final _filenamePattern = RegExp(
+        r'^[\w\-. ]+\.(png|jpg|jpeg|gif|webp|pdf|docx|xlsx|txt)$',
+        caseSensitive: false);
+
+    String? attachId = rawAttachId;
+    String? attachName = rawAttachName;
+
+    if (attachId == null && _filenamePattern.hasMatch(message.trim())) {
+      // Message IS the filename — check local cache by name
+      final localKey = 'local_${message.trim()}';
+      if (_attachmentBytesCache.containsKey(localKey)) {
+        attachId = localKey;
+        attachName = message.trim();
+        message = ''; // don't show filename as chat text
+      } else {
+        // Not in cache — show it as a non-clickable file chip using name only
+        attachName = message.trim();
+        attachId = ''; // signal: show chip but can't fetch
+        message = '';
+      }
+    }
 
     // Match on username first, fall back to user_id vs detail id
     bool isMe = false;
@@ -3202,13 +3576,36 @@ class _TicketSidebarState extends State<TicketSidebar> {
                         bottomRight: Radius.circular(isMe ? 3 : 16),
                       ),
                     ),
-                    child: SelectableText(
-                      message,
-                      style: TextStyle(
-                        color: isMe ? Colors.white : Colors.white,
-                        fontSize: 13,
-                        height: 1.45,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: isMe
+                          ? CrossAxisAlignment.end
+                          : CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // ── Attachment (image or file chip) ─────────────────
+                        if (attachName != null && attachName.isNotEmpty)
+                          _buildRemarkAttachment(
+                            attachId ?? '',
+                            attachName,
+                            isMe: isMe,
+                          ),
+
+                        // ── Text message ────────────────────────────────────
+                        if (message.isNotEmpty)
+                          Padding(
+                            padding: (attachName != null && attachName.isNotEmpty)
+                                ? const EdgeInsets.only(top: 6)
+                                : EdgeInsets.zero,
+                            child: SelectableText(
+                              message,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                                height: 1.45,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 ),
@@ -3232,6 +3629,245 @@ class _TicketSidebarState extends State<TicketSidebar> {
         ],
       ),
     );
+  }
+
+  /// Renders an attachment inside a remark bubble.
+  ///
+  /// Priority order for image data:
+  ///   1. Local bytes cache (instant — works on localhost)
+  ///   2. _AuthImage → fetches presigned S3 URL via backend (live server)
+  ///
+  /// A View / Download action bar is always shown below images.
+  Widget _buildRemarkAttachment(
+      String attachmentId, String attachmentName, {required bool isMe}) {
+    final ext = attachmentName.split('.').last.toLowerCase();
+    final isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].contains(ext);
+    final canFetch = attachmentId.isNotEmpty && !attachmentId.startsWith('local_');
+    final cachedBytes = _attachmentBytesCache[attachmentId];
+
+    if (isImage) {
+      return Column(
+        crossAxisAlignment:
+        isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // ── Image preview ─────────────────────────────────────────────────
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: cachedBytes != null
+            // Fast path: render directly from memory
+                ? Image.memory(
+              cachedBytes,
+              width: 220,
+              height: 160,
+              fit: BoxFit.cover,
+            )
+                : canFetch
+            // Slow path: fetch presigned URL from backend
+                ? SizedBox(
+              width: 220,
+              child: _AuthImage(url: attachmentId, height: 160),
+            )
+            // No data at all
+                : Container(
+              width: 220,
+              height: 100,
+              color: Colors.white10,
+              child: const Center(
+                child: Icon(Icons.broken_image,
+                    color: Colors.white38, size: 32),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 6),
+
+          // ── Action bar: View + Download ───────────────────────────────────
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // View — blob URL from cache (works on localhost), else presigned
+              _attachActionBtn(
+                icon: Icons.open_in_new,
+                label: 'View',
+                onTap: () {
+                  if (cachedBytes != null) {
+                    _viewBytesInNewTab(cachedBytes, attachmentName);
+                  } else if (canFetch) {
+                    ApiAttachment.viewFile(attachmentId, attachmentName);
+                  }
+                },
+              ),
+              const SizedBox(width: 6),
+
+              // Download — blob URL from cache, else presigned S3
+              _attachActionBtn(
+                icon: Icons.download_outlined,
+                label: 'Download',
+                onTap: () async {
+                  if (cachedBytes != null) {
+                    _downloadBytesDirectly(cachedBytes, attachmentName);
+                  } else if (canFetch) {
+                    await ApiAttachment.downloadFile(
+                        attachmentId, attachmentName);
+                  }
+                },
+              ),
+            ],
+          ),
+        ],
+      );
+    }
+
+    // ── Non-image: file chip ──────────────────────────────────────────────────
+    return Column(
+      crossAxisAlignment:
+      isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.white.withOpacity(0.2)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.insert_drive_file_outlined,
+                  color: Colors.white70, size: 18),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  attachmentName,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 6),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _attachActionBtn(
+              icon: Icons.open_in_new,
+              label: 'View',
+              onTap: () {
+                if (cachedBytes != null) {
+                  _viewBytesInNewTab(cachedBytes, attachmentName);
+                } else if (canFetch) {
+                  ApiAttachment.viewFile(attachmentId, attachmentName);
+                }
+              },
+            ),
+            const SizedBox(width: 6),
+            _attachActionBtn(
+              icon: Icons.download_outlined,
+              label: 'Download',
+              onTap: () async {
+                if (cachedBytes != null) {
+                  _downloadBytesDirectly(cachedBytes, attachmentName);
+                } else if (canFetch) {
+                  await ApiAttachment.downloadFile(attachmentId, attachmentName);
+                }
+              },
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// Small action button used in the image attachment action bar.
+  Widget _attachActionBtn({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: Colors.white.withOpacity(0.2)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 13, color: Colors.white70),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Opens bytes in a new browser tab using a blob URL.
+  /// Works on localhost — no server round-trip needed.
+  void _viewBytesInNewTab(Uint8List bytes, String fileName) {
+    try {
+      final mimeType = _mimeFromExtension(fileName.split('.').last.toLowerCase());
+      final blob = html.Blob([bytes], mimeType);
+      final blobUrl = html.Url.createObjectUrlFromBlob(blob);
+      html.window.open(blobUrl, '_blank');
+      // Revoke after a delay to allow the tab to load
+      Future.delayed(const Duration(seconds: 10),
+              () => html.Url.revokeObjectUrl(blobUrl));
+    } catch (e) {
+      debugPrint('⚠️ View in new tab error: $e');
+    }
+  }
+
+  /// Downloads bytes directly in the browser without a server round-trip.
+  /// Used when the image is still only in local memory (localhost dev).
+  void _downloadBytesDirectly(Uint8List bytes, String fileName) {
+    try {
+      final mimeType = _mimeFromExtension(fileName.split('.').last.toLowerCase());
+      final blob = html.Blob([bytes], mimeType);
+      final blobUrl = html.Url.createObjectUrlFromBlob(blob);
+      final anchor = html.AnchorElement(href: blobUrl)
+        ..setAttribute('download', fileName)
+        ..style.display = 'none';
+      html.document.body!.append(anchor);
+      anchor.click();
+      anchor.remove();
+      Future.delayed(const Duration(seconds: 2),
+              () => html.Url.revokeObjectUrl(blobUrl));
+    } catch (e) {
+      debugPrint('⚠️ Direct download error: $e');
+    }
+  }
+
+  static String _mimeFromExtension(String ext) {
+    switch (ext) {
+      case 'jpg':
+      case 'jpeg': return 'image/jpeg';
+      case 'png':  return 'image/png';
+      case 'gif':  return 'image/gif';
+      case 'webp': return 'image/webp';
+      case 'pdf':  return 'application/pdf';
+      case 'docx': return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      case 'xlsx': return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      case 'txt':  return 'text/plain';
+      default:     return 'application/octet-stream';
+    }
   }
 
   // ─── shared widgets ────────────────────────────────────────────────────────
