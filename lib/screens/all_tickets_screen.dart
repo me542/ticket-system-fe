@@ -52,7 +52,7 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
 
   // ── Status Filter ─────────────────────────────────────────
   String _selectedFilter = 'All';
-  final List<String> _filters = ['All', 'For Endorsement', 'For Approval', 'For Assignment ', 'In Progress', 'Resolved', 'Cancelled'];
+  final List<String> _filters = ['All', 'For Endorsement', 'For Approval', 'For Assignment', 'In Progress', 'Resolved', 'Cancelled'];
 
   // ── Column Filters ────────────────────────────────────────
   final Map<String, String> _colFilters = {
@@ -144,15 +144,16 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
       const map = {
         'For Endorsement':       'for endorsement',
         'For Approval':       'for approval',
-        'For Assignment':       'for Assignment',
+        'For Assignment':       'for assignment',
         'In Progress':        'in progress',
         'Resolved':  'resolved',
         'Cancelled': 'cancelled',
       };
-      final prefix = map[_selectedFilter] ?? '';
+      final key = _selectedFilter.trim();
+      final prefix = map[key] ?? '';
       list = list
           .where((r) =>
-          (r['status'] ?? '').toString().toLowerCase().startsWith(prefix))
+          (r['status'] ?? '').toString().toLowerCase().contains(prefix))
           .toList();
     }
 
@@ -352,8 +353,8 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
 
       const headers = [
         'Ticket ID', 'Creator', 'Category', 'Subcategory',  'Subject', 'Institution',
-        'Type', 'Description', 'Priority', 'Assignee', 'Endorser',
-        'Approver', 'Status', 'Created At', 'Updated At',
+        'Type', 'Description', 'Priority', 'Assignee', 'Endorser', 'Endorsed At',
+        'Approver', 'Approved At', 'Status', 'Created At', 'Updated At',
         'Cancelled By', 'Cancelled At', 'Started At',
         'Resolved At', 'Resolution Minutes',
       ];
@@ -379,7 +380,9 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
           r['priority']?.toString() ?? '',
           r['assignee']           ?? '',
           r['endorser']           ?? '',
+          r['endorsed_at'] ?? '',
           r['approver']           ?? '',
+          r['approved_at'] ?? '',
           r['status']             ?? '',
           r['created_at']         ?? '',
           r['updated_at']         ?? '',
@@ -918,7 +921,9 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
       _ColDef('Priority',           'priority',            90, true),
       _ColDef('Assignee',           'assignee',           120, true),
       _ColDef('Endorser',           'endorser',           120, true),
+      _ColDef('Endorsed At', 'endorsed_at', 160, false),
       _ColDef('Approver',           'approver',           120, true),
+      _ColDef('Approved At', 'approved_at', 160, false),
       _ColDef('Created At',         'created_at',         160, true),
       _ColDef('Updated At',         'updated_at',         160, true),
       _ColDef('Cancelled By',       'cancelled_by',       120, true),

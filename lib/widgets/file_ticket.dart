@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import '../core/services/api_file.dart';
 import '../core/services/api_login.dart';
@@ -66,6 +67,7 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
     _loadUsers();
     _loadCategories();
     _descCtrl.addListener(_onDescChanged);
+    _subjectCtrl.text = "BAKAWAN: Requesting for ";
   }
 
   @override
@@ -658,7 +660,7 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
                     height: 70,
                     child: _fieldInput(
                       controller: _subjectCtrl,
-                      hint: 'Brief summary of the issue...',
+                      // hint: 'Brief summary of the issue...',
                     ),
                   ),
                 ),
@@ -738,6 +740,10 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
                         controller: _descCtrl,
                         minLines: 12,
                         maxLines: null,
+                        // Allow all characters including special characters
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(RegExp(r'[\s\S]')),
+                        ],
                         onChanged: (_) {
                           // Mark as manually edited so switching sub
                           // doesn't silently wipe their work
@@ -1020,6 +1026,10 @@ class _CreateTicketSidebarState extends State<CreateTicketSidebar> {
       TextField(
         controller: controller,
         style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
+        // Allow all characters including special characters (@, #, /, -, &, etc.)
+        inputFormatters: [
+          FilteringTextInputFormatter.allow(RegExp(r'[\s\S]')),
+        ],
         decoration: InputDecoration(
           hintText: hint,
           hintStyle:

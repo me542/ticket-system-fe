@@ -178,6 +178,8 @@ class ApiTicket {
               'cancelled_at':       t['cancelled_at'],
               'started_at':         t['started_at'],
               'resolved_at':        t['resolved_at'],
+              'endorsed_at':        t['endorsed_at'],
+              'approved_at':        t['approved_at'],
               'resolution_minutes': t['resolution_minutes']  ?? '',
               'resolution_time':    t['resolution_time']     ?? '',
             };

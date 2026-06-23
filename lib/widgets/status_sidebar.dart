@@ -571,6 +571,21 @@ class _TicketSidebarState extends State<TicketSidebar> {
         return _rawStatus.replaceAll(' ', '');
     }
   }
+  /// Formats an ISO timestamp string into "Jun 12, 2025  2:30 PM".
+  /// Returns null if the raw value is empty/—/unparseable.
+  String? _formatTimestamp(String raw) {
+    if (raw.isEmpty || raw == '—') return null;
+    final dt = DateTime.tryParse(raw)?.toLocal();
+    if (dt == null) return null;
+
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    final h12 = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+    final ampm = dt.hour < 12 ? 'AM' : 'PM';
+    return '${months[dt.month - 1]} ${dt.day}, ${dt.year}  $h12:${_p(dt.minute)} $ampm';
+  }
 
   bool get _isSubmitted => _normalizedStatus == 'submitted';
   bool get _isEndorsed => _normalizedStatus == 'endorsed';
@@ -1706,6 +1721,12 @@ class _TicketSidebarState extends State<TicketSidebar> {
     final resolverName  = assigneeName;
     final submitterName = _field(['username', 'submitter', 'created_by'],
         fallback: widget.ticket?.submitter ?? '');
+    final endorsedAtStr = _formatTimestamp(_field(['endorser_at', 'endorsed_at', 'endorse_at']));
+    final approvedAtStr = _formatTimestamp(_field(['approver_at', 'approved_at', 'approve_at']));
+    final assignedAtStr = _formatTimestamp(_field(['assigned_at', 'assignee_at', 'grab_at']));
+    final resolvedAtStr = _formatTimestamp(_field(['resolved_at']));
+    final closedAtStr   = _formatTimestamp(_field(['closed_at', 'close_at']));
+    final cancelledAtStr = _formatTimestamp(_field(['cancelled_at', 'canceled_at', 'cancel_at', 'updated_at']));
 
     // ── Derive "was done before cancel" flags ──────────────────────────────
     final hadEndorser   = _field(['endorser', 'endorser_name', 'endorsed_by']) != '—';
@@ -1780,6 +1801,9 @@ class _TicketSidebarState extends State<TicketSidebar> {
             statusColor: cancelledAtStep == 'endorse'
                 ? Colors.redAccent
                 : (endorseDone ? Colors.green : Colors.orange),
+            timestamp: cancelledAtStep == 'endorse'
+                ? cancelledAtStr
+                : (endorseDone ? endorsedAtStr : null),
           ),
 
           Divider(color: Colors.grey.shade800),
@@ -1802,6 +1826,9 @@ class _TicketSidebarState extends State<TicketSidebar> {
                 : (approveDone
                 ? Colors.green
                 : Colors.grey.shade600),
+            timestamp: cancelledAtStep == 'approve'
+                ? cancelledAtStr
+                : (approveDone ? approvedAtStr : null),
           ),
 
           Divider(color: Colors.grey.shade800),
@@ -1824,6 +1851,9 @@ class _TicketSidebarState extends State<TicketSidebar> {
                 : (assignDone
                 ? Colors.green
                 : Colors.grey.shade600),
+            timestamp: cancelledAtStep == 'assign'
+                ? cancelledAtStr
+                : (assignDone ? assignedAtStr : null),
           ),
 
           Divider(color: Colors.grey.shade800),
@@ -1847,6 +1877,9 @@ class _TicketSidebarState extends State<TicketSidebar> {
                 : (resolveDone
                 ? Colors.teal
                 : Colors.grey.shade600),
+            timestamp: cancelledAtStep == 'resolve'
+                ? cancelledAtStr
+                : (resolveDone ? resolvedAtStr : null),
           ),
 
           Divider(color: Colors.grey.shade800),
@@ -1872,6 +1905,9 @@ class _TicketSidebarState extends State<TicketSidebar> {
             overrideAvatarColor: resolveDone && !closeDone && !_isCancelled
                 ? Colors.indigo.shade400
                 : null,
+            timestamp: cancelledAtStep == 'close'
+                ? cancelledAtStr
+                : (closeDone ? closedAtStr : null),
           ),
         ],
       ),
@@ -1888,6 +1924,7 @@ class _TicketSidebarState extends State<TicketSidebar> {
     required Color statusColor,
     bool isCancelledHere = false,   // ← ADD THIS
     Color? overrideAvatarColor,
+    String? timestamp,
   })
 
   {
@@ -1940,6 +1977,16 @@ class _TicketSidebarState extends State<TicketSidebar> {
                   role,
                   style: const TextStyle(color: Colors.grey, fontSize: 11),
                 ),
+                if (timestamp != null && timestamp.isNotEmpty) ...[   // 👈 ADD THIS BLOCK
+                  const SizedBox(height: 2),
+                  Text(
+                    timestamp,
+                    style: const TextStyle(
+                      color: AppTheme.textMuted,
+                      fontSize: 10,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -2033,6 +2080,37 @@ class _TicketSidebarState extends State<TicketSidebar> {
         role == 'resolver' ||
             role.startsWith('resolver') ||
             role.contains('resolv');
+
+    // ── CREATOR — close after resolved (applies regardless of role) ───────────
+    // Must run before the role-specific branches below, otherwise an
+    // endorser/approver/resolver who also happens to be the creator gets
+    // routed into their role's logic and never sees the Close button.
+    if (_isCreator && _isResolved && !_isclosed) {
+      return _actionCard(
+        debugLabel: 'creator · can close (role: $role)',
+        children: [
+          _actionBtn(
+            label: 'Close Ticket',
+            icon: Icons.lock_outline,
+            color: Colors.indigo,
+            onTap: () => _confirmAndAct('close', ticket.id),
+          ),
+        ],
+      );
+    }
+
+    if (_isCreator && _isclosed) {
+      return _actionCard(
+        children: [
+          const Icon(Icons.lock, color: Colors.indigo, size: 18),
+          const SizedBox(width: 8),
+          const Text(
+            'You have closed this ticket.',
+            style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
+          ),
+        ],
+      );
+    }
 
     // ── Cancelled ────────────────────────────────────────────────────────────
     if (_isCancelled) {
@@ -2350,33 +2428,33 @@ class _TicketSidebarState extends State<TicketSidebar> {
       );
     }
 
-    // ── SUBMITTER — close after resolved ─────────────────────────────────────
-    if (_isCreator && _isResolved && !_isclosed) {
-      return _actionCard(
-        debugLabel: 'submitter · can close',
-        children: [
-          _actionBtn(
-            label: 'Close Ticket',
-            icon: Icons.lock_outline,
-            color: Colors.indigo,
-            onTap: () => _confirmAndAct('close', ticket.id),
-          ),
-        ],
-      );
-    }
-
-    if (_isCreator && _isclosed) {
-      return _actionCard(
-        children: [
-          const Icon(Icons.lock, color: Colors.indigo, size: 18),
-          const SizedBox(width: 8),
-          const Text(
-            'You have closed this ticket.',
-            style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
-          ),
-        ],
-      );
-    }
+    // // ── SUBMITTER — close after resolved ─────────────────────────────────────
+    // if (_isCreator && _isResolved && !_isclosed) {
+    //   return _actionCard(
+    //     debugLabel: 'submitter · can close',
+    //     children: [
+    //       _actionBtn(
+    //         label: 'Close Ticket',
+    //         icon: Icons.lock_outline,
+    //         color: Colors.indigo,
+    //         onTap: () => _confirmAndAct('close', ticket.id),
+    //       ),
+    //     ],
+    //   );
+    // }
+    //
+    // if (_isCreator && _isclosed) {
+    //   return _actionCard(
+    //     children: [
+    //       const Icon(Icons.lock, color: Colors.indigo, size: 18),
+    //       const SizedBox(width: 8),
+    //       const Text(
+    //         'You have closed this ticket.',
+    //         style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
+    //       ),
+    //     ],
+    //   );
+    // }
 
     // ── Fallback ──────────────────────────────────────────────────────────────
     return _actionCard(
