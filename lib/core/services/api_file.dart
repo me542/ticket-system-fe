@@ -7,18 +7,18 @@ import 'package:file_picker/file_picker.dart';
 import 'api_login.dart';
 
 class ApiTicket {
-  // static const String baseUrl =
-  //     String.fromEnvironment(
-  //       'API_BASE_URL',
-  //       defaultValue: 'http://localhost:8080',
-  //     ) +
-  //         '/api/user';
+  static const String baseUrl =
+      String.fromEnvironment(
+        'API_BASE_URL',
+        defaultValue: 'http://localhost:8080',
+      ) +
+          '/api/user';
 
   // Prod
-  static const String baseUrl =
-      String.fromEnvironment('API_BASE_URL',
-          defaultValue: 'http://idiyanale-be.bakawan-ai.com') +
-          '/api/user';
+  // static const String baseUrl =
+  //     String.fromEnvironment('API_BASE_URL',
+  //         defaultValue: 'http://idiyanale-be.bakawan-ai.com') +
+  //         '/api/user';
 
   /// Maps file extension → MIME type (must match backend allowedTypes exactly)
   static MediaType _mimeType(String? extension) {
@@ -178,6 +178,8 @@ class ApiTicket {
               'cancelled_at':       t['cancelled_at'],
               'started_at':         t['started_at'],
               'resolved_at':        t['resolved_at'],
+              'endorsed_at':        t['endorsed_at'],
+              'approved_at':        t['approved_at'],
               'resolution_minutes': t['resolution_minutes']  ?? '',
               'resolution_time':    t['resolution_time']     ?? '',
             };
