@@ -55,7 +55,9 @@ class ApiRemarks {
     required String ticketId,
     required String userId,
     required String message,
-    String username = '', required String attachmentId, required String attachmentName,
+    String username = '',
+    String attachmentId = '',
+    String attachmentName = '',
   }) async {
     if (ticketId.isEmpty || userId.isEmpty || message.trim().isEmpty) {
       throw ArgumentError('ticketId, userId, and message are required');
@@ -69,7 +71,9 @@ class ApiRemarks {
       'user_id':   userId,
       'message':   message.trim(),
     };
-    if (username.isNotEmpty) body['username'] = username;
+    if (username.isNotEmpty)       body['username']        = username;
+    if (attachmentId.isNotEmpty)   body['attachment_id']   = attachmentId;
+    if (attachmentName.isNotEmpty) body['attachment_name'] = attachmentName;
 
     final res = await http.post(
       Uri.parse('$_baseUrl/ticket/remark'),
